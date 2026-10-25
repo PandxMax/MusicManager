@@ -97,3 +97,12 @@ VERSIÓN 1.05
  - Botón ✨ "Buscar portada automáticamente" (también en clic derecho de la portada y en Herramientas).
    Busca en iTunes y Deezer (sin claves) la portada en alta calidad y la pone sola en las canciones
    seleccionadas que no tengan; si eliges una sola con portada, pregunta si reemplazarla.
+
+VERSIÓN 1.06
+------------
+ - El espectrograma (con la comparación y el análisis de calidad) reemplaza a los metadatos y la letra
+   en la misma ventana. Botón "⬅ Volver a metadatos y letra" para regresar.
+ - Reproductor: botones ☰ (lista de reproducción), ⏮ anterior, ⏭ siguiente y ⏹ detener junto a ▶.
+ - Los colores del programa toman el de la portada de la canción que suena (Ver ▸ Colores según la portada).
+ - Si no se encuentra portada: se ofrece abrir Google Imágenes ("artista título portada"); al copiar la
+   imagen, el programa pregunta si ponerla. También en clic derecho de la portada.

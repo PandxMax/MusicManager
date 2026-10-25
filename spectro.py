@@ -375,7 +375,7 @@ def _badge(text, color):
     return l
 
 
-class SpectrumDialog(QDialog):
+class SpectrumDialog(QWidget):
     def __init__(self, paths, parent=None):
         super().__init__(parent)
         self.setWindowTitle("📊 Espectrograma y análisis de calidad")
@@ -526,7 +526,10 @@ class SpectrumDialog(QDialog):
         if fn:
             w.grab().save(fn, "PNG")
 
-    def closeEvent(self, e):
+    def shutdown(self):
         self.worker._stop = True
         self.worker.wait(3000)
+
+    def closeEvent(self, e):
+        self.shutdown()
         super().closeEvent(e)

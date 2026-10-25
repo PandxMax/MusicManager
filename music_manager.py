@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.05"
+APP_VERSION = "1.06"
 
 
 class TMenu(QMenu):
@@ -506,6 +506,32 @@ def parse_side(text):
     return int(t) if t.isdigit() and int(t) >= 50 else None
 
 
+def dominant_color(data, dark=True):
+    """Color vistoso predominante de una portada (para teñir el programa). None si no hay."""
+    img = QImage.fromData(data)
+    if img.isNull():
+        return None
+    img = img.scaled(40, 40, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    buckets = {}
+    for y in range(img.height()):
+        for x in range(img.width()):
+            c = QColor(img.pixel(x, y))
+            h, sat, v, _ = c.getHsvF()
+            if v < 0.18 or sat < 0.12:
+                continue
+            w = sat * (0.4 + v)
+            k = int(max(h, 0) * 12) % 12
+            b = buckets.setdefault(k, [0.0, 0.0, 0.0, 0.0])
+            b[0] += w; b[1] += w * max(h, 0); b[2] += w * sat; b[3] += w * v
+    if not buckets:
+        return None
+    b = max(buckets.values(), key=lambda t: t[0])
+    h, sat, v = b[1] / b[0], b[2] / b[0], b[3] / b[0]
+    sat = min(1.0, max(sat, 0.45))
+    v = min(1.0, max(v, 0.62)) if dark else min(0.78, max(v, 0.45))
+    return QColor.fromHsvF(h % 1.0, sat, v).name()
+
+
 def cover_dims(data):
     img = QImage.fromData(data)
     return (img.width(), img.height()) if not img.isNull() else (0, 0)
@@ -673,7 +699,7 @@ class CoverWorker(QThread):
     """Busca portadas en iTunes y Deezer (gratis y sin clave) y descarga la de mayor calidad."""
     got = pyqtSignal(str, bytes)  # ruta, imagen
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.05 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.06 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, jobs, side):
         super().__init__()
@@ -1564,6 +1590,7 @@ class Main(QMainWindow):
         lv.addWidget(self.btn_lyr)
 
         bottom = QWidget()
+        self.bottom_w = bottom
         bl = QHBoxLayout(bottom)
         bl.setContentsMargins(0, 0, 0, 0)
         bl.addWidget(meta_box)
@@ -1681,6 +1708,7 @@ class Main(QMainWindow):
         ai_scroll.setMinimumHeight(180)
         ai_scroll.setWidget(ai_box)
         rightw = QWidget()
+        self.rightw_w = rightw
         rv = QVBoxLayout(rightw)
         rv.setContentsMargins(4, 0, 0, 0)
         rv.addWidget(cover_box)        # fija: no se mueve
@@ -2175,10 +2203,19 @@ class Main(QMainWindow):
         self.vol.wheel_step = 5
         self.vol.tip_fn = lambda v: f"Volumen: {v}%"
         self.seek.tip_fn = lambda v: f"{fmt_ms(v)} / {fmt_ms(self.seek.maximum())}"
-        for w in (self.now_cover, infow, self.btn_prev, self.btn_next, self.btn_stop):
+        for w in (self.now_cover, infow):
             w.setParent(bar)   # siguen existiendo para el resto del código, pero ocultos
             w.hide()
+        self.btn_list = QPushButton("☰")
+        self.btn_list.setObjectName("tbtn")
+        self.btn_list.setToolTip("Lista de reproducción")
+        self.btn_list.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_list.clicked.connect(self.show_playlist)
+        h.addWidget(self.btn_list)
+        h.addWidget(self.btn_prev)
         h.addWidget(self.btn_play)
+        h.addWidget(self.btn_next)
+        h.addWidget(self.btn_stop)
         self.seek.setFixedWidth(260)
         h.addWidget(self.seek)
         h.addWidget(self.time_lbl)
@@ -2204,7 +2241,7 @@ class Main(QMainWindow):
             self.btn_mute.clicked.connect(self.toggle_mute)
         else:
             self.set_now("Sin reproductor integrado", "El doble clic abrirá tu reproductor predeterminado")
-            for w in (self.btn_prev, self.btn_play, self.btn_stop, self.btn_next, self.seek, self.vol):
+            for w in (self.btn_prev, self.btn_play, self.btn_stop, self.btn_next, self.btn_list, self.seek, self.vol):
                 w.setEnabled(False)
         return bar
 
@@ -2227,6 +2264,7 @@ class Main(QMainWindow):
             self.now_cover.setPixmap(pm)
         else:
             self.now_cover.setPixmap(self.default_icon.pixmap(52, 52))
+        self.apply_cover_colors(data)
         self.mark_items()
 
     def toggle_play(self):
@@ -2244,6 +2282,63 @@ class Main(QMainWindow):
     def stop_play(self):
         if self.player is not None:
             self.player.stop()
+            self.apply_cover_colors(None)
+
+    def apply_cover_colors(self, data):
+        """Tiñe el programa con el color de la portada que suena (si la opción está activa)."""
+        if not int(self.cfg.value("cover_colors", 1) or 0):
+            data = None
+        col = dominant_color(data, self.theme == "dark") if data else None
+        col = col or (self.accent or None)
+        if col == getattr(self, "_cur_tint", "x"):
+            return
+        self._cur_tint = col
+        apply_theme(QApplication.instance(), self.theme, col)
+
+    def toggle_cover_colors(self, on):
+        self.cfg.setValue("cover_colors", 1 if on else 0)
+        self._cur_tint = "x"
+        p = self.playing_path
+        self.apply_cover_colors(self.cover_data_of(p) if p and on else None)
+
+    def show_playlist(self):
+        if getattr(self, "pl_dlg", None) is not None and self.pl_dlg.isVisible():
+            self.pl_dlg.close()
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("☰ Lista de reproducción")
+        dlg.resize(420, 480)
+        v = QVBoxLayout(dlg)
+        v.addWidget(QLabel("Canciones de la carpeta actual. Doble clic para reproducir."))
+        lw = QListWidget()
+        cur = None
+        for r in range(self.list.count()):
+            it = self.list.item(r)
+            p = it.data(PATH_ROLE)
+            if it.data(KIND_ROLE) == "dir" or not p:
+                continue
+            artist = self.val(p, "artist")
+            title = self.val(p, "title") or os.path.splitext(os.path.basename(p))[0]
+            li = QListWidgetItem(("▶ " if p == self.playing_path else "") + (f"{artist} - " if artist else "") + title)
+            li.setData(PATH_ROLE, p)
+            lw.addItem(li)
+            if p == self.playing_path:
+                cur = li
+        if cur:
+            lw.setCurrentItem(cur)
+            lw.scrollToItem(cur)
+
+        def go(li):
+            p = li.data(PATH_ROLE)
+            it = self.list.item(self.row_index.get(p, -1)) if p in self.row_index else None
+            if it is not None:
+                self.play_item(it)
+                dlg.close()
+        lw.itemDoubleClicked.connect(go)
+        v.addWidget(lw, 1)
+        self.pl_dlg = dlg
+        i18n.retranslate(dlg)
+        dlg.show()
 
     def step_play(self, d):
         if self.player is None or self.list.count() == 0:
@@ -2529,7 +2624,7 @@ class Main(QMainWindow):
             return
         jobs = [(p, self.val(p, "artist"), self.val(p, "title") or os.path.splitext(os.path.basename(p))[0],
                  self.val(p, "album")) for p in todo]
-        self.cov_ok, self.cov_total = 0, len(jobs)
+        self.cov_ok, self.cov_total, self.cov_fail = 0, len(jobs), []
         self.statusBar().showMessage(f"Buscando {len(jobs)} portada(s) en iTunes y Deezer…")
         self.cov_worker = CoverWorker(jobs, 1200)
         self.cov_worker.got.connect(self.auto_cover_got)
@@ -2538,6 +2633,7 @@ class Main(QMainWindow):
 
     def auto_cover_got(self, path, data):
         if not data:
+            self.cov_fail.append(path)
             return
         data = prepare_cover(data, self.cover_side())
         if data is None:
@@ -2554,6 +2650,63 @@ class Main(QMainWindow):
         self.statusBar().showMessage(
             f"Portada puesta en {self.cov_ok} de {self.cov_total} canciones (en naranja). "
             "Revísalas y pulsa «Guardar». Revisa que sean las correctas.")
+        if self.cov_fail:
+            n = len(self.cov_fail)
+            p = self.cov_fail[0]
+            name = (self.val(p, "artist") + " - " if self.val(p, "artist") else "") + (
+                self.val(p, "title") or os.path.splitext(os.path.basename(p))[0])
+            extra = "" if n == 1 else f"\n\n(Faltan {n} canciones; te abro la primera. Para las demás, usa clic derecho en la portada → «Buscar en Google Imágenes».)"
+            q = QMessageBox.question(self, "Portada no encontrada",
+                                     f"No encontré portada para «{name}».\n\n¿Buscarla en Google Imágenes? "
+                                     f"Copia la imagen que te guste (clic derecho → Copiar imagen) y el programa te ofrecerá ponerla.{extra}")
+            if q == QMessageBox.StandardButton.Yes:
+                self.google_cover(p)
+
+    def google_cover(self, path=None):
+        path = path or self.current_path()
+        if not path:
+            return
+        artist = self.val(path, "artist")
+        title = self.val(path, "title") or os.path.splitext(os.path.basename(path))[0]
+        q = quote_plus(f"{artist} {title} portada".strip())
+        QDesktopServices.openUrl(QUrl(f"https://www.google.com/search?tbm=isch&q={q}"))
+        self._await_cover = path
+        cb = QApplication.clipboard()
+        try:
+            cb.dataChanged.disconnect(self.on_clip_for_cover)
+        except TypeError:
+            pass
+        cb.dataChanged.connect(self.on_clip_for_cover)
+        self.statusBar().showMessage("En el navegador: abre la imagen, clic derecho → «Copiar imagen». Aquí te ofreceré ponerla.")
+
+    def on_clip_for_cover(self):
+        path = getattr(self, "_await_cover", None)
+        cb = QApplication.clipboard()
+        img = cb.image()
+        if not path or img.isNull() or min(img.width(), img.height()) < 100:
+            return
+        self._await_cover = None
+        try:
+            cb.dataChanged.disconnect(self.on_clip_for_cover)
+        except TypeError:
+            pass
+        q = QMessageBox.question(self, "Poner portada", f"Copiaste una imagen de {img.width()}×{img.height()} px.\n\n"
+                                 f"¿Ponerla como portada de «{os.path.basename(path)}»?")
+        if q != QMessageBox.StandardButton.Yes:
+            return
+        ba = QByteArray()
+        buf = QBuffer(ba)
+        buf.open(QIODevice.OpenModeFlag.WriteOnly)
+        img.save(buf, "PNG" if img.hasAlphaChannel() else "JPG", 92)
+        data = prepare_cover(bytes(ba), self.cover_side())
+        if data is None:
+            return
+        self.apply_form()
+        self.pending.setdefault(path, {})["_cover"] = data
+        self.mark_items()
+        if self.current_path() == path:
+            self.show_current(path, len(self.cur_paths))
+        self.statusBar().showMessage("Portada puesta (pendiente de guardar, en naranja).")
 
     def remove_cover(self):
         if not self.cur_paths:
@@ -3013,11 +3166,20 @@ class Main(QMainWindow):
         self.theme = name
         self.cfg.setValue("theme", name)
         apply_theme(QApplication.instance(), name, self.accent or None)
+        self.retint()
 
     def set_accent(self, color):
         self.accent = color or ""
         self.cfg.setValue("accent", self.accent)
         apply_theme(QApplication.instance(), self.theme, self.accent or None)
+        self.retint()
+
+    def retint(self):
+        self._cur_tint = self.accent or None
+        p = self.playing_path
+        if p and self.player is not None and self.player.playbackState() != QMediaPlayer.PlaybackState.StoppedState:
+            self._cur_tint = "x"
+            self.apply_cover_colors(self.cover_data_of(p))
 
     def show_right_tab(self, i):
         self.act_lyr.blockSignals(True)
@@ -3117,6 +3279,7 @@ class Main(QMainWindow):
         m = TMenu(self)
         m.addAction("🖼 Cambiar portada…", self.set_cover)
         m.addAction("✨ Buscar portada automáticamente", self.auto_cover)
+        m.addAction("🌐 Buscar en Google Imágenes…", lambda: self.google_cover())
         m.addAction("🗑 Quitar portada", self.remove_cover)
         m.addSeparator()
         m.addAction("📋 Copiar portada", self.copy_cover)
@@ -3241,10 +3404,52 @@ class Main(QMainWindow):
         except ImportError as e:
             QMessageBox.warning(self, "Espectrograma", f"Falta un componente: {e}\n\nInstala:  pip install numpy imageio-ffmpeg")
             return
-        dlg = spectro.SpectrumDialog(paths[:12], self)
-        i18n.retranslate(dlg)
-        dlg.show()
-        self._spec = dlg
+        self.close_spectrum(restore=False)
+        pane = QWidget()
+        pv = QVBoxLayout(pane)
+        pv.setContentsMargins(4, 0, 0, 0)
+        top = QHBoxLayout()
+        back = QPushButton("⬅ Volver a metadatos y letra")
+        back.setObjectName("tabbtn")
+        back.setCursor(Qt.CursorShape.PointingHandCursor)
+        back.clicked.connect(lambda: self.close_spectrum())
+        top.addWidget(back)
+        top.addStretch(1)
+        pv.addLayout(top)
+        sw = spectro.SpectrumDialog(paths[:12], pane)
+        sw.setWindowFlags(Qt.WindowType.Widget)
+        pv.addWidget(sw, 1)
+        self.spec_pane, self.spec_widget = pane, sw
+        self._spec_sizes = self.main_split.sizes()
+        self.main_split.addWidget(pane)
+        self.main_split.setCollapsible(self.main_split.indexOf(pane), False)
+        self.bottom_w.hide()
+        self.rightw_w.hide()
+        pane.show()
+        a = self._spec_sizes
+        total = sum(a)
+        self.main_split.setSizes([a[0], 430, 0, max(520, total - a[0] - 430)])
+        i18n.retranslate(pane)
+        self.statusBar().showMessage("Espectrograma en el panel derecho. «Volver» recupera los metadatos y la letra.")
+
+    def close_spectrum(self, restore=True):
+        pane = getattr(self, "spec_pane", None)
+        if pane is None:
+            return
+        try:
+            self.spec_widget.shutdown()
+        except Exception:
+            pass
+        pane.hide()
+        pane.setParent(None)
+        pane.deleteLater()
+        self.spec_pane = self.spec_widget = None
+        if restore:
+            self.bottom_w.show()
+            self.rightw_w.show()
+            sz = getattr(self, "_spec_sizes", None)
+            if sz and len(sz) >= 3:
+                self.main_split.setSizes(sz[:3])
 
     def open_youtube(self, path, external=True):
         artist, title = self.val(path, "artist"), self.val(path, "title")
@@ -3289,6 +3494,10 @@ class Main(QMainWindow):
         v.addAction(self.act_tree2)
         v.addAction(self.act_orient)
         v.addAction(self.act_lyr)
+        self.act_cc = self.act("🎨 Colores según la portada", self.toggle_cover_colors,
+                               "El programa toma el color de la portada de la canción que suena", True)
+        self.act_cc.setChecked(bool(int(self.cfg.value("cover_colors", 1) or 0)))
+        v.addAction(self.act_cc)
         v.addSeparator()
         v.addAction(self.act("🔄 Recargar carpetas", self.reload_all))
 
@@ -3669,6 +3878,11 @@ class Main(QMainWindow):
         log.setHtml(
             "<h3>📜 Historial de versiones</h3>"
             f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>El espectrograma, la comparación y el análisis de calidad ahora reemplazan a los metadatos y la letra en la misma ventana; un botón «Volver» los recupera.</li>"
+            "<li>Reproductor: botones de lista de reproducción, anterior, siguiente y detener junto a reproducir.</li>"
+            "<li>Los colores del programa se adaptan a la portada de la canción que suena (se puede desactivar en Ver).</li>"
+            "<li>Si no se encuentra una portada, se abre Google Imágenes con «artista título portada» y el programa ofrece ponerla al copiar la imagen.</li></ul>"
+            "<h4>Versión 1.05</h4><ul>"
             "<li>Botón ✨ de portada automática: busca en iTunes y Deezer la portada en alta calidad (hasta 1200 px) y la pone sola en las canciones seleccionadas.</li></ul>"
             "<h4>Versión 1.04</h4><ul>"
             "<li>Géneros y Letra comparten el panel derecho con dos botones: se acabó el desbordamiento lateral de la ventana.</li></ul>"
