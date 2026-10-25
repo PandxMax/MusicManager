@@ -6,7 +6,7 @@ Music Manager: explorador de carpetas (arrastrar y soltar) + editor de metadatos
 Instalación:   pip install PyQt6 mutagen send2trash
 Ejecutar:      python music_manager.py
 """
-import sys, os, json, re, shutil, time, base64, html, urllib.request, urllib.error
+import sys, os, json, re, shutil, time, base64, html, urllib.request, urllib.error, urllib.parse
 from functools import lru_cache
 from urllib.parse import quote_plus, quote
 
@@ -27,7 +27,7 @@ from i18n import tr as T
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import USLT, APIC
+from mutagen.id3 import USLT, APIC, SYLT
 
 try:
     from send2trash import send2trash
@@ -48,7 +48,7 @@ FIELDS = [("title", "Título"), ("artist", "Artista"), ("album", "Álbum"),
 EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
-THUMB, COVER = 96, 220
+THUMB, COVER = 96, 200
 APP_VERSION = "1.01"
 
 
@@ -148,6 +148,27 @@ def write_tags(path, changes):
             skipped.append(k)
     f.save()
     return skipped
+
+
+LRC_RE = re.compile(r"\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]")
+
+
+def parse_lrc(text):
+    """Letra sincronizada [mm:ss.xx] -> [(texto, milisegundos)] ordenado por tiempo."""
+    out = []
+    for line in (text or "").splitlines():
+        stamps = LRC_RE.findall(line)
+        if not stamps:
+            continue
+        txt = LRC_RE.sub("", line).strip()
+        for m, sec, fr in stamps:
+            out.append((txt, int(m) * 60000 + int(sec) * 1000 + (int((fr + "00")[:3]) if fr else 0)))
+    out.sort(key=lambda x: x[1])
+    return out
+
+
+def is_lrc(text):
+    return len(parse_lrc(text)) >= 2
 
 
 def mime_of(data):
@@ -261,8 +282,12 @@ def write_extra(path, lyrics=None, cover=None):
     if isinstance(f, MP3):
         if lyrics is not None:
             t.delall("USLT")
+            t.delall("SYLT")
             if lyrics.strip():
                 t.add(USLT(encoding=3, lang="eng", desc="", text=lyrics))
+                sy = parse_lrc(lyrics)
+                if len(sy) >= 2:  # letra con tiempos: también como SYLT (letra sincronizada de ID3)
+                    t.add(SYLT(encoding=3, lang="eng", format=2, type=1, desc="", text=sy))
         if cover is not None:
             t.delall("APIC")
             if cover:
@@ -624,31 +649,64 @@ class AIWorker(AIBase):
             self.failed.emit(str(e))
 
 
-class LyricsWorker(AIBase):
-    """Pide la letra de cada canción, una por una. No inventa: si no la sabe, devuelve vacío."""
+class LrclibWorker(QThread):
+    """Busca letras en LRCLIB (https://lrclib.net), gratis y sin clave. Prefiere la letra sincronizada."""
     got = pyqtSignal(str, str)  # ruta, letra ("" si no hubo)
     finished_all = pyqtSignal()
+    failed = pyqtSignal(str)
+    UA = "MusicManager/1.01 (https://github.com/PandxMax/MusicManager)"
 
-    def __init__(self, provider, model, key, jobs):
-        super().__init__(provider, model, key)
-        self.jobs = jobs  # [(ruta, artista, título, álbum)]
+    def __init__(self, jobs, prefer_synced=True):
+        super().__init__()
+        self.jobs, self.prefer_synced = jobs, prefer_synced  # jobs: [(ruta, artista, título, álbum, segundos)]
+
+    def fetch(self, url):
+        req = urllib.request.Request(url, headers={"User-Agent": self.UA})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return None
+            raise
+
+    def pick(self, d):
+        if not d or d.get("instrumental"):
+            return ""
+        synced, plain = d.get("syncedLyrics") or "", d.get("plainLyrics") or ""
+        return (synced or plain) if self.prefer_synced else (plain or synced)
+
+    def find(self, artist, title, album, dur):
+        q = {"track_name": title}
+        if artist:
+            q["artist_name"] = artist
+        if album:
+            q["album_name"] = album
+        if dur:
+            q["duration"] = str(int(dur))
+        text = self.pick(self.fetch("https://lrclib.net/api/get?" + urllib.parse.urlencode(q)))
+        if text:
+            return text
+        sq = {"track_name": title}
+        if artist:
+            sq["artist_name"] = artist
+        res = self.fetch("https://lrclib.net/api/search?" + urllib.parse.urlencode(sq)) or []
+        res = [r for r in res if not r.get("instrumental")]
+        if self.prefer_synced:
+            res.sort(key=lambda r: not r.get("syncedLyrics"))
+        for r in res:
+            text = self.pick(r)
+            if text:
+                return text
+        return ""
 
     def run(self):
         try:
-            for path, artist, title, album in self.jobs:
-                who = f"«{title}»" + (f" de {artist}" if artist else "") + (f" (álbum {album})" if album else "")
-                prompt = (
-                    f"Necesito la letra de la canción {who}. Si la conoces con certeza, escribe solo "
-                    "la letra tal como es, sin títulos, sin comentarios y sin markdown. No inventes "
-                    "ni rellenes con texto aproximado. Si no la conoces con certeza, no puedes "
-                    "proporcionarla (por ejemplo, por derechos de autor) o es instrumental, "
-                    "responde únicamente: SIN_LETRA")
-                text = self.ask(prompt).strip()
-                text = re.sub(r"^```\w*\s*|\s*```$", "", text).strip()
-                self.got.emit(path, "" if looks_like_refusal(text) else text)
+            for path, artist, title, album, dur in self.jobs:
+                self.got.emit(path, self.find(artist, title, album, dur))
             self.finished_all.emit()
-        except urllib.error.HTTPError as e:
-            self.failed.emit(self.error_text(e))
+        except urllib.error.URLError as e:
+            self.failed.emit(f"No se pudo conectar con LRCLIB: {getattr(e, 'reason', e)}")
         except Exception as e:
             self.failed.emit(str(e))
 
@@ -1321,7 +1379,8 @@ class Main(QMainWindow):
         self.player_bar = self.build_player_bar()
 
         # ---------- metadatos
-        meta_box = QGroupBox("Metadatos (de las canciones seleccionadas)")
+        meta_box = QGroupBox()
+        meta_box.setStyleSheet("QGroupBox { margin-top: 0px; padding-top: 10px; }")
         grid = QGridLayout(meta_box)
         self.inputs = {}
         for i, (k, n) in enumerate(FIELDS):
@@ -1380,7 +1439,7 @@ class Main(QMainWindow):
         self.lyrics.textChanged.connect(self.on_lyrics_edit)
         lv.addWidget(self.lyr_status)
         lv.addWidget(self.lyrics)
-        self.btn_lyr = QPushButton("✨ Poner letra con IA")
+        self.btn_lyr = QPushButton("🔎 Buscar letra en LRCLIB (sincronizada)")
         self.btn_lyr.clicked.connect(self.run_lyrics)
         lv.addWidget(self.btn_lyr)
         self.lyr_box.hide()
@@ -1435,9 +1494,37 @@ class Main(QMainWindow):
         self.cover_lbl.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cover_lbl.customContextMenuRequested.connect(self.cover_menu)
         self.cover_lbl.setToolTip("Clic derecho: cambiar, quitar, copiar, pegar, guardar o redimensionar")
-        cv.addWidget(self.cover_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
-        cv.addWidget(self.info_lbl)
-        cv.addWidget(self.status_lbl)
+        ch = QHBoxLayout()
+        ch.setSpacing(6)
+        left = QVBoxLayout()
+        for text, tip, fn in (("➕", "Cambiar portada…", self.set_cover), ("💾", "Guardar portada como imagen…", self.save_cover_as),
+                              ("❌", "Quitar portada", self.remove_cover)):
+            b = QPushButton(text)
+            b.setObjectName("tbtn")
+            b.setFixedSize(34, 34)
+            b.setToolTip(tip)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(lambda _=False, f=fn: f())
+            left.addWidget(b)
+        left.addStretch(1)
+        right_col = QVBoxLayout()
+        eye = QPushButton("👁")
+        eye.setObjectName("tbtn")
+        eye.setFixedSize(34, 34)
+        eye.setToolTip("Ver la portada en grande")
+        eye.setCursor(Qt.CursorShape.PointingHandCursor)
+        eye.clicked.connect(self.view_cover)
+        right_col.addWidget(eye, 0, Qt.AlignmentFlag.AlignRight)
+        right_col.addStretch(1)
+        self.info_lbl.setObjectName("hint")
+        self.info_lbl.setFixedWidth(64)
+        self.info_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
+        right_col.addWidget(self.info_lbl)
+        ch.addLayout(left)
+        ch.addWidget(self.cover_lbl)
+        ch.addLayout(right_col)
+        cv.addLayout(ch)
+        self.status_lbl.hide()
         cover_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         ai_box = QGroupBox("Reconocer géneros con IA")
@@ -1481,14 +1568,14 @@ class Main(QMainWindow):
         rv.setContentsMargins(4, 0, 0, 0)
         rv.addWidget(cover_box)        # fija: no se mueve
         rv.addWidget(ai_scroll, 1)     # esta parte sí se desplaza
-        rightw.setMinimumWidth(330)
+        rightw.setMinimumWidth(360)
 
         main = QSplitter()
         main.addWidget(self.left_split)
         main.addWidget(middle)
         main.addWidget(rightw)
         main.setStretchFactor(1, 1)
-        main.setSizes([290, 880, 340])
+        main.setSizes([290, 860, 370])
         self.main_split, self.mid_split = main, middle
         for sp in (main, middle, self.left_split):
             self.style_splitter(sp)
@@ -2226,14 +2313,21 @@ class Main(QMainWindow):
             if "lyrics" in pend:
                 self.lyr_status.setText("✎ Letra nueva (pendiente de guardar): revísala antes de guardar")
             else:
-                self.lyr_status.setText("✔ Esta canción ya tiene letra" if has_l else "✘ Esta canción no tiene letra")
+                self.lyr_status.setText(("✔ Esta canción ya tiene letra" + (" ⏱ sincronizada (con minutos)" if is_lrc(lyr) else ""))
+                                        if has_l else "✘ Esta canción no tiene letra")
         else:
             self.lyrics.setEnabled(False)
             self.lyrics.setPlainText("")
             self.lyrics.setPlaceholderText("Selecciona UNA sola canción para ver o editar su letra.")
             self.lyr_status.setText("")
         dims = f"Portada: {pm.width()}×{pm.height()} px · {len(data) // 1024} KB" if data and not pm.isNull() else ""
-        self.info_lbl.setText("\n".join(x for x in (d["info"], dims, note) if x))
+        if data and not pm.isNull():
+            kind = "PNG" if data[:4] == b"\x89PNG" else ("JPEG" if data[:2] == b"\xff\xd8" else "IMG")
+            self.info_lbl.setText(f"{kind}\n{pm.width()}×{pm.height()}\n{len(data) // 1024} KB")
+        else:
+            self.info_lbl.setText("")
+        self.info_lbl.setToolTip(note)
+        self.info_lbl.setStyleSheet("color:#E67E00" if "pendiente" in note else "")
         yes = '<span style="color:#2ecc71">✔ sí</span>'
         no = '<span style="color:#e74c3c">✘ no</span>'
         g = html.escape(self.val(path, "genre")) or "—"
@@ -2302,6 +2396,12 @@ class Main(QMainWindow):
                     skipped |= set(write_tags(path, easy))
                 if "lyrics" in ch or "_cover" in ch:
                     write_extra(path, ch.get("lyrics"), ch.get("_cover"))
+                if ch.get("lyrics") and is_lrc(ch["lyrics"]) and int(self.cfg.value("save_lrc", 1) or 0):
+                    try:  # archivo .lrc junto a la canción: lo leen casi todos los reproductores
+                        with open(os.path.splitext(path)[0] + ".lrc", "w", encoding="utf-8") as fh:
+                            fh.write(ch["lyrics"])
+                    except OSError:
+                        pass
                 ok += 1
                 del self.pending[path]
                 self.meta.pop(path, None)
@@ -2400,10 +2500,7 @@ class Main(QMainWindow):
     def run_lyrics(self):
         paths = list(self.cur_paths)
         if not paths:
-            QMessageBox.information(self, "Letra con IA", "Selecciona una o varias canciones primero.")
-            return
-        settings = self.ai_settings()
-        if not settings:
+            QMessageBox.information(self, "LRCLIB", "Selecciona una o varias canciones primero.")
             return
         self.apply_form()
         todo, skipped = [], 0
@@ -2415,20 +2512,26 @@ class Main(QMainWindow):
             else:
                 todo.append(p)
         if not todo and len(paths) == 1:
-            q = QMessageBox.question(self, "Ya tiene letra",
-                                     "Esta canción ya tiene letra. ¿Reemplazarla con la de la IA?")
+            q = QMessageBox.question(self, "Ya tiene letra", "Esta canción ya tiene letra. ¿Reemplazarla con la de LRCLIB?")
             if q == QMessageBox.StandardButton.Yes:
                 todo = paths
         if not todo:
             self.statusBar().showMessage("Todas las canciones seleccionadas ya tienen letra.")
             return
+
+        def secs(p):
+            try:
+                m, s_ = tech_info(p)["dur"].split(":")
+                return int(m) * 60 + int(s_)
+            except Exception:
+                return 0
         jobs = [(p, self.val(p, "artist"), self.val(p, "title") or os.path.splitext(os.path.basename(p))[0],
-                 self.val(p, "album")) for p in todo]
+                 self.val(p, "album"), secs(p)) for p in todo]
         self.lyr_ok, self.lyr_total = 0, len(jobs)
         self.btn_lyr.setEnabled(False)
         extra = f" ({skipped} ya tenían letra y se omiten)" if skipped else ""
-        self.statusBar().showMessage(f"Pidiendo {len(jobs)} letra(s) a {settings[0]}…{extra}")
-        self.lyr_worker = LyricsWorker(*settings, jobs)
+        self.statusBar().showMessage(f"Buscando {len(jobs)} letra(s) en LRCLIB…{extra}")
+        self.lyr_worker = LrclibWorker(jobs, bool(int(self.cfg.value("prefer_synced", 1) or 0)))
         self.lyr_worker.got.connect(self.lyrics_got)
         self.lyr_worker.finished_all.connect(self.lyrics_done)
         self.lyr_worker.failed.connect(self.lyrics_failed)
@@ -2447,12 +2550,12 @@ class Main(QMainWindow):
         self.btn_lyr.setEnabled(True)
         self.statusBar().showMessage(
             f"Letra puesta en {self.lyr_ok} de {self.lyr_total} canciones (en naranja). "
-            "Revísalas y pulsa «Guardar». En las demás la IA no la conoce o no pudo darla.")
+            "Revísalas y pulsa «Guardar». En las demás, LRCLIB no tiene la letra.")
 
     def lyrics_failed(self, msg):
         self.btn_lyr.setEnabled(True)
         self.statusBar().showMessage("Falló la consulta de letras.")
-        QMessageBox.warning(self, "Error de IA", msg)
+        QMessageBox.warning(self, "Error de LRCLIB", msg)
 
     def open_chat(self):
         path = self.current_path()
@@ -2798,6 +2901,24 @@ class Main(QMainWindow):
             except OSError:
                 return None
         return None
+
+    def view_cover(self):
+        p = self.current_path()
+        data = self.cover_data_of(p) if p else None
+        pm = QPixmap()
+        if not data or not pm.loadFromData(data):
+            self.statusBar().showMessage("Esta canción no tiene portada.")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(os.path.basename(p))
+        v = QVBoxLayout(dlg)
+        scr = QApplication.primaryScreen().availableGeometry()
+        side = int(min(scr.width(), scr.height()) * 0.8)
+        lab = QLabel()
+        lab.setPixmap(pm if max(pm.width(), pm.height()) <= side else
+                      pm.scaled(side, side, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        v.addWidget(lab)
+        dlg.exec()
 
     def cover_menu(self, pos):
         if not self.cur_paths:
@@ -3220,6 +3341,9 @@ class Main(QMainWindow):
             size_cb.addItem(v if v == "Original" else v + " px", v)
         size_cb.setCurrentIndex(max(0, size_cb.findData("Original" if self.cover_max is None else str(self.cover_max))))
         apply_fns.append(lambda: self.set_cover_max(parse_side(size_cb.currentData())))
+        add_page("letras", "Letras", page(
+            chk("Preferir la letra sincronizada (con minutos) al buscar en LRCLIB", "prefer_synced", 1),
+            chk("Guardar también un archivo .lrc junto a la canción", "save_lrc", 1)), grp)
         add_page("portadas", "Portadas", page(QLabel("Tamaño máximo de las portadas nuevas (nunca se agranda):"), size_cb), grp)
         # Fuentes de etiquetas
         tok = QLineEdit(str(self.cfg.value("discogs_token", "") or ""))
@@ -3358,6 +3482,7 @@ class Main(QMainWindow):
             "<li>Espectrograma y análisis de calidad (comparación de varias canciones).</li>"
             "<li>Convertir formatos: MP3, FLAC, M4A, OGG, Opus y WAV.</li>"
             "<li>Fuentes de etiquetas: MusicBrainz y Discogs.</li>"
+            "<li>Letras sincronizadas desde LRCLIB (con los minutos de cada línea y archivo .lrc).</li>"
             "<li>Información técnica del archivo (códec, tasa de bits, frecuencia…).</li>"
             "<li>Clic derecho en el artista: Wikipedia, YouTube y Spotify.</li>"
             "<li>Ajustes con categorías, tema y color de acento, y 3 idiomas (ES / EN / RU).</li>"

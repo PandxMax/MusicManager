@@ -71,3 +71,10 @@ VERSIÓN 1.01
  - "Acerca de" muestra la versión y el historial de versiones.
  - Volumen: botón de altavoz para silenciar, rueda del ratón sobre la barra o el altavoz,
    y globos que muestran el minuto (barra de avance) y el % de volumen.
+
+LETRAS CON LRCLIB
+-----------------
+ - El botón de letra ahora busca en LRCLIB (gratis, sin clave) y trae la letra sincronizada
+   con los minutos de cada línea ([mm:ss.xx]). Se guarda en la etiqueta (y como SYLT en MP3)
+   y, si quieres, también en un archivo .lrc junto a la canción (Ajustes > Etiquetas > Letras).
+ - Panel de portada rediseñado: botones ➕ 💾 ❌ 👁 y los datos de la imagen (formato, tamaño y peso).

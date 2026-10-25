@@ -51,15 +51,16 @@ Clic derecho sobre el artista (en el panel de metadatos o en la lista): **histor
 - Los cambios quedan pendientes (en naranja) hasta que pulses Guardar.
 
 ### 🖼️ Portadas
-- Ve la portada en grande y su **tamaño en píxeles**.
+- Panel con botones **➕ cambiar, 💾 guardar, ❌ quitar y 👁 ver en grande**, y los datos de la imagen (formato, píxeles y peso).
 - **Cambiar, quitar, copiar y pegar** portada: copia la de una canción y pégala en otras.
 - **Guardar la portada como imagen**.
 - **Redimensionar** a 300, 500, 600, 800, 1000, 1200 px u otro tamaño (nunca agranda).
 - Todo desde el **clic derecho** sobre la portada.
 
-### 📝 Letras
-- Panel de letra que se **muestra u oculta** cuando quieras.
-- **Poner letra con IA**: si la IA no la conoce, no se la inventa.
+### 📝 Letras sincronizadas (LRCLIB)
+- Panel de letra que se **muestra u oculta** cuando quieras, también con el botón **📝 Letra** de los metadatos.
+- **Buscar letra en LRCLIB** (gratis, sin clave): trae la letra **sincronizada** con el minuto de cada línea (formato LRC).
+- Se guarda en la etiqueta del archivo (y como letra sincronizada SYLT en MP3) y, si quieres, en un **archivo `.lrc`** junto a la canción para otros reproductores.
 
 ### 🤖 IA para géneros
 - Funciona con **Claude, ChatGPT o Gemini** (usas tu propia clave API).
