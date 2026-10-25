@@ -1,0 +1,50 @@
+MUSIC MANAGER
+=============
+
+PARA TENERLO COMO UN PROGRAMA NORMAL (recomendado)
+  1) Extrae el ZIP completo en una carpeta.
+  2) Doble clic en CREAR_PROGRAMA.bat
+  3) Espera a que termine (la primera vez tarda unos minutos y necesita internet).
+  Al final se abre solo y queda instalado con acceso directo en el Escritorio
+  y en el menu Inicio. Para quitarlo: Configuracion > Aplicaciones > Music Manager.
+  Tambien se crea MusicManager_portable.zip para llevarlo a otro PC.
+
+  Si Windows muestra "Windows protegio tu PC": Mas informacion > Ejecutar de todas formas
+  (pasa con cualquier programa nuevo que no esta firmado).
+
+PARA PROBARLO SIN INSTALAR
+  Doble clic en INICIAR.bat
+
+ATAJOS
+  Doble clic ........ reproducir una cancion / abrir una carpeta
+  Ctrl+C / Ctrl+X ... copiar / cortar archivos o carpetas
+  Ctrl+V ............ pegar en la carpeta elegida
+  Supr .............. eliminar (a la papelera)
+  F2 ................ renombrar
+  Ctrl+S ............ guardar los cambios en los archivos
+  Espacio / Enter ... pausa / reproducir
+  Arrastrar ......... mover canciones o carpetas a otra carpeta
+
+PORTADA: clic derecho sobre la portada grande (cambiar, quitar, copiar, pegar,
+guardar como imagen, redimensionar).
+CANCION: clic derecho > Buscar en YouTube.
+
+ESPECTROGRAMA Y CALIDAD (📊 Espectro)
+-------------------------------------
+Selecciona una o varias canciones (Ctrl+clic) y pulsa "📊 Espectro" (o clic derecho).
+ - Espectrograma estilo Spek: frecuencia en kHz, tiempo y nivel en dB.
+ - Muestra frecuencia de muestreo, bits, bitrate, frecuencia de corte, pico, RMS y rango dinámico.
+ - Veredicto: Alta fidelidad / Calidad normal / Calidad baja, con los motivos
+   (detecta MP3 o AAC convertidos a FLAC).
+ - Con varias canciones: pestaña "Comparación" con tabla y espectro medio superpuesto.
+ - Puedes limitar la frecuencia máxima y guardar la imagen.
+
+CAMBIOS DE LA VERSIÓN NUEVA
+---------------------------
+ - Sin barra de herramientas: todo está en los menús (Archivo, Edición, Ver, Reproducción,
+   Herramientas, Ajustes, Ayuda). La búsqueda queda arriba a la derecha (Ctrl+F).
+ - Ajustes: IA (proveedor, modelo, clave), Apariencia (tema claro/oscuro y color de acento) e Idioma
+   (Español, English, Русский).
+ - Reproductor compacto: botón play/pausa, barra de avance y volumen.
+ - YouTube dentro del programa: clic derecho en una canción > Ver en YouTube (o Herramientas).
+   Necesita PyQt6-WebEngine (ya incluido en requirements.txt); el .exe pesará más.
