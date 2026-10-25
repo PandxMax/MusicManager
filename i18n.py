@@ -26,6 +26,8 @@ _ROWS = [
     ("☰ Lista", "☰ List", "☰ Список"), ("🗂 2.º árbol", "🗂 2nd tree", "🗂 2-е дерево"),
     ("⇄ Árboles lado a lado", "⇄ Trees side by side", "⇄ Деревья рядом"),
     ("📝 Letra", "📝 Lyrics", "📝 Текст песни"),
+    ("✨ Buscar portada automáticamente", "✨ Find cover automatically", "✨ Найти обложку автоматически"),
+    ("✨ Portadas automáticas (alta calidad)", "✨ Automatic covers (high quality)", "✨ Автоматические обложки (высокое качество)"),
     ("🔄 Recargar carpetas", "🔄 Reload folders", "🔄 Обновить папки"),
     ("▶ Reproducir / pausa\tEspacio", "▶ Play / pause\tSpace", "▶ Играть / пауза\tПробел"),
     ("⏮ Anterior", "⏮ Previous", "⏮ Предыдущая"), ("⏭ Siguiente", "⏭ Next", "⏭ Следующая"),

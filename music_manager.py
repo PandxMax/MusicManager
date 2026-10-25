@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.04"
+APP_VERSION = "1.05"
 
 
 class TMenu(QMenu):
@@ -669,12 +669,99 @@ class AIWorker(AIBase):
             self.failed.emit(str(e))
 
 
+class CoverWorker(QThread):
+    """Busca portadas en iTunes y Deezer (gratis y sin clave) y descarga la de mayor calidad."""
+    got = pyqtSignal(str, bytes)  # ruta, imagen
+    finished_all = pyqtSignal()
+    UA = "MusicManager/1.05 (https://github.com/PandxMax/MusicManager)"
+
+    def __init__(self, jobs, side):
+        super().__init__()
+        self.jobs, self.side = jobs, side  # jobs: [(ruta, artista, título, álbum)]
+        self.cache = {}
+
+    def get(self, url, raw=False):
+        req = urllib.request.Request(url, headers={"User-Agent": self.UA})
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    b = r.read()
+                    return b if raw else json.loads(b.decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code not in (429, 500, 502, 503, 504):
+                    return None
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+                pass
+            time.sleep(1 + attempt)
+        return None
+
+    @staticmethod
+    def norm(t):
+        return re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).strip()
+
+    def itunes_urls(self, artist, title, album):
+        q = quote_plus(f"{artist} {album or title}".strip())
+        d = self.get(f"https://itunes.apple.com/search?term={q}&entity=album&limit=8")
+        res = (d or {}).get("results", [])
+        if not res:
+            d = self.get(f"https://itunes.apple.com/search?term={quote_plus(f'{artist} {title}'.strip())}&entity=song&limit=8")
+            res = (d or {}).get("results", [])
+        a, al = self.norm(artist), self.norm(album)
+        best = None
+        for r in res:
+            ra, ral = self.norm(r.get("artistName")), self.norm(r.get("collectionName"))
+            score = (2 if a and (a in ra or ra in a) else 0) + (2 if al and (al in ral or ral in al) else 0)
+            if (best is None or score > best[0]) and r.get("artworkUrl100"):
+                best = (score, r["artworkUrl100"])
+        if best and best[0] >= 2:
+            u = best[1]
+            return [re.sub(r"/\d+x\d+[a-z]*\.", f"/{self.side}x{self.side}bb.", u), u.replace("100x100", "600x600")]
+        return []
+
+    def deezer_urls(self, artist, title, album):
+        q = quote_plus(f'artist:"{artist}" track:"{title}"') if artist else quote_plus(title)
+        d = self.get(f"https://api.deezer.com/search?q={q}&limit=5")
+        a = self.norm(artist)
+        for r in (d or {}).get("data", []):
+            ra = self.norm((r.get("artist") or {}).get("name"))
+            if a and not (a in ra or ra in a):
+                continue
+            alb = r.get("album") or {}
+            urls = [alb.get(k) for k in ("cover_xl", "cover_big") if alb.get(k)]
+            if urls:
+                return urls
+        return []
+
+    def run(self):
+        for path, artist, title, album in self.jobs:
+            data = None
+            key = (self.norm(artist), self.norm(album) or self.norm(title))
+            if key in self.cache:
+                data = self.cache[key]
+            else:
+                for finder in (self.itunes_urls, self.deezer_urls):
+                    try:
+                        urls = finder(artist, title, album)
+                    except Exception:
+                        urls = []
+                    for u in urls:
+                        b = self.get(u, raw=True)
+                        if b and QImage.fromData(b).width() > 0:
+                            data = b
+                            break
+                    if data:
+                        break
+                self.cache[key] = data
+            self.got.emit(path, data or b"")
+        self.finished_all.emit()
+
+
 class LrclibWorker(QThread):
     """Busca letras en LRCLIB (https://lrclib.net), gratis y sin clave. Prefiere la letra sincronizada."""
     got = pyqtSignal(str, str)  # ruta, letra ("" si no hubo)
     finished_all = pyqtSignal()
     failed = pyqtSignal(str)
-    UA = "MusicManager/1.04 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.05 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, jobs, prefer_synced=True):
         super().__init__()
@@ -1529,7 +1616,7 @@ class Main(QMainWindow):
         ch.setSpacing(10)
         left = QVBoxLayout()
         left.setSpacing(6)
-        for text, tip, fn in (("🖼", "Cambiar portada…", self.set_cover), ("💾", "Guardar portada como imagen…", self.save_cover_as),
+        for text, tip, fn in (("🖼", "Cambiar portada…", self.set_cover), ("✨", "Buscar portada automáticamente (alta calidad)", self.auto_cover), ("💾", "Guardar portada como imagen…", self.save_cover_as),
                               ("🗑", "Quitar portada", self.remove_cover), ("🔍", "Ver la portada en grande", self.view_cover)):
             b = QPushButton(text)
             b.setObjectName("iconbtn")
@@ -2426,6 +2513,48 @@ class Main(QMainWindow):
         self.mark_items()
         self.show_current(self.current_path(), len(self.cur_paths))
 
+    def auto_cover(self):
+        paths = list(self.cur_paths)
+        if not paths:
+            QMessageBox.information(self, "Portada automática", "Selecciona una o varias canciones primero.")
+            return
+        self.apply_form()
+        todo = [p for p in paths if not self.cover_data_of(p)]
+        if not todo and len(paths) == 1:
+            q = QMessageBox.question(self, "Ya tiene portada", "Esta canción ya tiene portada. ¿Reemplazarla con una de mejor calidad de internet?")
+            if q == QMessageBox.StandardButton.Yes:
+                todo = paths
+        if not todo:
+            self.statusBar().showMessage("Todas las canciones seleccionadas ya tienen portada.")
+            return
+        jobs = [(p, self.val(p, "artist"), self.val(p, "title") or os.path.splitext(os.path.basename(p))[0],
+                 self.val(p, "album")) for p in todo]
+        self.cov_ok, self.cov_total = 0, len(jobs)
+        self.statusBar().showMessage(f"Buscando {len(jobs)} portada(s) en iTunes y Deezer…")
+        self.cov_worker = CoverWorker(jobs, 1200)
+        self.cov_worker.got.connect(self.auto_cover_got)
+        self.cov_worker.finished_all.connect(self.auto_cover_done)
+        self.cov_worker.start()
+
+    def auto_cover_got(self, path, data):
+        if not data:
+            return
+        data = prepare_cover(data, self.cover_side())
+        if data is None:
+            return
+        self.pending.setdefault(path, {})["_cover"] = data
+        self.cov_ok += 1
+        self.mark_items()
+        if len(self.cur_paths) == 1 and self.current_path() == path:
+            self.show_current(path, 1)
+
+    def auto_cover_done(self):
+        if len(self.cur_paths) > 1 and self.cur_paths:
+            self.show_current(self.current_path(), len(self.cur_paths))
+        self.statusBar().showMessage(
+            f"Portada puesta en {self.cov_ok} de {self.cov_total} canciones (en naranja). "
+            "Revísalas y pulsa «Guardar». Revisa que sean las correctas.")
+
     def remove_cover(self):
         if not self.cur_paths:
             return
@@ -2987,6 +3116,7 @@ class Main(QMainWindow):
         n = len(self.cur_paths)
         m = TMenu(self)
         m.addAction("🖼 Cambiar portada…", self.set_cover)
+        m.addAction("✨ Buscar portada automáticamente", self.auto_cover)
         m.addAction("🗑 Quitar portada", self.remove_cover)
         m.addSeparator()
         m.addAction("📋 Copiar portada", self.copy_cover)
@@ -3171,6 +3301,8 @@ class Main(QMainWindow):
         t = mb.addMenu("&Herramientas")
         t.addAction(self.act("📊 Espectrograma y calidad…", self.open_spectrum,
                              "Espectrograma y análisis de calidad de las canciones seleccionadas (varias = comparar)"))
+        t.addAction(self.act("✨ Portadas automáticas (alta calidad)", self.auto_cover,
+                             "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
         t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
 
@@ -3537,6 +3669,8 @@ class Main(QMainWindow):
         log.setHtml(
             "<h3>📜 Historial de versiones</h3>"
             f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>Botón ✨ de portada automática: busca en iTunes y Deezer la portada en alta calidad (hasta 1200 px) y la pone sola en las canciones seleccionadas.</li></ul>"
+            "<h4>Versión 1.04</h4><ul>"
             "<li>Géneros y Letra comparten el panel derecho con dos botones: se acabó el desbordamiento lateral de la ventana.</li></ul>"
             "<h4>Versión 1.03</h4><ul>"
             "<li>El panel de carpetas ya no se puede aplastar al abrir la letra.</li>"
