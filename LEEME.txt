@@ -106,3 +106,16 @@ VERSIÓN 1.06
  - Los colores del programa toman el de la portada de la canción que suena (Ver ▸ Colores según la portada).
  - Si no se encuentra portada: se ofrece abrir Google Imágenes ("artista título portada"); al copiar la
    imagen, el programa pregunta si ponerla. También en clic derecho de la portada.
+
+VERSIÓN 1.07
+------------
+ - ✨ Portada automática: ahora muestra VARIAS opciones (iTunes y Deezer) para elegir una; Google Imágenes
+   solo se ofrece si no aparece ninguna. Canciones del mismo álbum comparten la elección.
+ - Volumen: una sola barrita que se despliega al pasar el ratón sobre el botón de sonido.
+   Un pequeño disco gira con la portada de la canción que suena.
+ - Metadatos: solo "Deshacer cambios" y "Guardar cambios" (renombrar sigue en F2 y en el clic derecho).
+   Se quitó la palabra "Portada" sobre la imagen.
+ - Lista de reproducción propia (☰): arrastra canciones o carpetas, ordénalas arrastrando, quítalas
+   con Supr, guárdala/cárgala como .m3u8. Canciones bien separadas.
+ - Clic derecho en una carpeta: "Reproducir carpeta" y "Añadir carpeta a la lista".
+ - El espectrograma ya no agranda nada: aparece solo en el panel de abajo (donde van los metadatos).
