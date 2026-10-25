@@ -6,6 +6,16 @@
 
 **Organiza tu música como un profesional: explora, mueve, edita etiquetas, portadas y letras, analiza la calidad real de tus archivos y deja que una IA te ayude con los géneros.**
 
+<br/>
+
+<a href="https://github.com/PandxMax/MusicManager/releases/latest/download/MusicManager-Windows.zip">
+  <img src="https://img.shields.io/badge/%E2%AC%87%20DESCARGAR%20PARA%20WINDOWS-7C5CFF?style=for-the-badge&logoColor=white" alt="Descargar Music Manager" height="48"/>
+</a>
+
+<sub>Descarga el .zip, descomprímelo y abre <b>MusicManager.exe</b>. Después se actualiza solo desde <i>Ayuda → Buscar actualizaciones</i>.</sub>
+
+<br/>
+
 ![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.09-7C5CFF)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
