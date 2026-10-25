@@ -27,7 +27,7 @@
 ### 📁 Explorador de carpetas
 - **Arrastra y suelta** canciones o carpetas sobre otra carpeta para moverlas.
 - **Dos árboles** de carpetas a la vez (activables y en vertical u horizontal) para mover de uno a otro sin perderte.
-- Mover entre árboles fácil: la **carpeta destino se resalta** al arrastrar, se **abren solas** las carpetas al pasar por encima, **Ctrl al soltar = copiar** y clic derecho → *Mover / Copiar al otro árbol*.
+- Mover entre árboles fácil: la **carpeta destino se resalta** al arrastrar, **Ctrl al soltar = copiar** y clic derecho → *Mover / Copiar al otro árbol*.
 - **Barra horizontal** en los árboles para ver nombres largos y carpetas muy anidadas.
 - **Cortar, copiar, pegar, renombrar y eliminar** archivos y carpetas (Ctrl+X, Ctrl+C, Ctrl+V, F2, Supr). Eliminar usa la papelera.
 - Vista de **iconos con portadas** o de **lista**.
@@ -37,6 +37,13 @@
 ### 🏷️ Editor de metadatos
 Edita **título, artista, álbum, artista del álbum, compositor, género, año, pista, disco y BPM** de una o de muchas canciones a la vez.
 Compatible con **MP3, FLAC, OGG, Opus y M4A/MP4**. Los cambios quedan marcados hasta que pulsas **Guardar** (Ctrl+S).
+
+Además del editor, el panel muestra la **información técnica** de cada archivo: **códec, tasa de bits, frecuencia, duración, modo (CBR/VBR) y tamaño**.
+
+### 🌐 Fuentes de etiquetas (MusicBrainz y Discogs)
+- Menú **Fuente de etiquetas**: busca la canción en **MusicBrainz** (gratis) o en **Discogs** (con un token personal gratuito).
+- Elige el resultado correcto y aplica **título, artista, álbum, año, pista, género y portada** con casillas para decidir qué copiar.
+- Los cambios quedan pendientes (en naranja) hasta que pulses Guardar.
 
 ### 🖼️ Portadas
 - Ve la portada en grande y su **tamaño en píxeles**.
@@ -73,7 +80,7 @@ Selecciona una o varias canciones y abre **Herramientas → Espectrograma**.
 - Guarda junto a los originales o en otra carpeta; nunca sobrescribe nada.
 
 ### ▶️ Reproductor y YouTube
-- Reproductor compacto en la **línea de estado, abajo a la derecha**: play/pausa, barra de avance y volumen. Doble clic en una canción para reproducirla.
+- Reproductor compacto en la **línea de estado, abajo a la derecha**: play/pausa, barra de avance y volumen. Doble clic en una canción para reproducirla. **Haz clic en la barra** donde quieras para saltar a ese punto.
 - **Buscar en YouTube**: clic derecho en una canción y se abre tu navegador con esa canción.
 
 ### 🎨 Personalización
@@ -126,7 +133,7 @@ En Windows también puedes hacer doble clic en `CREAR_PROGRAMA.bat` para crear e
 
 ## 🧩 Tecnología
 
-**Python** · **PyQt6** (interfaz y reproductor) · **mutagen** (etiquetas) · **numpy** + **ffmpeg** (espectrogramas y conversión) · **PyInstaller** (el `.exe`).
+**Python** · **PyQt6** (interfaz y reproductor) · **mutagen** (etiquetas) · **MusicBrainz / Discogs** (fuentes de etiquetas) · **numpy** + **ffmpeg** (espectrogramas y conversión) · **PyInstaller** (el `.exe`).
 
 ---
 

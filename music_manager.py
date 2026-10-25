@@ -11,15 +11,15 @@ from functools import lru_cache
 from urllib.parse import quote_plus
 
 from PyQt6.QtCore import (QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
-                          QTimer, QStandardPaths, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
+                          QTimer, QRectF, QStandardPaths, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
 from PyQt6.QtGui import (QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
-                         QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QCursor, QMouseEvent)
+                         QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPolygonF, QCursor, QMouseEvent)
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QSplitter, QTreeWidget, QTreeWidgetItem,
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
+    QInputDialog, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
 )
 import mutagen
 import i18n
@@ -159,6 +159,44 @@ def _pop(tags, key):
         del tags[key]
     except KeyError:
         pass
+
+
+@lru_cache(maxsize=4096)
+def _tech(path, mtime):
+    out = {"codec": "—", "bitrate": "—", "freq": "—", "dur": "—", "mode": "—", "size": "—"}
+    try:
+        out["size"] = f"{os.path.getsize(path) / 1048576:.2f} MB"
+        f = mutagen.File(path)
+        i = f.info
+        kind = type(f).__name__
+        if kind == "MP4":
+            out["codec"] = "ALAC" if "alac" in str(getattr(i, "codec", "")).lower() else "AAC"
+        else:
+            out["codec"] = {"MP3": "MP3", "FLAC": "FLAC", "OggVorbis": "Vorbis", "OggOpus": "Opus"}.get(kind, kind)
+        br = int(getattr(i, "bitrate", 0) or 0)
+        if br:
+            out["bitrate"] = f"{br // 1000} kbps"
+        sr = int(getattr(i, "sample_rate", 0) or 0)
+        if sr:
+            out["freq"] = f"{sr} Hz"
+        secs = int(getattr(i, "length", 0) or 0)
+        out["dur"] = f"{secs // 60}:{secs % 60:02d}"
+        bm = getattr(i, "bitrate_mode", None)
+        if bm is not None and str(bm).split(".")[-1] not in ("UNKNOWN", "0"):
+            out["mode"] = str(bm).split(".")[-1]
+        elif out["codec"] in ("FLAC", "ALAC"):
+            out["mode"] = "Sin pérdida"
+    except Exception:
+        pass
+    return out
+
+
+def tech_info(path):
+    try:
+        m = os.path.getmtime(path)
+    except OSError:
+        m = 0
+    return _tech(path, m)
 
 
 def inspect_file(path):
@@ -617,6 +655,70 @@ class LyricsWorker(AIBase):
 # ------------------------------------------------------------------ Widgets
 
 
+class ClickSlider(QSlider):
+    """Barra en la que un clic salta directamente a ese punto (y también se puede arrastrar)."""
+    seekTo = pyqtSignal(int)
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            opt = QStyleOptionSlider()
+            self.initStyleOption(opt)
+            handle = self.style().subControlRect(QStyle.ComplexControl.CC_Slider, opt,
+                                                 QStyle.SubControl.SC_SliderHandle, self)
+            if not handle.contains(e.position().toPoint()):
+                span = max(1, self.width() - handle.width())
+                x = int(e.position().x()) - handle.width() // 2
+                v = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), max(0, min(span, x)), span)
+                self.setValue(v)
+                self.seekTo.emit(v)
+                e.accept()
+                return
+        super().mousePressEvent(e)
+
+
+class PlayButton(QPushButton):
+    """Botón de reproducir/pausa dibujado a mano: círculo con degradado y brillo al pasar el ratón."""
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(36, 36)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setObjectName("playbtn2")
+        self.setFlat(True)
+        self.playing = False
+
+    def set_playing(self, on):
+        self.playing = bool(on)
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        base = self.palette().color(QPalette.ColorRole.Highlight)
+        full = QRectF(self.rect())
+        if self.underMouse() and self.isEnabled():
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(base.red(), base.green(), base.blue(), 70))
+            p.drawEllipse(full)
+        r = full.adjusted(3, 3, -3, -3)
+        if self.isDown():
+            r = r.adjusted(1, 1, -1, -1)
+        g = QLinearGradient(r.topLeft(), r.bottomRight())
+        g.setColorAt(0, base.lighter(135))
+        g.setColorAt(1, base.darker(120))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(g if self.isEnabled() else QColor(120, 120, 130)))
+        p.drawEllipse(r)
+        p.setBrush(QColor("white"))
+        c = r.center()
+        if self.playing:
+            p.drawRoundedRect(QRectF(c.x() - 5.5, c.y() - 6, 4, 12), 1.5, 1.5)
+            p.drawRoundedRect(QRectF(c.x() + 1.5, c.y() - 6, 4, 12), 1.5, 1.5)
+        else:
+            p.drawPolygon(QPolygonF([QPointF(c.x() - 4, c.y() - 7), QPointF(c.x() - 4, c.y() + 7),
+                                     QPointF(c.x() + 7, c.y())]))
+
+
 class FolderTree(QTreeWidget):
     """Árbol de carpetas. Arrastra carpetas o canciones y suéltalas en otra carpeta,
     incluso desde un árbol hacia el otro."""
@@ -641,7 +743,7 @@ class FolderTree(QTreeWidget):
         self.setDropIndicatorShown(False)   # en su lugar se resalta la carpeta destino
         self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
         self.setDefaultDropAction(Qt.DropAction.CopyAction)
-        self.setAutoExpandDelay(500)
+        self.setAutoExpandDelay(-1)   # no abre carpetas por sí solo al arrastrar
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.itemExpanded.connect(self.on_expand)
 
@@ -1190,6 +1292,16 @@ class Main(QMainWindow):
             self.inputs[k] = le
             grid.addWidget(QLabel(n), r, c * 2)
             grid.addWidget(le, r, c * 2 + 1)
+        self.tech = {}
+        for i, (k, n) in enumerate((("codec", "Códec"), ("bitrate", "Tasa de bits"), ("freq", "Frecuencia"),
+                                    ("dur", "Duración"), ("mode", "Modo"), ("size", "Tamaño"))):
+            r, c = divmod(i, 2)
+            le = QLineEdit()
+            le.setReadOnly(True)
+            le.setPlaceholderText("—")
+            self.tech[k] = le
+            grid.addWidget(QLabel(n), 5 + r, c * 2)
+            grid.addWidget(le, 5 + r, c * 2 + 1)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
         b1 = QPushButton("Aplicar a selección")
@@ -1204,7 +1316,7 @@ class Main(QMainWindow):
         row.addWidget(b1)
         row.addWidget(b3)
         row.addWidget(b2)
-        grid.addLayout(row, 5, 0, 1, 4)
+        grid.addLayout(row, 8, 0, 1, 4)
 
         # ---------- letra (oculta; se muestra con el botón «📝 Letra»)
         self.lyr_box = QGroupBox("Letra")
@@ -1672,17 +1784,18 @@ class Main(QMainWindow):
         infow = QWidget()
         infow.setLayout(info)
         infow.setFixedWidth(245)
-        self.btn_prev, self.btn_play = QPushButton("⏮"), QPushButton("▶")
+        self.btn_prev, self.btn_play = QPushButton("⏮"), PlayButton()
         self.btn_stop, self.btn_next = QPushButton("⏹"), QPushButton("⏭")
         for b, tip in ((self.btn_prev, "Anterior"), (self.btn_play, "Reproducir / pausa (Espacio)"),
                        (self.btn_stop, "Detener"), (self.btn_next, "Siguiente")):
-            b.setObjectName("playbtn" if b is self.btn_play else "tbtn")
+            if b is not self.btn_play:
+                b.setObjectName("tbtn")
             b.setToolTip(tip)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.seek = QSlider(Qt.Orientation.Horizontal)
+        self.seek = ClickSlider(Qt.Orientation.Horizontal)
         self.time_lbl = QLabel("0:00 / 0:00")
         self.time_lbl.setObjectName("hint")
-        self.vol = QSlider(Qt.Orientation.Horizontal)
+        self.vol = ClickSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
         self.vol.setValue(70)
         self.vol.setFixedWidth(90)
@@ -1710,6 +1823,7 @@ class Main(QMainWindow):
             self.player.mediaStatusChanged.connect(self.on_media_status)
             self.player.errorOccurred.connect(self.on_player_error)
             self.seek.sliderReleased.connect(lambda: self.player.setPosition(self.seek.value()))
+            self.seek.seekTo.connect(self.player.setPosition)
             self.vol.valueChanged.connect(lambda x: self.audio.setVolume(x / 100))
         else:
             self.set_now("Sin reproductor integrado", "El doble clic abrirá tu reproductor predeterminado")
@@ -1767,7 +1881,7 @@ class Main(QMainWindow):
             self.play_item(it)
 
     def on_state(self, st):
-        self.btn_play.setText("⏸" if st == QMediaPlayer.PlaybackState.PlayingState else "▶")
+        self.btn_play.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
 
     def on_media_status(self, st):
         if st == QMediaPlayer.MediaStatus.EndOfMedia:
@@ -1881,8 +1995,19 @@ class Main(QMainWindow):
             le.setText("" if multi or not vs else next(iter(vs)))
             le.setPlaceholderText("‹varios valores›" if multi else "")
             le.setEnabled(bool(paths))
+        self.fill_tech(paths)
         self.show_current(self.current_path(), len(paths))
         self.update_suggestions()
+
+    def fill_tech(self, paths):
+        if not paths:
+            for le in self.tech.values():
+                le.setText("")
+            return
+        infos = [tech_info(p) for p in paths[:150]]
+        for k, le in self.tech.items():
+            vs = {i[k] for i in infos}
+            le.setText(next(iter(vs)) if len(vs) == 1 else "‹varios›")
 
     def show_current(self, path, n):
         self._loading = True
@@ -2691,6 +2816,12 @@ class Main(QMainWindow):
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
         t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
 
+        fs = mb.addMenu("&Fuente de etiquetas")
+        fs.addAction(self.act("🎼 Buscar en MusicBrainz…", lambda: self.open_tag_source("musicbrainz")))
+        fs.addAction(self.act("💿 Buscar en Discogs…", lambda: self.open_tag_source("discogs")))
+        fs.addSeparator()
+        fs.addAction(self.act("🔑 Token de Discogs…", lambda: self.open_settings(3)))
+
         st = mb.addMenu("&Ajustes")
         st.addAction(self.act("🤖 Ajustes de IA…", lambda: self.open_settings(0)))
         st.addAction(self.act("🎨 Apariencia (tema y color)…", lambda: self.open_settings(1)))
@@ -2720,6 +2851,41 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         dlg.show()
         self._conv = dlg
+
+    def open_tag_source(self, source):
+        paths = self.selected_paths()
+        if not paths:
+            cp = self.current_path()
+            paths = [cp] if cp and os.path.isfile(cp) else []
+        if not paths:
+            QMessageBox.information(self, "Etiquetas", T("Selecciona una canción."))
+            return
+        token = str(self.cfg.value("discogs_token", "") or "").strip()
+        if source == "discogs" and not token:
+            QMessageBox.information(self, "Discogs", "Discogs necesita un token personal gratuito.\nPégalo en Ajustes → Fuentes de etiquetas.")
+            self.open_settings(3)
+            return
+        self.apply_form()
+        p = paths[0]
+        import tagsource
+        dlg = tagsource.TagSourceDialog(source, token, self.val(p, "artist"),
+                                        self.val(p, "title") or os.path.splitext(os.path.basename(p))[0],
+                                        self.val(p, "album"), self)
+        dlg.applied.connect(lambda fields, cover, p=p: self.apply_external(p, fields, cover))
+        i18n.retranslate(dlg)
+        dlg.show()
+        self._tagdlg = dlg
+
+    def apply_external(self, path, fields, cover):
+        d = self.pending.setdefault(path, {})
+        d.update(fields)
+        if cover:
+            data = prepare_cover(cover, self.cover_side())
+            if data:
+                d["_cover"] = data
+        self.mark_items()
+        self.on_select()
+        self.statusBar().showMessage("Etiquetas aplicadas a «%s» (pendientes de guardar, en naranja)." % os.path.basename(path))
 
     def youtube_current(self, external=True):
         p = self.current_path()
@@ -2790,6 +2956,20 @@ class Main(QMainWindow):
         l3.addWidget(QLabel("Algunos mensajes emergentes siguen en español."))
         l3.addStretch(1)
         tabs.addTab(w3, "Idioma")
+        # --- fuentes de etiquetas
+        w4 = QWidget()
+        l4 = QVBoxLayout(w4)
+        l4.addWidget(QLabel("MusicBrainz no necesita clave. Discogs necesita un token personal gratuito:"))
+        tok = QLineEdit(str(self.cfg.value("discogs_token", "") or ""))
+        tok.setEchoMode(QLineEdit.EchoMode.Password)
+        tok.setPlaceholderText("Token de Discogs")
+        tok.textChanged.connect(lambda t: self.cfg.setValue("discogs_token", t.strip()))
+        l4.addWidget(tok)
+        lnk = QLabel('<a href="https://www.discogs.com/settings/developers">Conseguir mi token (discogs.com/settings/developers)</a>')
+        lnk.setOpenExternalLinks(True)
+        l4.addWidget(lnk)
+        l4.addStretch(1)
+        tabs.addTab(w4, "Fuentes de etiquetas")
 
         def change_lang():
             code = lang_cb.currentData()

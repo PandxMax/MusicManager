@@ -51,3 +51,11 @@ CAMBIOS DE LA VERSIÓN NUEVA
  - Árboles: barra horizontal para nombres largos, la carpeta destino se resalta al arrastrar,
    Ctrl al soltar = copiar, y clic derecho > Mover/Copiar al otro árbol.
  - El reproductor ahora va en la línea de abajo, a la derecha.
+
+NOVEDADES (ÚLTIMA VERSIÓN)
+--------------------------
+ - Las carpetas ya no se abren solas al arrastrar sobre ellas.
+ - En la barra del reproductor haz clic donde quieras para saltar a ese punto. Botón de play rediseñado.
+ - Panel de metadatos: ahora muestra Códec, Tasa de bits, Frecuencia, Duración, Modo y Tamaño.
+ - Menú "Fuente de etiquetas": busca y aplica etiquetas y portada desde MusicBrainz (gratis)
+   o Discogs (necesita un token gratuito: Ajustes > Fuentes de etiquetas).
