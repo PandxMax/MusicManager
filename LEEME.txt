@@ -84,3 +84,5 @@ CORRECCIONES
  - El panel de carpetas ya no se puede aplastar al abrir la letra o mover las divisiones.
  - LRCLIB: reintentos automáticos cuando el servicio está saturado (error 503) y un mensaje claro.
  - Panel de portada rediseñado y botón "📊 Espectro" junto a los datos técnicos.
+
+VERSIÓN 1.03 (cada cambio sube la versión; el historial está en Ayuda > Acerca de)

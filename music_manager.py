@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.01"
+APP_VERSION = "1.03"
 
 
 class TMenu(QMenu):
@@ -672,7 +672,7 @@ class LrclibWorker(QThread):
     got = pyqtSignal(str, str)  # ruta, letra ("" si no hubo)
     finished_all = pyqtSignal()
     failed = pyqtSignal(str)
-    UA = "MusicManager/1.01 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.03 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, jobs, prefer_synced=True):
         super().__init__()
@@ -3519,13 +3519,21 @@ class Main(QMainWindow):
         log.setHtml(
             "<h3>📜 Historial de versiones</h3>"
             f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>El panel de carpetas ya no se puede aplastar al abrir la letra.</li>"
+            "<li>LRCLIB: reintentos automáticos si el servicio está saturado (error 503).</li>"
+            "<li>Panel de portada más cuidado: esquinas redondeadas, sombra y botones con iconos.</li>"
+            "<li>Botón «📊 Espectro» junto a los datos técnicos de la canción.</li></ul>"
+            "<h4>Versión 1.02</h4><ul>"
+            "<li>Letras sincronizadas desde LRCLIB (con los minutos de cada línea y archivo .lrc); se quitó la letra con IA.</li>"
+            "<li>Botones de portada (cambiar, guardar, quitar, ver) y datos de la imagen.</li>"
+            "<li>Se quitaron títulos y textos repetidos del panel de metadatos y de la portada.</li></ul>"
+            "<h4>Versión 1.01</h4><ul>"
             "<li>Menús en lugar de barra de herramientas; reproductor compacto en la línea de estado.</li>"
             "<li>Botones atrás / adelante / subir para navegar por las carpetas.</li>"
             "<li>Árboles de carpetas con barra horizontal, destino resaltado y copiar con Ctrl.</li>"
             "<li>Espectrograma y análisis de calidad (comparación de varias canciones).</li>"
             "<li>Convertir formatos: MP3, FLAC, M4A, OGG, Opus y WAV.</li>"
             "<li>Fuentes de etiquetas: MusicBrainz y Discogs.</li>"
-            "<li>Letras sincronizadas desde LRCLIB (con los minutos de cada línea y archivo .lrc).</li>"
             "<li>Información técnica del archivo (códec, tasa de bits, frecuencia…).</li>"
             "<li>Clic derecho en el artista: Wikipedia, YouTube y Spotify.</li>"
             "<li>Ajustes con categorías, tema y color de acento, y 3 idiomas (ES / EN / RU).</li>"
