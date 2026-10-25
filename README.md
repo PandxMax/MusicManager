@@ -6,6 +6,7 @@
 
 **Organiza tu música como un profesional: explora, mueve, edita etiquetas, portadas y letras, analiza la calidad real de tus archivos y deja que una IA te ayude con los géneros.**
 
+![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.01-7C5CFF)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![PyQt6](https://img.shields.io/badge/Interfaz-PyQt6-41CD52?logo=qt&logoColor=white)
@@ -84,7 +85,7 @@ Selecciona una o varias canciones y abre **Herramientas → Espectrograma**.
 - Guarda junto a los originales o en otra carpeta; nunca sobrescribe nada.
 
 ### ▶️ Reproductor y YouTube
-- Reproductor compacto en la **línea de estado, abajo a la derecha**: play/pausa, barra de avance y volumen. Doble clic en una canción para reproducirla. **Haz clic en la barra** donde quieras para saltar a ese punto.
+- Reproductor compacto en la **línea de estado, abajo a la derecha**: play/pausa, barra de avance y volumen. El **altavoz silencia**, la **rueda del ratón** cambia el volumen y al pasar el ratón por las barras se ve el **minuto** y el **% de volumen**. Doble clic en una canción para reproducirla. **Haz clic en la barra** donde quieras para saltar a ese punto.
 - **Buscar en YouTube**: clic derecho en una canción y se abre tu navegador con esa canción.
 
 ### 🎨 Personalización

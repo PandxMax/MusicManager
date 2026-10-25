@@ -65,3 +65,9 @@ NOVEDADES (ÚLTIMA VERSIÓN)
    etiquetas, Inteligencia artificial, Reproductor) y botones Aceptar / Cancelar.
  - La información técnica (códec, tasa de bits, frecuencia, duración, modo, tamaño) ahora se muestra como
    etiquetas en la cabecera del cuadro de metadatos, y el botón "📝 Letra" está junto a Guardar.
+
+VERSIÓN 1.01
+------------
+ - "Acerca de" muestra la versión y el historial de versiones.
+ - Volumen: botón de altavoz para silenciar, rueda del ratón sobre la barra o el altavoz,
+   y globos que muestran el minuto (barra de avance) y el % de volumen.

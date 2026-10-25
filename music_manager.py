@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
+    QInputDialog, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
 )
 import mutagen
 import i18n
@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 220
-APP_VERSION = "1.0"
+APP_VERSION = "1.01"
 
 
 class TMenu(QMenu):
@@ -657,24 +657,56 @@ class LyricsWorker(AIBase):
 
 
 class ClickSlider(QSlider):
-    """Barra en la que un clic salta directamente a ese punto (y también se puede arrastrar)."""
+    """Barra en la que un clic salta directamente a ese punto (y también se puede arrastrar).
+    Muestra un globo con el valor al pasar el ratón y, si wheel_step > 0, se mueve con la rueda."""
     seekTo = pyqtSignal(int)
 
+    def __init__(self, *a):
+        super().__init__(*a)
+        self.tip_fn, self.wheel_step = None, 0
+        self.setMouseTracking(True)
+
+    def _handle(self):
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        return self.style().subControlRect(QStyle.ComplexControl.CC_Slider, opt, QStyle.SubControl.SC_SliderHandle, self)
+
+    def value_at(self, x):
+        h = self._handle()
+        span = max(1, self.width() - h.width())
+        px = max(0, min(span, int(x) - h.width() // 2))
+        return QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), px, span)
+
+    def show_tip(self, value, gpos):
+        if self.tip_fn:
+            QToolTip.showText(gpos, self.tip_fn(value), self)
+
     def mousePressEvent(self, e):
-        if e.button() == Qt.MouseButton.LeftButton:
-            opt = QStyleOptionSlider()
-            self.initStyleOption(opt)
-            handle = self.style().subControlRect(QStyle.ComplexControl.CC_Slider, opt,
-                                                 QStyle.SubControl.SC_SliderHandle, self)
-            if not handle.contains(e.position().toPoint()):
-                span = max(1, self.width() - handle.width())
-                x = int(e.position().x()) - handle.width() // 2
-                v = QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), max(0, min(span, x)), span)
-                self.setValue(v)
-                self.seekTo.emit(v)
-                e.accept()
-                return
+        if e.button() == Qt.MouseButton.LeftButton and not self._handle().contains(e.position().toPoint()):
+            v = self.value_at(e.position().x())
+            self.setValue(v)
+            self.seekTo.emit(v)
+            e.accept()
+            return
         super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        super().mouseMoveEvent(e)
+        self.show_tip(self.value_at(e.position().x()), e.globalPosition().toPoint())
+
+    def leaveEvent(self, e):
+        QToolTip.hideText()
+        super().leaveEvent(e)
+
+    def wheelEvent(self, e):
+        if self.wheel_step:
+            d = e.angleDelta().y()
+            if d:
+                self.setValue(self.value() + (self.wheel_step if d > 0 else -self.wheel_step))
+                self.show_tip(self.value(), e.globalPosition().toPoint())
+            e.accept()
+        else:
+            super().wheelEvent(e)
 
 
 class PlayButton(QPushButton):
@@ -1157,7 +1189,7 @@ class SongList(QListWidget):
 class Main(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Music Manager")
+        self.setWindowTitle(f"Music Manager {APP_VERSION}")
         self.resize(1500, 840)
         self.setMinimumSize(1000, 620)
         self.cfg = QSettings("MusicManager", "MusicManager")
@@ -1692,6 +1724,9 @@ class Main(QMainWindow):
 
     def eventFilter(self, obj, ev):
         # botones laterales del ratón = atrás / adelante, como en el Explorador
+        if obj is self.btn_mute and ev.type() == QEvent.Type.Wheel:
+            self.vol.wheelEvent(ev)   # rueda sobre el altavoz = subir/bajar volumen
+            return True
         if obj is self.list.viewport() and ev.type() == QEvent.Type.MouseButtonPress:
             if ev.button() == Qt.MouseButton.BackButton:
                 self.nav_back()
@@ -1874,7 +1909,7 @@ class Main(QMainWindow):
         bar.setObjectName("playerbar")
         h = QHBoxLayout(bar)
         h.setContentsMargins(0, 0, 4, 0)
-        h.setSpacing(8)
+        h.setSpacing(6)
         self.now_cover = QLabel()
         self.now_cover.setObjectName("nowcover")
         self.now_cover.setFixedSize(52, 52)
@@ -1902,10 +1937,18 @@ class Main(QMainWindow):
         self.seek = ClickSlider(Qt.Orientation.Horizontal)
         self.time_lbl = QLabel("0:00 / 0:00")
         self.time_lbl.setObjectName("hint")
+        self.btn_mute = QPushButton("🔊")
+        self.btn_mute.setObjectName("tbtn")
+        self.btn_mute.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_mute.setToolTip("Silenciar")
+        self.btn_mute.installEventFilter(self)
         self.vol = ClickSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
         self.vol.setValue(70)
         self.vol.setFixedWidth(90)
+        self.vol.wheel_step = 5
+        self.vol.tip_fn = lambda v: f"Volumen: {v}%"
+        self.seek.tip_fn = lambda v: f"{fmt_ms(v)} / {fmt_ms(self.seek.maximum())}"
         for w in (self.now_cover, infow, self.btn_prev, self.btn_next, self.btn_stop):
             w.setParent(bar)   # siguen existiendo para el resto del código, pero ocultos
             w.hide()
@@ -1913,7 +1956,7 @@ class Main(QMainWindow):
         self.seek.setFixedWidth(260)
         h.addWidget(self.seek)
         h.addWidget(self.time_lbl)
-        h.addWidget(QLabel("🔊"))
+        h.addWidget(self.btn_mute)
         h.addWidget(self.vol)
         self.btn_play.clicked.connect(self.toggle_play)
         self.btn_stop.clicked.connect(self.stop_play)
@@ -1931,7 +1974,8 @@ class Main(QMainWindow):
             self.player.errorOccurred.connect(self.on_player_error)
             self.seek.sliderReleased.connect(lambda: self.player.setPosition(self.seek.value()))
             self.seek.seekTo.connect(self.player.setPosition)
-            self.vol.valueChanged.connect(lambda x: self.audio.setVolume(x / 100))
+            self.vol.valueChanged.connect(self.on_vol)
+            self.btn_mute.clicked.connect(self.toggle_mute)
         else:
             self.set_now("Sin reproductor integrado", "El doble clic abrirá tu reproductor predeterminado")
             for w in (self.btn_prev, self.btn_play, self.btn_stop, self.btn_next, self.seek, self.vol):
@@ -1986,6 +2030,26 @@ class Main(QMainWindow):
             it = self.list.item(n)
             self.list.scrollToItem(it)
             self.play_item(it)
+
+    def on_vol(self, x):
+        if self.player is None:
+            return
+        if x > 0 and self.audio.isMuted():
+            self.audio.setMuted(False)
+        self.audio.setVolume(x / 100)
+        self.update_vol_icon()
+
+    def toggle_mute(self):
+        if self.player is None:
+            return
+        self.audio.setMuted(not self.audio.isMuted())
+        self.update_vol_icon()
+
+    def update_vol_icon(self):
+        v = self.vol.value()
+        muted = self.player is not None and self.audio.isMuted()
+        self.btn_mute.setText("🔇" if muted or v == 0 else ("🔈" if v < 34 else "🔉" if v < 67 else "🔊"))
+        self.btn_mute.setToolTip(T("Quitar silencio") if muted else T("Silenciar"))
 
     def on_state(self, st):
         self.btn_play.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
@@ -3268,15 +3332,46 @@ class Main(QMainWindow):
         box.exec()
 
     def show_about(self):
-        box = QMessageBox(self)
-        box.setWindowTitle("Acerca de Music Manager")
-        box.setIconPixmap(self.logo_pm.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio,
-                                              Qt.TransformationMode.SmoothTransformation))
-        box.setTextFormat(Qt.TextFormat.RichText)
-        box.setText(f"<h3>Music Manager {APP_VERSION}</h3>"
-                    "<p>Organiza tu música: mueve carpetas, edita etiquetas, portadas y letras, "
-                    "y deja que una IA te ayude con los géneros.</p>")
-        box.exec()
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Acerca de Music Manager")
+        dlg.resize(560, 560)
+        v = QVBoxLayout(dlg)
+        top = QHBoxLayout()
+        pm = QLabel()
+        pm.setPixmap(self.logo_pm.scaled(88, 88, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        top.addWidget(pm)
+        t = QLabel(f"<h2 style='margin:0'>Music Manager</h2><p style='margin:2px 0'>Versión <b>{APP_VERSION}</b></p>"
+                   "<p>Organiza tu música: mueve carpetas, edita etiquetas, portadas y letras,<br>"
+                   "analiza la calidad de tus archivos y deja que una IA te ayude con los géneros.</p>")
+        t.setTextFormat(Qt.TextFormat.RichText)
+        t.setWordWrap(True)
+        top.addWidget(t, 1)
+        v.addLayout(top)
+        log = QTextBrowser()
+        log.setOpenExternalLinks(True)
+        log.setHtml(
+            "<h3>📜 Historial de versiones</h3>"
+            f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>Menús en lugar de barra de herramientas; reproductor compacto en la línea de estado.</li>"
+            "<li>Botones atrás / adelante / subir para navegar por las carpetas.</li>"
+            "<li>Árboles de carpetas con barra horizontal, destino resaltado y copiar con Ctrl.</li>"
+            "<li>Espectrograma y análisis de calidad (comparación de varias canciones).</li>"
+            "<li>Convertir formatos: MP3, FLAC, M4A, OGG, Opus y WAV.</li>"
+            "<li>Fuentes de etiquetas: MusicBrainz y Discogs.</li>"
+            "<li>Información técnica del archivo (códec, tasa de bits, frecuencia…).</li>"
+            "<li>Clic derecho en el artista: Wikipedia, YouTube y Spotify.</li>"
+            "<li>Ajustes con categorías, tema y color de acento, y 3 idiomas (ES / EN / RU).</li>"
+            "<li>Volumen: silenciar, rueda del ratón y globos con el minuto y el volumen.</li></ul>"
+            "<h4>Versión 1.0</h4><ul>"
+            "<li>Explorador con arrastrar y soltar entre dos árboles.</li>"
+            "<li>Editor de etiquetas, portadas (copiar, pegar, redimensionar) y letras.</li>"
+            "<li>IA (Claude, ChatGPT, Gemini) para géneros y letras.</li>"
+            "<li>Reproductor integrado y búsqueda en YouTube.</li></ul>")
+        v.addWidget(log, 1)
+        ok = QPushButton("Cerrar")
+        ok.clicked.connect(dlg.accept)
+        v.addWidget(ok, 0, Qt.AlignmentFlag.AlignRight)
+        dlg.exec()
 
     def go_to_row(self, r):
         it = self.list.item(r)
