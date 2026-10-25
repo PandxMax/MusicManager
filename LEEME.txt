@@ -127,3 +127,13 @@ VERSIÓN 1.08
    vuelve a abrir. Solo funciona en el .exe; sus ajustes se conservan.
  - IMPORTANTE: la primera vez hay que descargar la 1.08 a mano (las anteriores no tienen esta función).
    Desde ahí, cada versión nueva se instala sola. El flujo "Crear EXE" ahora publica una Release en GitHub.
+
+VERSIÓN 1.09
+------------
+ - Volumen: la barra aparece hacia ARRIBA, flotando sobre el botón de sonido (ya no empuja nada).
+ - Botón flotante ☰ en la esquina inferior derecha: despliega, por encima de portada, géneros y letra,
+   el panel de la lista de reproducción. Lo primero que muestra es lo que suena ahora; debajo, la lista.
+   Arrastra canciones o carpetas desde el explorador, ordénalas arrastrando, crea listas con nombre
+   (＋), cambia entre ellas, guarda/importa .m3u8. "Cola actual" es la lista por defecto.
+ - Cuadritos de fondo en la barra de posición: bailan con el ritmo REAL de la canción (se analiza el audio
+   al empezar a sonar) y, al detener la música, caen hacia abajo y desaparecen.

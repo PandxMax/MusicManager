@@ -11,7 +11,7 @@ from functools import lru_cache
 from urllib.parse import quote_plus, quote
 
 from PyQt6.QtCore import (QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
-                          QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
+                          QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
 from PyQt6.QtGui import (QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
                          QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent, QPen)
 from PyQt6.QtWidgets import (
@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.08"
+APP_VERSION = "1.09"
 
 
 class TMenu(QMenu):
@@ -345,6 +345,17 @@ QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
 QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 8px; font-size: 11px; }
 QPushButton#tabbtn { border-radius: 10px; padding: 7px 10px; }
+QFrame#plpanel { background: @window; border: 1px solid @border; border-radius: 14px; }
+QFrame#npcard { background: @surface2; border: 1px solid @border; border-radius: 12px; }
+QPushButton#fab { background: @accent; color: white; border: none; border-radius: 20px; font-size: 18px; padding: 0; }
+QPushButton#fab:hover { background: @accent_hover; }
+QFrame#volpop { background: @surface2; border: 1px solid @border; border-radius: 10px; }
+QSlider::groove:vertical { width: 6px; background: @border; border-radius: 3px; }
+QSlider::add-page:vertical { background: @accent; border-radius: 3px; }
+QSlider::handle:vertical { background: white; border: 2px solid @accent; height: 12px; width: 12px; margin: 0 -4px; border-radius: 8px; }
+QListWidget#pl { background: transparent; border: none; outline: none; }
+QListWidget#pl::item { background: @surface; border: 1px solid @border; border-radius: 8px; padding: 4px 8px; margin: 1px 2px; }
+QListWidget#pl::item:selected { background: @accent_soft; border-color: @accent; color: @text; }
 QPushButton#tabbtn:checked { background: @accent; color: white; border-color: @accent; font-weight: 600; }
 QPushButton#chipbtn { background: @accent_soft; border: 1px solid @accent; border-radius: 10px; padding: 2px 10px; font-size: 11px; }
 QPushButton#chipbtn:hover { background: @accent; color: white; }
@@ -756,7 +767,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.08 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.09 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -959,46 +970,176 @@ class SpinDisc(QWidget):
 
 
 class VolBox(QWidget):
-    """Botón de volumen; al pasar el ratón se despliega la barrita para subir o bajar."""
+    """Botón de volumen; al pasar el ratón aparece hacia ARRIBA una barra vertical flotante (no mueve nada)."""
     def __init__(self, btn, slider):
         super().__init__()
         self.btn, self.slider = btn, slider
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(2)
         lay.addWidget(btn)
-        lay.addWidget(slider)
-        slider.setMinimumWidth(0)
-        slider.setMaximumWidth(0)
-        self.anim = QPropertyAnimation(slider, b"maximumWidth", self)
-        self.anim.setDuration(160)
-        self.anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.pop = QFrame(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.pop.setObjectName("volpop")
+        self.pop.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        pl = QVBoxLayout(self.pop)
+        pl.setContentsMargins(10, 10, 10, 10)
+        pl.addWidget(slider, 0, Qt.AlignmentFlag.AlignHCenter)
+        slider.setFixedHeight(110)
+        slider.setFixedWidth(24)
         self.timer = QTimer(self)
-        self.timer.setSingleShot(True)
-        self.timer.setInterval(500)
-        self.timer.timeout.connect(self.close_it)
-        self.setMouseTracking(True)
+        self.timer.setInterval(200)
+        self.timer.timeout.connect(self.check)
+        btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        btn.installEventFilter(self)
 
-    def go(self, w):
-        self.anim.stop()
-        self.anim.setStartValue(self.slider.maximumWidth())
-        self.anim.setEndValue(w)
-        self.anim.start()
+    def eventFilter(self, obj, ev):
+        if obj is self.btn and ev.type() == QEvent.Type.Enter:
+            self.open_it()
+        return super().eventFilter(obj, ev)
 
-    def enterEvent(self, e):
-        self.timer.stop()
-        self.go(90)
-        super().enterEvent(e)
-
-    def leaveEvent(self, e):
+    def open_it(self):
+        self.pop.adjustSize()
+        g = self.btn.mapToGlobal(QPoint(self.btn.width() // 2, 0))
+        self.pop.move(g.x() - self.pop.width() // 2, g.y() - self.pop.height() - 2)
+        self.pop.show()
+        self.pop.raise_()
         self.timer.start()
-        super().leaveEvent(e)
 
-    def close_it(self):
-        if self.slider.isSliderDown() or self.underMouse():
-            self.timer.start()
+    def check(self):
+        pos = QCursor.pos()
+        near = self.btn.rect().adjusted(-6, -6, 6, 6)
+        over_btn = near.contains(self.btn.mapFromGlobal(pos))
+        pr = self.pop.geometry().adjusted(-6, -10, 6, 14)
+        if self.slider.isSliderDown() or over_btn or pr.contains(pos):
             return
-        self.go(0)
+        self.pop.hide()
+        self.timer.stop()
+
+
+class VizWorker(QThread):
+    """Calcula (una vez por canción) la energía por bandas de frecuencia para animar los cuadritos al ritmo real."""
+    ready = pyqtSignal(str, object, int)
+
+    def __init__(self, path, bands=32):
+        super().__init__()
+        self.path, self.bands = path, bands
+
+    def run(self):
+        try:
+            import numpy as np
+            import spectro
+            rate, n, fps = 11025, 1024, 25
+            hop = rate // fps
+            x = spectro.decode_mono(self.path, rate)
+            frames = max(1, (len(x) - n) // hop)
+            win = np.hanning(n).astype(np.float32)
+            freqs = np.fft.rfftfreq(n, 1.0 / rate)
+            edges = np.geomspace(40, 5000, self.bands + 1)
+            idx = []
+            for b in range(self.bands):
+                lo = int(np.searchsorted(freqs, edges[b]))
+                hi = max(int(np.searchsorted(freqs, edges[b + 1])), lo + 1)
+                idx.append((lo, hi))
+            view = np.lib.stride_tricks.sliding_window_view(x, n)
+            out = np.zeros((frames, self.bands), np.float32)
+            step = 400
+            for a in range(0, frames, step):
+                if self.isInterruptionRequested():
+                    return
+                b = min(frames, a + step)
+                chunk = view[a * hop: (b - 1) * hop + 1: hop][: b - a] * win
+                mag = np.abs(np.fft.rfft(chunk, axis=1))
+                for k, (lo, hi) in enumerate(idx):
+                    out[a:b, k] = mag[:, lo:hi].mean(axis=1)
+            db = 20 * np.log10(out + 1e-5)
+            lo = np.percentile(db, 8, axis=0)
+            hi = np.percentile(db, 99, axis=0)
+            norm = np.clip((db - lo) / np.maximum(hi - lo, 1e-3), 0, 1).astype(np.float32)
+            self.ready.emit(self.path, norm, fps)
+        except Exception:
+            self.ready.emit(self.path, None, 25)
+
+
+class VizBar(QWidget):
+    """Cuadritos de fondo que bailan con la música; al parar, caen y desaparecen."""
+    COLS, SQ, GAP = 32, 6, 2
+
+    def __init__(self, pos_fn):
+        super().__init__()
+        cell = self.SQ + self.GAP
+        self.cell = cell
+        self.setFixedSize(self.COLS * cell + 4, 38)
+        self.rows = (self.height() - 4) // cell
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.pos_fn, self.data, self.fps, self.state = pos_fn, None, 25, "stopped"
+        self.lvl = [0.0] * self.COLS
+        self.parts = []
+        self.t = 0.0
+        self.timer = QTimer(self)
+        self.timer.setInterval(33)
+        self.timer.timeout.connect(self.tick)
+
+    def set_data(self, arr, fps):
+        self.data, self.fps = arr, fps
+
+    def set_state(self, st):
+        import random
+        if st == self.state:
+            return
+        prev, self.state = self.state, st
+        if st == "stopped":
+            bottom = self.height() - 2
+            for c, v in enumerate(self.lvl):
+                for r in range(int(v + 0.5)):
+                    self.parts.append([c * self.cell + 2, bottom - (r + 1) * self.cell + self.GAP,
+                                       random.uniform(-10, 40), 1.0, random.uniform(-20, 20)])
+                self.lvl[c] = 0.0
+            self.data = None
+        if st == "playing" or self.parts:
+            self.timer.start()
+
+    def tick(self):
+        import math, random
+        dt = 0.033
+        self.t += dt
+        if self.state == "playing":
+            row = None
+            if self.data is not None and len(self.data):
+                i = min(len(self.data) - 1, max(0, int(self.pos_fn() / 1000.0 * self.fps)))
+                row = self.data[i]
+            for c in range(self.COLS):
+                if row is not None:
+                    tgt = float(row[c]) ** 1.4 * self.rows
+                else:   # mientras se analiza la canción: movimiento suave
+                    tgt = (0.25 + 0.2 * math.sin(self.t * 4 + c * 0.6) + 0.15 * math.sin(self.t * 7 + c)) * self.rows
+                self.lvl[c] = tgt if tgt > self.lvl[c] else max(tgt, self.lvl[c] - 9 * dt)
+        gone = []
+        for p in self.parts:
+            p[2] += 900 * dt
+            p[1] += p[2] * dt
+            p[0] += p[4] * dt
+            p[3] -= 1.6 * dt
+            if p[3] <= 0 or p[1] > self.height():
+                gone.append(p)
+        for p in gone:
+            self.parts.remove(p)
+        if self.state != "playing" and not self.parts:
+            self.timer.stop()
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        base = self.palette().color(QPalette.ColorRole.Highlight)
+        bottom = self.height() - 2
+        p.setPen(Qt.PenStyle.NoPen)
+        for c, v in enumerate(self.lvl):
+            for r in range(int(v + 0.5)):
+                a = 70 + int(60 * r / max(1, self.rows - 1))
+                p.setBrush(QColor(base.red(), base.green(), base.blue(), a))
+                p.drawRoundedRect(QRectF(c * self.cell + 2, bottom - (r + 1) * self.cell + self.GAP, self.SQ, self.SQ), 1.5, 1.5)
+        for x, y, _vy, al, _vx in self.parts:
+            p.setBrush(QColor(base.red(), base.green(), base.blue(), int(110 * max(0, al))))
+            p.drawRoundedRect(QRectF(x, y, self.SQ, self.SQ), 1.5, 1.5)
 
 
 class PlaylistList(QListWidget):
@@ -1013,6 +1154,7 @@ class PlaylistList(QListWidget):
         self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.setObjectName("pl")
         self.setSpacing(3)
         self.setUniformItemSizes(True)
         self.setWordWrap(False)
@@ -1128,8 +1270,12 @@ class ClickSlider(QSlider):
         self.initStyleOption(opt)
         return self.style().subControlRect(QStyle.ComplexControl.CC_Slider, opt, QStyle.SubControl.SC_SliderHandle, self)
 
-    def value_at(self, x):
+    def value_at(self, x, y=None):
         h = self._handle()
+        if self.orientation() == Qt.Orientation.Vertical and y is not None:
+            span = max(1, self.height() - h.height())
+            py = max(0, min(span, int(y) - h.height() // 2))
+            return QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), py, span, True)
         span = max(1, self.width() - h.width())
         px = max(0, min(span, int(x) - h.width() // 2))
         return QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), px, span)
@@ -1140,7 +1286,7 @@ class ClickSlider(QSlider):
 
     def mousePressEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton and not self._handle().contains(e.position().toPoint()):
-            v = self.value_at(e.position().x())
+            v = self.value_at(e.position().x(), e.position().y())
             self.setValue(v)
             self.seekTo.emit(v)
             e.accept()
@@ -1149,7 +1295,7 @@ class ClickSlider(QSlider):
 
     def mouseMoveEvent(self, e):
         super().mouseMoveEvent(e)
-        self.show_tip(self.value_at(e.position().x()), e.globalPosition().toPoint())
+        self.show_tip(self.value_at(e.position().x(), e.position().y()), e.globalPosition().toPoint())
 
     def leaveEvent(self, e):
         QToolTip.hideText()
@@ -1658,7 +1804,7 @@ class Main(QMainWindow):
         self.protected, self.worker, self.icons_mode = set(), None, True
         self.row_index = {}
         self.playing_path, self.lyr_worker, self.player = None, None, None
-        self.playlist, self.pl_active, self.pl_dlg = [], False, None
+        self.playlist, self.pl_active, self.pl_lists, self.pl_name = [], False, {}, "Cola actual"
         self.pl_load()
         self.lyr_ok = self.lyr_total = 0
         self.chats = {}
@@ -2003,6 +2149,7 @@ class Main(QMainWindow):
         cl.setSpacing(0)
         cl.addWidget(main, 1)
         self.setCentralWidget(central)
+        self.build_pl_panel(central)
         self.statusBar().addPermanentWidget(self.player_bar)   # reproductor en la línea de estado, a la derecha
         self.statusBar().setSizeGripEnabled(False)
         self.statusBar().showMessage("Arrastra carpetas o canciones sobre otra carpeta. Doble clic en una canción para reproducirla.")
@@ -2232,6 +2379,8 @@ class Main(QMainWindow):
 
     def eventFilter(self, obj, ev):
         # botones laterales del ratón = atrás / adelante, como en el Explorador
+        if obj is self.centralWidget() and ev.type() in (QEvent.Type.Resize, QEvent.Type.Show):
+            self.layout_overlay()
         if obj is self.btn_mute and ev.type() == QEvent.Type.Wheel:
             self.vol.wheelEvent(ev)   # rueda sobre el altavoz = subir/bajar volumen
             return True
@@ -2450,7 +2599,7 @@ class Main(QMainWindow):
         self.btn_mute.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_mute.setToolTip("Silenciar")
         self.btn_mute.installEventFilter(self)
-        self.vol = ClickSlider(Qt.Orientation.Horizontal)
+        self.vol = ClickSlider(Qt.Orientation.Vertical)
         self.vol.setRange(0, 100)
         self.vol.setValue(70)
         self.vol.wheel_step = 5
@@ -2469,8 +2618,14 @@ class Main(QMainWindow):
         h.addWidget(self.btn_play)
         h.addWidget(self.btn_next)
         h.addWidget(self.btn_stop)
-        self.seek.setFixedWidth(260)
-        h.addWidget(self.seek)
+        self.viz = VizBar(lambda: self.player.position() if self.player is not None else 0)
+        self.seek.setFixedWidth(self.viz.width())
+        seekbox = QWidget()
+        sg = QGridLayout(seekbox)
+        sg.setContentsMargins(0, 0, 0, 0)
+        sg.addWidget(self.viz, 0, 0)
+        sg.addWidget(self.seek, 0, 0)
+        h.addWidget(seekbox)
         h.addWidget(self.time_lbl)
         self.volbox = VolBox(self.btn_mute, self.vol)
         h.addWidget(self.volbox)
@@ -2526,6 +2681,7 @@ class Main(QMainWindow):
             self.now_cover.setPixmap(self.default_icon.pixmap(52, 52))
             self.disc.set_cover(None)
         self.apply_cover_colors(data)
+        self.start_viz(path)
         self.pl_refresh()
         self.mark_items()
 
@@ -2563,16 +2719,77 @@ class Main(QMainWindow):
         p = self.playing_path
         self.apply_cover_colors(self.cover_data_of(p) if p and on else None)
 
+    # ------------------------------------------------- Visualizador
+    def start_viz(self, path):
+        self.viz.set_data(None, 25)
+        if not hasattr(self, "_viz_workers"):
+            self._viz_workers = set()
+        for old in self._viz_workers:
+            old.requestInterruption()
+        w = VizWorker(path, VizBar.COLS)
+        self._viz_workers.add(w)   # se conserva hasta que termine (evita destruir un hilo en marcha)
+        w.ready.connect(self.viz_ready)
+        w.finished.connect(lambda w=w: self._viz_workers.discard(w))
+        w.start()
+
+    def viz_ready(self, path, arr, fps):
+        if path == self.playing_path:
+            self.viz.set_data(arr, fps)
+
     # ------------------------------------------------- Lista de reproducción
+    QUEUE = "Cola actual"
+
     def pl_load(self):
         try:
-            data = json.loads(str(self.cfg.value("playlist", "[]") or "[]"))
+            lists = json.loads(str(self.cfg.value("playlists", "{}") or "{}"))
         except ValueError:
-            data = []
-        self.playlist = [p for p in data if isinstance(p, str) and os.path.isfile(p)]
+            lists = {}
+        if not isinstance(lists, dict):
+            lists = {}
+        if self.QUEUE not in lists:
+            try:
+                old = json.loads(str(self.cfg.value("playlist", "[]") or "[]"))
+            except ValueError:
+                old = []
+            lists[self.QUEUE] = old if isinstance(old, list) else []
+        self.pl_lists = {k: [p for p in v if isinstance(p, str) and os.path.isfile(p)]
+                         for k, v in lists.items() if isinstance(v, list)}
+        name = str(self.cfg.value("pl_name", self.QUEUE))
+        self.pl_name = name if name in self.pl_lists else self.QUEUE
+        self.playlist = self.pl_lists[self.pl_name]
 
     def pl_save(self):
-        self.cfg.setValue("playlist", json.dumps(self.playlist))
+        self.cfg.setValue("playlists", json.dumps(self.pl_lists))
+        self.cfg.setValue("pl_name", self.pl_name)
+
+    def pl_switch(self, name):
+        if name not in self.pl_lists:
+            return
+        self.pl_name = name
+        self.playlist = self.pl_lists[name]
+        self.pl_save()
+        self.pl_refresh()
+
+    def pl_new(self, copy=False):
+        name, ok = QInputDialog.getText(self, "Nueva lista de reproducción",
+                                        "Nombre de la lista:" if not copy else "Guardar esta lista como:")
+        name = (name or "").strip()
+        if not ok or not name:
+            return
+        if name in self.pl_lists:
+            QMessageBox.information(self, "Lista de reproducción", "Ya existe una lista con ese nombre.")
+            return
+        self.pl_lists[name] = list(self.playlist) if copy else []
+        self.pl_switch(name)
+
+    def pl_delete(self):
+        if self.pl_name == self.QUEUE:
+            self.pl_clear()
+            return
+        q = QMessageBox.question(self, "Eliminar lista", f"¿Eliminar la lista «{self.pl_name}»? (Las canciones no se borran.)")
+        if q == QMessageBox.StandardButton.Yes:
+            del self.pl_lists[self.pl_name]
+            self.pl_switch(self.QUEUE)
 
     def pl_expand(self, paths):
         out = []
@@ -2590,17 +2807,18 @@ class Main(QMainWindow):
     def pl_add(self, paths):
         have = set(self.playlist)
         new = [p for p in self.pl_expand(paths) if p not in have]
-        self.playlist += new
+        self.playlist.extend(new)
         self.pl_save()
         self.pl_refresh()
-        self.statusBar().showMessage(f"{len(new)} canción(es) añadida(s) a la lista de reproducción ({len(self.playlist)} en total).")
+        self.statusBar().showMessage(f"{len(new)} canción(es) añadida(s) a «{self.pl_name}» ({len(self.playlist)} en total).")
 
     def play_folder(self, folder):
         files = self.pl_expand([folder])
         if not files:
             self.statusBar().showMessage("Esa carpeta no tiene canciones.")
             return
-        self.playlist = files
+        self.pl_switch(self.QUEUE)
+        self.playlist[:] = files
         self.pl_save()
         self.pl_active = True
         self.play_file(files[0])
@@ -2610,7 +2828,7 @@ class Main(QMainWindow):
 
     def pl_label(self, i, p):
         name = os.path.splitext(os.path.basename(p))[0]
-        return ("▶  " if p == self.playing_path and self.pl_active else "     ") + f"{i + 1}. {name}"
+        return ("▶  " if p == self.playing_path and self.pl_active else "") + f"{i + 1}. {name}"
 
     def pl_refresh(self):
         lw = getattr(self, "pl_list", None)
@@ -2622,15 +2840,37 @@ class Main(QMainWindow):
             it = QListWidgetItem(self.pl_label(i, p))
             it.setData(PATH_ROLE, p)
             it.setToolTip(p)
-            it.setSizeHint(QSize(10, 34))
+            it.setSizeHint(QSize(10, 38))
             lw.addItem(it)
             if p == self.playing_path and self.pl_active:
                 lw.setCurrentItem(it)
         lw.blockSignals(False)
+        self.pl_combo.blockSignals(True)
+        self.pl_combo.clear()
+        self.pl_combo.addItems(list(self.pl_lists))
+        self.pl_combo.setCurrentText(self.pl_name)
+        self.pl_combo.blockSignals(False)
         self.pl_count.setText(f"{len(self.playlist)} canciones")
 
+    def pl_update_np(self):
+        if getattr(self, "np_title", None) is None:
+            return
+        st = self.player.playbackState() if self.player is not None else None
+        if not self.playing_path or st == QMediaPlayer.PlaybackState.StoppedState:
+            self.np_title.setText("Nada sonando")
+            self.np_sub.setText("Doble clic en una canción para reproducirla")
+            self.np_cover.setPixmap(self.default_icon.pixmap(64, 64))
+            return
+        self.np_title.setText(self.now_lbl.toolTip() or self.now_lbl.text())
+        icon = "▶ Reproduciendo" if st == QMediaPlayer.PlaybackState.PlayingState else "⏸ En pausa"
+        self.np_sub.setText(f"{icon} · {self.now_sub.toolTip() or self.now_sub.text()}".strip(" ·"))
+        pm = self.now_cover.pixmap()
+        if pm is not None and not pm.isNull():
+            self.np_cover.setPixmap(rounded_pm(pm.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                                                          Qt.TransformationMode.SmoothTransformation), 10))
+
     def pl_sync(self):
-        self.playlist = [self.pl_list.item(r).data(PATH_ROLE) for r in range(self.pl_list.count())]
+        self.playlist[:] = [self.pl_list.item(r).data(PATH_ROLE) for r in range(self.pl_list.count())]
         self.pl_save()
         self.pl_refresh()
 
@@ -2642,7 +2882,7 @@ class Main(QMainWindow):
         self.pl_refresh()
 
     def pl_clear(self):
-        self.playlist = []
+        self.playlist.clear()
         self.pl_save()
         self.pl_refresh()
 
@@ -2655,7 +2895,7 @@ class Main(QMainWindow):
     def pl_export(self):
         if not self.playlist:
             return
-        fn, _ = QFileDialog.getSaveFileName(self, "Guardar lista de reproducción", "mi_lista.m3u8", "Lista M3U (*.m3u8 *.m3u)")
+        fn, _ = QFileDialog.getSaveFileName(self, "Guardar lista de reproducción", f"{self.pl_name}.m3u8", "Lista M3U (*.m3u8 *.m3u)")
         if fn:
             try:
                 with open(fn, "w", encoding="utf-8") as fh:
@@ -2675,47 +2915,131 @@ class Main(QMainWindow):
         except OSError as e:
             QMessageBox.warning(self, "Error", str(e))
             return
-        self.playlist = [p for p in (x if os.path.isabs(x) else os.path.join(base, x) for x in items) if os.path.isfile(p)]
+        self.playlist[:] = [p for p in (x if os.path.isabs(x) else os.path.join(base, x) for x in items) if os.path.isfile(p)]
         self.pl_save()
         self.pl_refresh()
 
+    def build_pl_panel(self, central):
+        """Panel flotante con la lista de reproducción: se despliega sobre la columna derecha (portada, géneros, letra)."""
+        panel = QFrame(central)
+        panel.setObjectName("plpanel")
+        v = QVBoxLayout(panel)
+        v.setContentsMargins(12, 12, 12, 12)
+        v.setSpacing(8)
+        t = QLabel("Reproduciendo ahora")
+        f = t.font()
+        f.setBold(True)
+        t.setFont(f)
+        v.addWidget(t)
+        card = QFrame()
+        card.setObjectName("npcard")
+        ch = QHBoxLayout(card)
+        ch.setContentsMargins(8, 8, 8, 8)
+        self.np_cover = QLabel()
+        self.np_cover.setFixedSize(64, 64)
+        ch.addWidget(self.np_cover)
+        col = QVBoxLayout()
+        self.np_title = QLabel("Nada sonando")
+        self.np_title.setWordWrap(True)
+        ft = self.np_title.font()
+        ft.setBold(True)
+        self.np_title.setFont(ft)
+        self.np_sub = QLabel("")
+        self.np_sub.setObjectName("hint")
+        self.np_sub.setWordWrap(True)
+        col.addWidget(self.np_title)
+        col.addWidget(self.np_sub)
+        col.addStretch(1)
+        ch.addLayout(col, 1)
+        v.addWidget(card)
+        row = QHBoxLayout()
+        row.setSpacing(4)
+        self.pl_combo = QComboBox()
+        self.pl_combo.activated.connect(lambda _=0: self.pl_switch(self.pl_combo.currentText()))
+        row.addWidget(self.pl_combo, 1)
+        for text, tip, fn in (("＋", "Crear una lista nueva", self.pl_new), ("🗑", "Eliminar la lista (o vaciar la cola)", self.pl_delete)):
+            b = QPushButton(text)
+            b.setObjectName("iconbtn")
+            b.setFixedSize(34, 34)
+            b.setToolTip(tip)
+            b.clicked.connect(lambda _=False, f=fn: f())
+            row.addWidget(b)
+        more = QPushButton("⋯")
+        more.setObjectName("iconbtn")
+        more.setFixedSize(34, 34)
+        more.setToolTip("Más opciones")
+        mm = TMenu(self)
+        mm.addAction("💾 Guardar esta lista con otro nombre…", lambda: self.pl_new(copy=True))
+        mm.addAction("➖ Quitar las seleccionadas (Supr)", self.pl_remove)
+        mm.addAction("🧹 Vaciar la lista", self.pl_clear)
+        mm.addSeparator()
+        mm.addAction("📤 Exportar como archivo .m3u8…", self.pl_export)
+        mm.addAction("📥 Importar archivo .m3u8…", self.pl_import)
+        more.setMenu(mm)
+        row.addWidget(more)
+        v.addLayout(row)
+        self.pl_list = PlaylistList()
+        self.pl_list.dropped.connect(self.pl_add)
+        self.pl_list.reordered.connect(self.pl_sync)
+        self.pl_list.itemDoubleClicked.connect(self.pl_play)
+        sc = QShortcut(QKeySequence("Delete"), self.pl_list)
+        sc.setContext(Qt.ShortcutContext.WidgetShortcut)
+        sc.activated.connect(self.pl_remove)
+        v.addWidget(self.pl_list, 1)
+        hint = QLabel("Arrastra aquí canciones o carpetas. Arrastra para ordenar. Doble clic para reproducir.")
+        hint.setWordWrap(True)
+        hint.setObjectName("hint")
+        v.addWidget(hint)
+        self.pl_count = QLabel("")
+        self.pl_count.setObjectName("hint")
+        v.addWidget(self.pl_count)
+        v.addSpacing(46)   # deja libre el botón flotante
+        panel.hide()
+        self.pl_panel = panel
+        fab = QPushButton("☰", central)
+        fab.setObjectName("fab")
+        fab.setFixedSize(40, 40)
+        fab.setCursor(Qt.CursorShape.PointingHandCursor)
+        fab.setToolTip("Lista de reproducción")
+        sh = QGraphicsDropShadowEffect(fab)
+        sh.setBlurRadius(18)
+        sh.setOffset(0, 3)
+        sh.setColor(QColor(0, 0, 0, 150))
+        fab.setGraphicsEffect(sh)
+        fab.clicked.connect(self.show_playlist)
+        self.pl_fab = fab
+        central.installEventFilter(self)
+        self.main_split.splitterMoved.connect(lambda *a: self.layout_overlay())
+        self.pl_refresh()
+        self.pl_update_np()
+        i18n.retranslate(panel)
+        QTimer.singleShot(0, self.layout_overlay)
+
+    def layout_overlay(self):
+        c = self.centralWidget()
+        if c is None or getattr(self, "pl_panel", None) is None:
+            return
+        r = self.rightw_w
+        tl = r.mapTo(c, QPoint(0, 0))
+        self.pl_panel.setGeometry(tl.x(), tl.y(), max(300, r.width()), r.height())
+        self.pl_fab.move(c.width() - self.pl_fab.width() - 16, c.height() - self.pl_fab.height() - 12)
+        if self.pl_panel.isVisible():
+            self.pl_panel.raise_()
+        self.pl_fab.raise_()
+
     def show_playlist(self):
-        if getattr(self, "pl_dlg", None) is None:
-            dlg = QDialog(self)
-            dlg.setWindowTitle("☰ Lista de reproducción")
-            dlg.resize(440, 560)
-            v = QVBoxLayout(dlg)
-            top = QHBoxLayout()
-            for text, fn in (("📂 Cargar…", self.pl_import), ("💾 Guardar…", self.pl_export),
-                             ("➖ Quitar", self.pl_remove), ("🧹 Vaciar", self.pl_clear)):
-                b = QPushButton(text)
-                b.clicked.connect(lambda _=False, f=fn: f())
-                top.addWidget(b)
-            v.addLayout(top)
-            self.pl_list = PlaylistList()
-            self.pl_list.dropped.connect(self.pl_add)
-            self.pl_list.reordered.connect(self.pl_sync)
-            self.pl_list.itemDoubleClicked.connect(self.pl_play)
-            sc = QShortcut(QKeySequence("Delete"), self.pl_list)
-            sc.setContext(Qt.ShortcutContext.WidgetShortcut)
-            sc.activated.connect(self.pl_remove)
-            v.addWidget(self.pl_list, 1)
-            self.pl_count = QLabel("")
-            self.pl_count.setObjectName("hint")
-            hint = QLabel("Arrastra aquí canciones o carpetas desde el explorador. Arrastra para ordenar. Doble clic para reproducir.")
-            hint.setWordWrap(True)
-            hint.setObjectName("hint")
-            v.addWidget(hint)
-            v.addWidget(self.pl_count)
-            self.pl_dlg = dlg
-            i18n.retranslate(dlg)
-            self.pl_refresh()
-        if self.pl_dlg.isVisible():
-            self.pl_dlg.hide()
+        """Muestra u oculta el panel flotante de la lista de reproducción."""
+        if self.pl_panel.isVisible():
+            self.pl_panel.hide()
+            self.pl_fab.setText("☰")
         else:
+            self.layout_overlay()
             self.pl_refresh()
-            self.pl_dlg.show()
-            self.pl_dlg.raise_()
+            self.pl_update_np()
+            self.pl_panel.show()
+            self.pl_panel.raise_()
+            self.pl_fab.setText("✕")
+            self.pl_fab.raise_()
 
     def step_play(self, d):
         if self.player is not None and self.pl_active and self.playlist:
@@ -2761,6 +3085,9 @@ class Main(QMainWindow):
     def on_state(self, st):
         self.btn_play.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
         self.disc.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
+        self.viz.set_state({QMediaPlayer.PlaybackState.PlayingState: "playing",
+                            QMediaPlayer.PlaybackState.PausedState: "paused"}.get(st, "stopped"))
+        self.pl_update_np()
 
     def on_media_status(self, st):
         if st == QMediaPlayer.MediaStatus.EndOfMedia and int(self.cfg.value("autonext", 1) or 0):
@@ -4437,6 +4764,10 @@ class Main(QMainWindow):
         log.setHtml(
             "<h3>📜 Historial de versiones</h3>"
             f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>Volumen: la barra aparece hacia arriba, flotando (no mueve nada).</li>"
+            "<li>Botón flotante ☰ al costado: despliega por encima de portada, géneros y letra la lista de reproducción; arriba muestra lo que suena ahora, y puedes arrastrar canciones y crear/guardar listas con nombre.</li>"
+            "<li>Cuadritos de fondo en la barra de posición que bailan con el ritmo real de la canción y caen al detenerla.</li></ul>"
+            "<h4>Versión 1.08</h4><ul>"
             "<li>Actualización desde el propio programa: Ayuda ▸ «Buscar actualizaciones…» descarga la versión nueva y se reemplaza sola (también avisa al abrir).</li></ul>"
             "<h4>Versión 1.07</h4><ul>"
             "<li>✨ Portada automática: muestra varias opciones (iTunes y Deezer) para elegir; Google Imágenes solo si no hay ninguna.</li>"
