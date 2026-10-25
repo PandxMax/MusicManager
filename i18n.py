@@ -71,6 +71,7 @@ _ROWS = [
     ("Campos que se muestran en el panel de metadatos:", "Fields shown in the metadata panel:", "Поля на панели метаданных:"),
     ("Tamaño máximo de las portadas nuevas (nunca se agranda):", "Max size of new covers (never enlarged):", "Макс. размер новых обложек (не увеличиваются):"),
     ("Pasar a la siguiente canción al terminar", "Play next song when finished", "Переходить к следующей песне"),
+    ("Información técnica (códec, tasa de bits, frecuencia…)", "Technical info (codec, bitrate, frequency…)", "Техническая информация (кодек, битрейт, частота…)"),
     ("Aceptar", "OK", "ОК"), ("Cancelar", "Cancel", "Отмена"),
     ("&Fuente de etiquetas", "&Tag source", "&Источник тегов"),
     ("🎼 Buscar en MusicBrainz…", "🎼 Search MusicBrainz…", "🎼 Поиск в MusicBrainz…"),

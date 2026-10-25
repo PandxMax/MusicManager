@@ -178,7 +178,7 @@ def _tech(path, mtime):
             out["bitrate"] = f"{br // 1000} kbps"
         sr = int(getattr(i, "sample_rate", 0) or 0)
         if sr:
-            out["freq"] = f"{sr} Hz"
+            out["freq"] = f"{sr / 1000:g} kHz"
         secs = int(getattr(i, "length", 0) or 0)
         out["dur"] = f"{secs // 60}:{secs % 60:02d}"
         bm = getattr(i, "bitrate_mode", None)
@@ -318,6 +318,7 @@ QToolBar QToolButton:checked { background: @accent; color: white; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
+QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 3px 10px; font-size: 12px; }
 QFrame#playerbar { background: transparent; border: none; }
 QLabel#nowtitle { font-weight: 600; }
 QLabel#nowcover { background: @base; border-radius: 8px; }
@@ -1298,23 +1299,25 @@ class Main(QMainWindow):
             self.inputs[k] = le
             lb = QLabel(n)
             self.field_widgets[k] = (lb, le)
-            grid.addWidget(lb, r, c * 2)
-            grid.addWidget(le, r, c * 2 + 1)
+            grid.addWidget(lb, r + 1, c * 2)
+            grid.addWidget(le, r + 1, c * 2 + 1)
             if k in ('artist', 'albumartist', 'composer'):
                 le.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
                 le.customContextMenuRequested.connect(lambda pos, le=le: self.person_menu(le, pos))
+        # información técnica: etiquetas de solo lectura (chips) en la cabecera del cuadro
         self.tech = {}
-        for i, (k, n) in enumerate((("codec", "Códec"), ("bitrate", "Tasa de bits"), ("freq", "Frecuencia"),
-                                    ("dur", "Duración"), ("mode", "Modo"), ("size", "Tamaño"))):
-            r, c = divmod(i, 2)
-            le = QLineEdit()
-            le.setReadOnly(True)
-            le.setPlaceholderText("—")
-            self.tech[k] = le
-            lb = QLabel(n)
-            self.field_widgets[k] = (lb, le)
-            grid.addWidget(lb, 5 + r, c * 2)
-            grid.addWidget(le, 5 + r, c * 2 + 1)
+        self.tech_bar = QWidget()
+        tbl = QHBoxLayout(self.tech_bar)
+        tbl.setContentsMargins(0, 0, 0, 4)
+        tbl.setSpacing(6)
+        for k in ("codec", "bitrate", "freq", "dur", "mode", "size"):
+            chip = QLabel("")
+            chip.setObjectName("chip")
+            chip.hide()
+            self.tech[k] = chip
+            tbl.addWidget(chip)
+        tbl.addStretch(1)
+        grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
         b1 = QPushButton("Aplicar a selección")
@@ -1325,11 +1328,17 @@ class Main(QMainWindow):
         b2.clicked.connect(self.save_all)
         b3 = QPushButton("✏️ Renombrar archivo…")
         b3.clicked.connect(self.rename_selected)
+        b4 = QPushButton("📝 Letra")
+        b4.setCheckable(True)
+        b4.setToolTip("Ver o editar la letra de la canción (también se puede poner con IA)")
+        b4.toggled.connect(self.act_lyr.setChecked)
+        self.act_lyr.toggled.connect(b4.setChecked)
         row = QHBoxLayout()
+        row.addWidget(b4)
         row.addWidget(b1)
         row.addWidget(b3)
         row.addWidget(b2)
-        grid.addLayout(row, 8, 0, 1, 4)
+        grid.addLayout(row, 6, 0, 1, 4)
 
         # ---------- letra (oculta; se muestra con el botón «📝 Letra»)
         self.lyr_box = QGroupBox("Letra")
@@ -2098,14 +2107,17 @@ class Main(QMainWindow):
         self.update_suggestions()
 
     def fill_tech(self, paths):
+        icons = {"codec": "🎵", "bitrate": "⚡", "freq": "🔊", "dur": "⏱", "mode": "⚙", "size": "💾"}
         if not paths:
-            for le in self.tech.values():
-                le.setText("")
+            for chip in self.tech.values():
+                chip.hide()
             return
         infos = [tech_info(p) for p in paths[:150]]
-        for k, le in self.tech.items():
+        for k, chip in self.tech.items():
             vs = {i[k] for i in infos}
-            le.setText(next(iter(vs)) if len(vs) == 1 else "‹varios›")
+            v = next(iter(vs)) if len(vs) == 1 else "‹varios›"
+            chip.setText(f"{icons[k]} {v}")
+            chip.setVisible(v != "—")
 
     def show_current(self, path, n):
         self._loading = True
@@ -2959,6 +2971,7 @@ class Main(QMainWindow):
         for k, (lb, le) in self.field_widgets.items():
             lb.setVisible(k not in hidden)
             le.setVisible(k not in hidden)
+        self.tech_bar.setVisible("tech" not in hidden)
 
     def web_artist(self, kind, name):
         name = (name or "").strip()
@@ -3124,8 +3137,7 @@ class Main(QMainWindow):
         hidden = {x for x in str(self.cfg.value("hidden_fields", "") or "").split(",") if x}
         gl = QGridLayout()
         boxes = {}
-        names = [(k, n) for k, n in FIELDS] + [("codec", "Códec"), ("bitrate", "Tasa de bits"), ("freq", "Frecuencia"),
-                                               ("dur", "Duración"), ("mode", "Modo"), ("size", "Tamaño")]
+        names = [(k, n) for k, n in FIELDS] + [("tech", "Información técnica (códec, tasa de bits, frecuencia…)")]
         for i, (k, n) in enumerate(names):
             c = QCheckBox(T(n))
             c.setChecked(k not in hidden)

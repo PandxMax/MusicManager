@@ -63,3 +63,5 @@ NOVEDADES (ÚLTIMA VERSIÓN)
  - Clic derecho en el artista (en el panel o en la lista): historia en Wikipedia, YouTube y Spotify.
  - Ajustes rediseñados con árbol de categorías (General, Apariencia, Idioma, Etiquetas, Fuentes de
    etiquetas, Inteligencia artificial, Reproductor) y botones Aceptar / Cancelar.
+ - La información técnica (códec, tasa de bits, frecuencia, duración, modo, tamaño) ahora se muestra como
+   etiquetas en la cabecera del cuadro de metadatos, y el botón "📝 Letra" está junto a Guardar.
