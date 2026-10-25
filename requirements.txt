@@ -1,5 +1,4 @@
 PyQt6
-PyQt6-WebEngine
 mutagen
 send2trash
 numpy

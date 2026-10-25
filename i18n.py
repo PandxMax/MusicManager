@@ -31,8 +31,14 @@ _ROWS = [
     ("⏮ Anterior", "⏮ Previous", "⏮ Предыдущая"), ("⏭ Siguiente", "⏭ Next", "⏭ Следующая"),
     ("⏹ Detener", "⏹ Stop", "⏹ Стоп"),
     ("📊 Espectrograma y calidad…", "📊 Spectrogram & quality…", "📊 Спектрограмма и качество…"),
-    ("▶️ Ver en YouTube (en el programa)", "▶️ Watch on YouTube (in app)", "▶️ Смотреть на YouTube (в программе)"),
-    ("🌐 Abrir en YouTube (navegador)", "🌐 Open on YouTube (browser)", "🌐 Открыть на YouTube (браузер)"),
+    ("🔄 Convertir formato…", "🔄 Convert format…", "🔄 Конвертировать формат…"),
+    ("▶️ Buscar en YouTube (navegador)", "▶️ Search on YouTube (browser)", "▶️ Искать на YouTube (браузер)"),
+    ("➡ Mover al otro árbol", "➡ Move to other tree", "➡ Переместить в другое дерево"),
+    ("🔄 Convertir formato", "🔄 Convert format", "🔄 Конвертировать формат"),
+    ("Formato de salida", "Output format", "Выходной формат"), ("Calidad", "Quality", "Качество"),
+    ("Guardar junto a los originales", "Save next to the originals", "Сохранить рядом с оригиналами"),
+    ("Guardar en otra carpeta…", "Save in another folder…", "Сохранить в другую папку…"),
+    ("▶ Convertir", "▶ Convert", "▶ Конвертировать"),
     ("🤖 Ajustes de IA…", "🤖 AI settings…", "🤖 Настройки ИИ…"),
     ("🎨 Apariencia (tema y color)…", "🎨 Appearance (theme & color)…", "🎨 Оформление (тема и цвет)…"),
     ("🌍 Idioma…", "🌍 Language…", "🌍 Язык…"),
@@ -40,7 +46,7 @@ _ROWS = [
     ("ℹ️ Acerca de Music Manager", "ℹ️ About Music Manager", "ℹ️ О программе Music Manager"),
     # menú contextual
     ("📂 Abrir carpeta", "📂 Open folder", "📂 Открыть папку"), ("▶ Reproducir", "▶ Play", "▶ Играть"),
-    ("▶️ Buscar en YouTube (abre el navegador)", "▶️ Watch on YouTube (in app)", "▶️ Смотреть на YouTube (в программе)"),
+    ("▶️ Buscar en YouTube (abre el navegador)", "▶️ Search on YouTube (browser)", "▶️ Искать на YouTube (браузер)"),
     ("📊 Espectrograma / calidad (varias = comparar)", "📊 Spectrogram / quality (several = compare)", "📊 Спектрограмма / качество (несколько = сравнить)"),
     ("✏️ Renombrar archivo (F2)", "✏️ Rename file (F2)", "✏️ Переименовать файл (F2)"),
     ("✂️ Cortar (Ctrl+X)", "✂️ Cut (Ctrl+X)", "✂️ Вырезать (Ctrl+X)"), ("📋 Copiar (Ctrl+C)", "📋 Copy (Ctrl+C)", "📋 Копировать (Ctrl+C)"),
@@ -84,8 +90,6 @@ _ROWS = [
     ("💾 Guardar imagen…", "💾 Save image…", "💾 Сохранить изображение…"),
     ("Espectrogramas", "Spectrograms", "Спектрограммы"), ("Comparación", "Comparison", "Сравнение"),
     ("Análisis", "Analysis", "Анализ"),
-    # youtube
-    ("🌐 Abrir en el navegador", "🌐 Open in browser", "🌐 Открыть в браузере"),
 ]
 TABLE = {es: {"en": en, "ru": ru} for es, en, ru in _ROWS}
 

@@ -27,6 +27,8 @@
 ### 📁 Explorador de carpetas
 - **Arrastra y suelta** canciones o carpetas sobre otra carpeta para moverlas.
 - **Dos árboles** de carpetas a la vez (activables y en vertical u horizontal) para mover de uno a otro sin perderte.
+- Mover entre árboles fácil: la **carpeta destino se resalta** al arrastrar, se **abren solas** las carpetas al pasar por encima, **Ctrl al soltar = copiar** y clic derecho → *Mover / Copiar al otro árbol*.
+- **Barra horizontal** en los árboles para ver nombres largos y carpetas muy anidadas.
 - **Cortar, copiar, pegar, renombrar y eliminar** archivos y carpetas (Ctrl+X, Ctrl+C, Ctrl+V, F2, Supr). Eliminar usa la papelera.
 - Vista de **iconos con portadas** o de **lista**.
 - **Búsqueda** de canciones, con opción de incluir subcarpetas.
@@ -64,9 +66,15 @@ Selecciona una o varias canciones y abre **Herramientas → Espectrograma**.
 
 > El veredicto es una estimación basada en el espectro, no una prueba definitiva.
 
+### 🔄 Convertir formatos
+- Selecciona canciones y abre **Herramientas → Convertir formato**.
+- Salida en **MP3, FLAC, M4A (AAC), OGG (Vorbis), Opus o WAV**, con la calidad (kbps) que elijas.
+- Conserva **etiquetas y portada** (la portada solo en MP3, FLAC y M4A).
+- Guarda junto a los originales o en otra carpeta; nunca sobrescribe nada.
+
 ### ▶️ Reproductor y YouTube
-- Reproductor compacto abajo: **play/pausa, barra de avance y volumen**. Doble clic en una canción para reproducirla.
-- **YouTube dentro del programa**: clic derecho en una canción → *Ver en YouTube*, y se abre una ventana con el navegador integrado buscando esa canción.
+- Reproductor compacto en la **línea de estado, abajo a la derecha**: play/pausa, barra de avance y volumen. Doble clic en una canción para reproducirla.
+- **Buscar en YouTube**: clic derecho en una canción y se abre tu navegador con esa canción.
 
 ### 🎨 Personalización
 - **Tema oscuro o claro** y **color de acento** a tu gusto.
@@ -109,14 +117,16 @@ En Windows también puedes hacer doble clic en `CREAR_PROGRAMA.bat` para crear e
 | Opciones de portada | Clic derecho sobre la portada |
 | Sugerir género con IA | Pon tu clave en *Ajustes → Ajustes de IA* y pulsa *Sugerir género* |
 | Analizar la calidad | *Herramientas → Espectrograma y calidad* |
-| Ver el vídeo en YouTube | Clic derecho en la canción → *Ver en YouTube* |
+| Buscar la canción en YouTube | Clic derecho en la canción → *Buscar en YouTube* |
+| Convertir a otro formato | *Herramientas → Convertir formato* |
+| Copiar en vez de mover al arrastrar | Mantén `Ctrl` al soltar |
 | Cambiar tema, color o idioma | Menú **Ajustes** |
 
 ---
 
 ## 🧩 Tecnología
 
-**Python** · **PyQt6** (interfaz y reproductor) · **PyQt6-WebEngine** (YouTube integrado) · **mutagen** (etiquetas) · **numpy** + **ffmpeg** (espectrogramas) · **PyInstaller** (el `.exe`).
+**Python** · **PyQt6** (interfaz y reproductor) · **mutagen** (etiquetas) · **numpy** + **ffmpeg** (espectrogramas y conversión) · **PyInstaller** (el `.exe`).
 
 ---
 

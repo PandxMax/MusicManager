@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
+    QInputDialog, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
 )
 import mutagen
 import i18n
@@ -280,7 +280,7 @@ QToolBar QToolButton:checked { background: @accent; color: white; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
-QFrame#playerbar { background: @surface; border-top: 1px solid @border; }
+QFrame#playerbar { background: transparent; border: none; }
 QLabel#nowtitle { font-weight: 600; }
 QLabel#nowcover { background: @base; border-radius: 8px; }
 QPushButton#tbtn { background: transparent; border: none; font-size: 17px; padding: 4px 8px; border-radius: 8px; }
@@ -626,13 +626,22 @@ class FolderTree(QTreeWidget):
         super().__init__()
         self.folder_icon = folder_icon
         self.setHeaderHidden(True)
+        # barra horizontal: la columna crece con los nombres largos / carpetas muy anidadas
+        self.header().setStretchLastSection(False)
+        self.header().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self.setAutoScrollMargin(40)
+        self.setIndentation(16)
+        self._hl = None
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
-        self.setDropIndicatorShown(True)
+        self.setDropIndicatorShown(False)   # en su lugar se resalta la carpeta destino
         self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
         self.setDefaultDropAction(Qt.DropAction.CopyAction)
-        self.setAutoExpandDelay(600)
+        self.setAutoExpandDelay(500)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.itemExpanded.connect(self.on_expand)
 
@@ -655,12 +664,33 @@ class FolderTree(QTreeWidget):
         if e.mimeData().hasUrls():
             e.acceptProposedAction()
 
+    def set_highlight(self, it):
+        if it is self._hl:
+            return
+        if self._hl is not None:
+            try:
+                self._hl.setBackground(0, QBrush())
+            except RuntimeError:
+                pass
+        self._hl = it
+        if it is not None:
+            c = QColor(self.palette().color(QPalette.ColorRole.Highlight))
+            c.setAlpha(120)
+            it.setBackground(0, QBrush(c))
+
     def dragMoveEvent(self, e):
         super().dragMoveEvent(e)
+        it = self.itemAt(e.position().toPoint())
+        self.set_highlight(it if it is not None and it.data(0, PATH_ROLE) else None)
         if e.mimeData().hasUrls():
             e.acceptProposedAction()
 
+    def dragLeaveEvent(self, e):
+        self.set_highlight(None)
+        super().dragLeaveEvent(e)
+
     def dropEvent(self, e):
+        self.set_highlight(None)
         it = self.itemAt(e.position().toPoint())
         paths = [u.toLocalFile() for u in e.mimeData().urls() if u.isLocalFile()]
         e.setDropAction(Qt.DropAction.CopyAction)  # evita que la vista borre nada por su cuenta
@@ -1100,6 +1130,7 @@ class Main(QMainWindow):
 
         self.pend_lbl = QLabel("")
         self.statusBar().addPermanentWidget(self.pend_lbl)
+        self._pend_added = True
 
         # ---------- árboles de carpetas (el segundo se activa desde la barra)
         self.tree = FolderTree(self.folder_icon)
@@ -1275,8 +1306,9 @@ class Main(QMainWindow):
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(0)
         cl.addWidget(main, 1)
-        cl.addWidget(self.player_bar)  # reproductor abajo, a lo ancho
         self.setCentralWidget(central)
+        self.statusBar().addPermanentWidget(self.player_bar)   # reproductor en la línea de estado, a la derecha
+        self.statusBar().setSizeGripEnabled(False)
         self.statusBar().showMessage("Arrastra carpetas o canciones sobre otra carpeta. Doble clic en una canción para reproducirla.")
         self.build_menus()
         if int(self.cfg.value("tree2", 0) or 0):
@@ -1622,7 +1654,7 @@ class Main(QMainWindow):
         bar = QFrame()
         bar.setObjectName("playerbar")
         h = QHBoxLayout(bar)
-        h.setContentsMargins(12, 3, 12, 3)
+        h.setContentsMargins(0, 0, 4, 0)
         h.setSpacing(8)
         self.now_cover = QLabel()
         self.now_cover.setObjectName("nowcover")
@@ -1653,12 +1685,13 @@ class Main(QMainWindow):
         self.vol = QSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
         self.vol.setValue(70)
-        self.vol.setFixedWidth(110)
+        self.vol.setFixedWidth(90)
         for w in (self.now_cover, infow, self.btn_prev, self.btn_next, self.btn_stop):
             w.setParent(bar)   # siguen existiendo para el resto del código, pero ocultos
             w.hide()
         h.addWidget(self.btn_play)
-        h.addWidget(self.seek, 1)
+        self.seek.setFixedWidth(260)
+        h.addWidget(self.seek)
         h.addWidget(self.time_lbl)
         h.addWidget(QLabel("🔊"))
         h.addWidget(self.vol)
@@ -2296,8 +2329,12 @@ class Main(QMainWindow):
         self.delete_paths(self.active_tree.selected_dirs())
 
     def defer_move(self, paths, target):
-        """Mueve cuando termina el arrastre (así la lista no se recarga en pleno arrastre)."""
-        QTimer.singleShot(0, lambda: self.move_items(paths, target))
+        """Mueve (o copia, con Ctrl) cuando termina el arrastre, para no recargar la lista en pleno arrastre."""
+        copy = bool(QApplication.keyboardModifiers() & Qt.KeyboardModifier.ControlModifier)
+        if copy:
+            QTimer.singleShot(0, lambda: self.copy_items(paths, target))
+        else:
+            QTimer.singleShot(0, lambda: self.move_items(paths, target))
 
     def open_dir(self, path):
         if not self.active_tree.reveal(path):
@@ -2336,6 +2373,13 @@ class Main(QMainWindow):
             m.addAction("📋 Copiar", lambda: self.clip_set("copy"))
         m.addAction("📥 Pegar aquí", self.paste_here)
         m.addAction("➕ Nueva carpeta aquí", lambda: self.new_folder())
+        other = self.tree2 if tree is self.tree else self.tree
+        oc = other.currentItem()
+        if it is not None and self.tree2_box.isVisible() and oc is not None and oc.data(0, PATH_ROLE):
+            srcs, dst = tree.selected_dirs(), oc.data(0, PATH_ROLE)
+            m.addSeparator()
+            m.addAction(f"➡ Mover al otro árbol  ({oc.text(0)})", lambda: self.move_items(srcs, dst))
+            m.addAction(f"⧉ Copiar al otro árbol  ({oc.text(0)})", lambda: self.copy_items(srcs, dst))
         if it is not None:
             if it.data(0, KIND_ROLE) == "pinned":
                 m.addSeparator()
@@ -2360,6 +2404,7 @@ class Main(QMainWindow):
                 m.addAction("▶ Reproducir", lambda: self.play_item(it))
                 m.addAction("▶️ Buscar en YouTube (abre el navegador)", lambda: self.open_youtube(it.data(PATH_ROLE)))
                 m.addAction("📊 Espectrograma / calidad (varias = comparar)", self.open_spectrum)
+                m.addAction("🔄 Convertir formato…", self.convert_selected)
                 m.addAction("✏️ Renombrar archivo (F2)", self.rename_selected)
             m.addSeparator()
             m.addAction("✂️ Cortar (Ctrl+X)", lambda: self.clip_set("cut"))
@@ -2588,24 +2633,10 @@ class Main(QMainWindow):
         dlg.show()
         self._spec = dlg
 
-    def open_youtube(self, path, external=False):
+    def open_youtube(self, path, external=True):
         artist, title = self.val(path, "artist"), self.val(path, "title")
         q = f"{artist} {title}".strip() if title else os.path.splitext(os.path.basename(path))[0]
-        if not external:
-            try:
-                from ytview import YouTubeDialog
-            except Exception:
-                external = True
-                self.statusBar().showMessage("Falta PyQt6-WebEngine: se abre en el navegador.")
-        if external:
-            QDesktopServices.openUrl(QUrl("https://www.youtube.com/results?search_query=" + quote_plus(q)))
-            return
-        if self.player is not None:
-            self.player.pause()
-        dlg = YouTubeDialog(q, self)
-        i18n.retranslate(dlg)
-        dlg.show()
-        self._yt = dlg
+        QDesktopServices.openUrl(QUrl("https://www.youtube.com/results?search_query=" + quote_plus(q)))
         self.statusBar().showMessage(f"Buscando «{q}» en YouTube…")
 
     def schedule_select(self):
@@ -2657,8 +2688,8 @@ class Main(QMainWindow):
         t = mb.addMenu("&Herramientas")
         t.addAction(self.act("📊 Espectrograma y calidad…", self.open_spectrum,
                              "Espectrograma y análisis de calidad de las canciones seleccionadas (varias = comparar)"))
-        t.addAction(self.act("▶️ Ver en YouTube (en el programa)", self.youtube_current))
-        t.addAction(self.act("🌐 Abrir en YouTube (navegador)", lambda: self.youtube_current(True)))
+        t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
+        t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
 
         st = mb.addMenu("&Ajustes")
         st.addAction(self.act("🤖 Ajustes de IA…", lambda: self.open_settings(0)))
@@ -2672,7 +2703,25 @@ class Main(QMainWindow):
         i18n.set_lang(str(self.cfg.value("lang", "es")))
         i18n.retranslate(self)
 
-    def youtube_current(self, external=False):
+    def convert_selected(self):
+        paths = self.selected_paths()
+        if not paths:
+            cp = self.current_path()
+            paths = [cp] if cp and os.path.isfile(cp) else []
+        if not paths:
+            QMessageBox.information(self, "Convertir", T("Selecciona una o varias canciones."))
+            return
+        try:
+            import convert
+        except ImportError as e:
+            QMessageBox.warning(self, "Convertir", f"Falta un componente: {e}")
+            return
+        dlg = convert.ConvertDialog(paths, self, on_done=lambda: self.load_folder(self.current_dir))
+        i18n.retranslate(dlg)
+        dlg.show()
+        self._conv = dlg
+
+    def youtube_current(self, external=True):
         p = self.current_path()
         if not p or not os.path.isfile(p):
             QMessageBox.information(self, "YouTube", T("Selecciona una canción."))
@@ -2866,7 +2915,6 @@ if __name__ == "__main__":
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MusicManager.App")
         except Exception:
             pass
-    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)  # necesario para el visor de YouTube
     app = QApplication(sys.argv)
     app.setApplicationName("Music Manager")
     w = Main()

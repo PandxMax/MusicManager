@@ -46,5 +46,8 @@ CAMBIOS DE LA VERSIÓN NUEVA
  - Ajustes: IA (proveedor, modelo, clave), Apariencia (tema claro/oscuro y color de acento) e Idioma
    (Español, English, Русский).
  - Reproductor compacto: botón play/pausa, barra de avance y volumen.
- - YouTube dentro del programa: clic derecho en una canción > Ver en YouTube (o Herramientas).
-   Necesita PyQt6-WebEngine (ya incluido en requirements.txt); el .exe pesará más.
+ - YouTube: clic derecho en una canción > Buscar en YouTube (se abre en tu navegador).
+ - Convertir formato: Herramientas > Convertir formato (MP3, FLAC, M4A, OGG, Opus, WAV).
+ - Árboles: barra horizontal para nombres largos, la carpeta destino se resalta al arrastrar,
+   Ctrl al soltar = copiar, y clic derecho > Mover/Copiar al otro árbol.
+ - El reproductor ahora va en la línea de abajo, a la derecha.

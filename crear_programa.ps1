@@ -68,7 +68,7 @@ if ($LASTEXITCODE -ne 0) { Fail "No se pudieron instalar los componentes. Revisa
 Step "Creando MusicManager.exe (de 1 a 3 minutos)..."
 if (Test-Path "build") { Remove-Item "build" -Recurse -Force -ErrorAction SilentlyContinue }
 if (Test-Path "dist") { Remove-Item "dist" -Recurse -Force -ErrorAction SilentlyContinue }
-& $vpy -m PyInstaller --noconfirm --clean --windowed --name MusicManager --icon MusicManager.ico --hidden-import logo_data --hidden-import spectro --hidden-import ytview --hidden-import i18n --collect-all imageio_ffmpeg music_manager.py
+& $vpy -m PyInstaller --noconfirm --clean --windowed --name MusicManager --icon MusicManager.ico --hidden-import logo_data --hidden-import spectro --hidden-import i18n --hidden-import convert --collect-all imageio_ffmpeg music_manager.py
 if (-not (Test-Path "dist\MusicManager\MusicManager.exe")) { Fail "No se pudo crear MusicManager.exe." }
 
 # ---------- 4) Instalar como programa normal
