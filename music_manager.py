@@ -13,13 +13,13 @@ from urllib.parse import quote_plus, quote
 from PyQt6.QtCore import (QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
                           QTimer, QRectF, QStandardPaths, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
 from PyQt6.QtGui import (QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
-                         QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPolygonF, QCursor, QMouseEvent)
+                         QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent)
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QSplitter, QTreeWidget, QTreeWidgetItem,
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
 )
 import mutagen
 import i18n
@@ -343,7 +343,11 @@ QToolBar QToolButton:checked { background: @accent; color: white; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
-QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 3px 10px; font-size: 12px; }
+QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 8px; font-size: 11px; }
+QPushButton#chipbtn { background: @accent_soft; border: 1px solid @accent; border-radius: 10px; padding: 2px 10px; font-size: 11px; }
+QPushButton#chipbtn:hover { background: @accent; color: white; }
+QPushButton#iconbtn { background: @surface2; border: 1px solid @border; border-radius: 10px; font-size: 16px; padding: 0; }
+QPushButton#iconbtn:hover { border-color: @accent; background: @accent_soft; }
 QFrame#playerbar { background: transparent; border: none; }
 QLabel#nowtitle { font-weight: 600; }
 QLabel#nowcover { background: @base; border-radius: 8px; }
@@ -447,6 +451,20 @@ def norm(p):
 
 
 # --------------------------------------------------------------------- Imágenes
+def rounded_pm(pm, r=14):
+    """Portada con las esquinas redondeadas."""
+    out = QPixmap(pm.size())
+    out.fill(Qt.GlobalColor.transparent)
+    p = QPainter(out)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    path = QPainterPath()
+    path.addRoundedRect(QRectF(out.rect()), r, r)
+    p.setClipPath(path)
+    p.drawPixmap(0, 0, pm)
+    p.end()
+    return out
+
+
 def note_icon(size=THUMB):
     pm = QPixmap(size, size)
     pm.fill(Qt.GlobalColor.transparent)
@@ -661,14 +679,23 @@ class LrclibWorker(QThread):
         self.jobs, self.prefer_synced = jobs, prefer_synced  # jobs: [(ruta, artista, título, álbum, segundos)]
 
     def fetch(self, url):
+        """Pide una dirección con reintentos (LRCLIB a veces responde 503 / 429 por saturación)."""
         req = urllib.request.Request(url, headers={"User-Agent": self.UA})
-        try:
-            with urllib.request.urlopen(req, timeout=15) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                return None
-            raise
+        last = ""
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    return json.loads(r.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    return None
+                last = f"LRCLIB respondió «{e.reason}» ({e.code})"
+                if e.code not in (429, 500, 502, 503, 504):
+                    break
+            except (urllib.error.URLError, TimeoutError, OSError) as e:
+                last = f"No hay conexión con LRCLIB ({getattr(e, 'reason', e)})"
+            time.sleep(1.5 * (attempt + 1))
+        raise RuntimeError(last + ". El servicio puede estar saturado: inténtalo de nuevo en unos minutos.")
 
     def pick(self, d):
         if not d or d.get("instrumental"):
@@ -701,14 +728,18 @@ class LrclibWorker(QThread):
         return ""
 
     def run(self):
-        try:
-            for path, artist, title, album, dur in self.jobs:
+        errors, last = 0, ""
+        for path, artist, title, album, dur in self.jobs:
+            try:
                 self.got.emit(path, self.find(artist, title, album, dur))
+            except Exception as e:  # una canción que falla no cancela las demás
+                errors += 1
+                last = str(e)
+                self.got.emit(path, "")
+        if errors and errors == len(self.jobs):
+            self.failed.emit(last)
+        else:
             self.finished_all.emit()
-        except urllib.error.URLError as e:
-            self.failed.emit(f"No se pudo conectar con LRCLIB: {getattr(e, 'reason', e)}")
-        except Exception as e:
-            self.failed.emit(str(e))
 
 
 # ------------------------------------------------------------------ Widgets
@@ -1249,7 +1280,7 @@ class Main(QMainWindow):
         super().__init__()
         self.setWindowTitle(f"Music Manager {APP_VERSION}")
         self.resize(1500, 840)
-        self.setMinimumSize(1000, 620)
+        self.setMinimumSize(1180, 640)
         self.cfg = QSettings("MusicManager", "MusicManager")
         self.pending, self.edited, self.lyrics_edited, self._loading = {}, set(), False, False
         self.cur_paths, self.current_dir = [], ""
@@ -1400,7 +1431,7 @@ class Main(QMainWindow):
         self.tech_bar = QWidget()
         tbl = QHBoxLayout(self.tech_bar)
         tbl.setContentsMargins(0, 0, 0, 4)
-        tbl.setSpacing(6)
+        tbl.setSpacing(4)
         for k in ("codec", "bitrate", "freq", "dur", "mode", "size"):
             chip = QLabel("")
             chip.setObjectName("chip")
@@ -1408,6 +1439,12 @@ class Main(QMainWindow):
             self.tech[k] = chip
             tbl.addWidget(chip)
         tbl.addStretch(1)
+        self.btn_spec = QPushButton("📊 Espectro")
+        self.btn_spec.setObjectName("chipbtn")
+        self.btn_spec.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_spec.setToolTip("Espectrograma y análisis de calidad de las canciones seleccionadas")
+        self.btn_spec.clicked.connect(self.open_spectrum)
+        tbl.addWidget(self.btn_spec)
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
@@ -1495,35 +1532,34 @@ class Main(QMainWindow):
         self.cover_lbl.customContextMenuRequested.connect(self.cover_menu)
         self.cover_lbl.setToolTip("Clic derecho: cambiar, quitar, copiar, pegar, guardar o redimensionar")
         ch = QHBoxLayout()
-        ch.setSpacing(6)
+        ch.setSpacing(10)
         left = QVBoxLayout()
-        for text, tip, fn in (("➕", "Cambiar portada…", self.set_cover), ("💾", "Guardar portada como imagen…", self.save_cover_as),
-                              ("❌", "Quitar portada", self.remove_cover)):
+        left.setSpacing(6)
+        for text, tip, fn in (("🖼", "Cambiar portada…", self.set_cover), ("💾", "Guardar portada como imagen…", self.save_cover_as),
+                              ("🗑", "Quitar portada", self.remove_cover), ("🔍", "Ver la portada en grande", self.view_cover)):
             b = QPushButton(text)
-            b.setObjectName("tbtn")
-            b.setFixedSize(34, 34)
+            b.setObjectName("iconbtn")
+            b.setFixedSize(38, 38)
             b.setToolTip(tip)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.clicked.connect(lambda _=False, f=fn: f())
             left.addWidget(b)
         left.addStretch(1)
-        right_col = QVBoxLayout()
-        eye = QPushButton("👁")
-        eye.setObjectName("tbtn")
-        eye.setFixedSize(34, 34)
-        eye.setToolTip("Ver la portada en grande")
-        eye.setCursor(Qt.CursorShape.PointingHandCursor)
-        eye.clicked.connect(self.view_cover)
-        right_col.addWidget(eye, 0, Qt.AlignmentFlag.AlignRight)
-        right_col.addStretch(1)
-        self.info_lbl.setObjectName("hint")
-        self.info_lbl.setFixedWidth(64)
-        self.info_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
-        right_col.addWidget(self.info_lbl)
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(26)
+        shadow.setOffset(0, 5)
+        shadow.setColor(QColor(0, 0, 0, 140))
+        self.cover_lbl.setGraphicsEffect(shadow)
+        self.info_lbl.setObjectName("chip")
+        self.info_lbl.setWordWrap(False)
+        self.info_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.info_lbl.hide()
+        ch.addStretch(1)
         ch.addLayout(left)
         ch.addWidget(self.cover_lbl)
-        ch.addLayout(right_col)
+        ch.addStretch(1)
         cv.addLayout(ch)
+        cv.addWidget(self.info_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
         self.status_lbl.hide()
         cover_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
@@ -1575,6 +1611,9 @@ class Main(QMainWindow):
         main.addWidget(middle)
         main.addWidget(rightw)
         main.setStretchFactor(1, 1)
+        self.left_split.setMinimumWidth(210)
+        for i in range(3):
+            main.setCollapsible(i, False)
         main.setSizes([290, 860, 370])
         self.main_split, self.mid_split = main, middle
         for sp in (main, middle, self.left_split):
@@ -1600,6 +1639,9 @@ class Main(QMainWindow):
                 st = self.cfg.value(key)
                 if st:
                     sp.restoreState(st)
+            sz = self.main_split.sizes()  # si una sesión anterior dejó el árbol aplastado, lo restaura
+            if sz and sz[0] < 210:
+                self.main_split.setSizes([290, max(600, sz[1] - 290 + sz[0]), sz[2]])
         except Exception:
             pass
 
@@ -2299,8 +2341,8 @@ class Main(QMainWindow):
                     data = None
         pm = QPixmap()
         if data and pm.loadFromData(data):
-            self.cover_lbl.setPixmap(pm.scaled(COVER, COVER, Qt.AspectRatioMode.KeepAspectRatio,
-                                               Qt.TransformationMode.SmoothTransformation))
+            self.cover_lbl.setPixmap(rounded_pm(pm.scaled(COVER, COVER, Qt.AspectRatioMode.KeepAspectRatio,
+                                                          Qt.TransformationMode.SmoothTransformation)))
         else:
             self.cover_lbl.clear()
             self.cover_lbl.setText("Sin portada")
@@ -2323,9 +2365,10 @@ class Main(QMainWindow):
         dims = f"Portada: {pm.width()}×{pm.height()} px · {len(data) // 1024} KB" if data and not pm.isNull() else ""
         if data and not pm.isNull():
             kind = "PNG" if data[:4] == b"\x89PNG" else ("JPEG" if data[:2] == b"\xff\xd8" else "IMG")
-            self.info_lbl.setText(f"{kind}\n{pm.width()}×{pm.height()}\n{len(data) // 1024} KB")
+            self.info_lbl.setText(f"{kind}  ·  {pm.width()}×{pm.height()} px  ·  {len(data) // 1024} KB")
         else:
             self.info_lbl.setText("")
+        self.info_lbl.setVisible(bool(self.info_lbl.text()))
         self.info_lbl.setToolTip(note)
         self.info_lbl.setStyleSheet("color:#E67E00" if "pendiente" in note else "")
         yes = '<span style="color:#2ecc71">✔ sí</span>'

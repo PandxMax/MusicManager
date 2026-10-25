@@ -78,3 +78,9 @@ LETRAS CON LRCLIB
    con los minutos de cada línea ([mm:ss.xx]). Se guarda en la etiqueta (y como SYLT en MP3)
    y, si quieres, también en un archivo .lrc junto a la canción (Ajustes > Etiquetas > Letras).
  - Panel de portada rediseñado: botones ➕ 💾 ❌ 👁 y los datos de la imagen (formato, tamaño y peso).
+
+CORRECCIONES
+------------
+ - El panel de carpetas ya no se puede aplastar al abrir la letra o mover las divisiones.
+ - LRCLIB: reintentos automáticos cuando el servicio está saturado (error 503) y un mensaje claro.
+ - Panel de portada rediseñado y botón "📊 Espectro" junto a los datos técnicos.
