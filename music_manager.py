@@ -8,7 +8,7 @@ Ejecutar:      python music_manager.py
 """
 import sys, os, json, re, shutil, time, base64, html, urllib.request, urllib.error
 from functools import lru_cache
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, quote
 
 from PyQt6.QtCore import (QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
                           QTimer, QRectF, QStandardPaths, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
+    QInputDialog, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
 )
 import mutagen
 import i18n
@@ -1173,6 +1173,8 @@ class Main(QMainWindow):
         self.default_icon = note_icon()
         self.folder_icon = QFileIconProvider().icon(QFileIconProvider.IconType.Folder)
         self.clip = None
+        self.back_stack, self.fwd_stack, self._nav_busy = [], [], False
+        self.field_widgets = {}
         self.cover_max = parse_side(str(self.cfg.value("cover_size", "1200")))
         self.cover_clip, self.cover_clip_img = None, None
         self.theme = str(self.cfg.value("theme", "dark"))
@@ -1189,9 +1191,13 @@ class Main(QMainWindow):
                 self.restoreGeometry(g)
             except Exception:
                 pass
-        if not int(self.cfg.value("welcomed", 0) or 0):  # primera vez: muestra la guía rápida
-            self.cfg.setValue("welcomed", 1)
+        self.apply_field_visibility()
+        if not int(self.cfg.value("welcomed", 0) or 0) or int(self.cfg.value("guide_every", 0) or 0):
+            self.cfg.setValue("welcomed", 1)  # primera vez (o si lo activas): muestra la guía rápida
             QTimer.singleShot(700, self.show_guide)
+        last = str(self.cfg.value("last_dir", "") or "")
+        if int(self.cfg.value("open_last", 1) or 0) and last and os.path.isdir(last):
+            QTimer.singleShot(0, lambda: None if self.tree.reveal(last) else self.load_folder(last))
 
     # ---------------------------------------------------------------- UI
     def act(self, text, fn, tip="", checkable=False):
@@ -1290,8 +1296,13 @@ class Main(QMainWindow):
             le = QLineEdit()
             le.textEdited.connect(lambda _, key=k: self.edited.add(key))
             self.inputs[k] = le
-            grid.addWidget(QLabel(n), r, c * 2)
+            lb = QLabel(n)
+            self.field_widgets[k] = (lb, le)
+            grid.addWidget(lb, r, c * 2)
             grid.addWidget(le, r, c * 2 + 1)
+            if k in ('artist', 'albumartist', 'composer'):
+                le.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+                le.customContextMenuRequested.connect(lambda pos, le=le: self.person_menu(le, pos))
         self.tech = {}
         for i, (k, n) in enumerate((("codec", "Códec"), ("bitrate", "Tasa de bits"), ("freq", "Frecuencia"),
                                     ("dur", "Duración"), ("mode", "Modo"), ("size", "Tamaño"))):
@@ -1300,7 +1311,9 @@ class Main(QMainWindow):
             le.setReadOnly(True)
             le.setPlaceholderText("—")
             self.tech[k] = le
-            grid.addWidget(QLabel(n), 5 + r, c * 2)
+            lb = QLabel(n)
+            self.field_widgets[k] = (lb, le)
+            grid.addWidget(lb, 5 + r, c * 2)
             grid.addWidget(le, 5 + r, c * 2 + 1)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
@@ -1338,7 +1351,32 @@ class Main(QMainWindow):
         bl.addWidget(self.lyr_box, 2)
 
         middle = QSplitter(Qt.Orientation.Vertical)
-        middle.addWidget(self.list)
+        self.list_pane = QWidget()
+        lpv = QVBoxLayout(self.list_pane)
+        lpv.setContentsMargins(0, 0, 0, 0)
+        lpv.setSpacing(4)
+        navbar = QHBoxLayout()
+        navbar.setSpacing(2)
+        self.btn_back, self.btn_fwd, self.btn_up = QPushButton("◀"), QPushButton("▶"), QPushButton("▲")
+        for b, tip, fn in ((self.btn_back, "Atrás (Alt+←)", self.nav_back), (self.btn_fwd, "Adelante (Alt+→)", self.nav_fwd),
+                           (self.btn_up, "Subir a la carpeta superior (Alt+↑)", self.nav_up)):
+            b.setObjectName("tbtn")
+            b.setFixedWidth(36)
+            b.setToolTip(tip)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(fn)
+            navbar.addWidget(b)
+        self.path_lbl = QLabel("")
+        self.path_lbl.setObjectName("hint")
+        self.path_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        navbar.addWidget(self.path_lbl, 1)
+        lpv.addLayout(navbar)
+        lpv.addWidget(self.list, 1)
+        middle.addWidget(self.list_pane)
+        QShortcut(QKeySequence("Alt+Left"), self, activated=self.nav_back)
+        QShortcut(QKeySequence("Alt+Right"), self, activated=self.nav_fwd)
+        QShortcut(QKeySequence("Alt+Up"), self, activated=self.nav_up)
+        self.list.viewport().installEventFilter(self)
         middle.addWidget(bottom)
         middle.setSizes([430, 300])
 
@@ -1643,9 +1681,68 @@ class Main(QMainWindow):
         self.list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.list.verticalScrollBar().setSingleStep(48)
 
+    def eventFilter(self, obj, ev):
+        # botones laterales del ratón = atrás / adelante, como en el Explorador
+        if obj is self.list.viewport() and ev.type() == QEvent.Type.MouseButtonPress:
+            if ev.button() == Qt.MouseButton.BackButton:
+                self.nav_back()
+                return True
+            if ev.button() == Qt.MouseButton.ForwardButton:
+                self.nav_fwd()
+                return True
+        return super().eventFilter(obj, ev)
+
+    def update_nav(self):
+        self.btn_back.setEnabled(bool(self.back_stack))
+        self.btn_fwd.setEnabled(bool(self.fwd_stack))
+        self.btn_up.setEnabled(bool(self.current_dir) and os.path.dirname(self.current_dir) != self.current_dir)
+        self.path_lbl.setText(self.path_lbl.fontMetrics().elidedText(
+            self.current_dir or "", Qt.TextElideMode.ElideMiddle, max(200, self.path_lbl.width())))
+        self.path_lbl.setToolTip(self.current_dir or "")
+
+    def nav_to(self, path):
+        self._nav_busy = True
+        try:
+            if not self.active_tree.reveal(path) or self.current_dir != path:
+                self.load_folder(path)
+        finally:
+            self._nav_busy = False
+        self.update_nav()
+
+    def nav_back(self):
+        while self.back_stack:
+            p = self.back_stack.pop()
+            if os.path.isdir(p):
+                if self.current_dir:
+                    self.fwd_stack.append(self.current_dir)
+                self.nav_to(p)
+                return
+        self.update_nav()
+
+    def nav_fwd(self):
+        while self.fwd_stack:
+            p = self.fwd_stack.pop()
+            if os.path.isdir(p):
+                if self.current_dir:
+                    self.back_stack.append(self.current_dir)
+                self.nav_to(p)
+                return
+        self.update_nav()
+
+    def nav_up(self):
+        par = os.path.dirname(self.current_dir.rstrip("\\/")) if self.current_dir else ""
+        if par and par != self.current_dir and os.path.isdir(par):
+            self.open_dir(par)
+
     def load_folder(self, path, keep=True, select=None):
         if not path or not os.path.isdir(path):
             return
+        if not self._nav_busy and self.current_dir and os.path.normpath(path) != os.path.normpath(self.current_dir):
+            if not self.back_stack or self.back_stack[-1] != self.current_dir:
+                self.back_stack.append(self.current_dir)
+            self.fwd_stack.clear()
+            del self.back_stack[:-100]
+        self.cfg.setValue("last_dir", path)
         keep_paths = set(select) if select else (
             set(self.selected_paths()) if keep and path == self.current_dir else set())
         self.current_dir = path
@@ -1678,6 +1775,7 @@ class Main(QMainWindow):
             if m is None:
                 self.thumb_queue.append(f)
         self.row_index = {self.list.item(r).data(PATH_ROLE): r for r in range(self.list.count())}
+        self.update_nav()
         if keep_paths:
             self.list.blockSignals(True)
             for p in keep_paths:
@@ -1884,7 +1982,7 @@ class Main(QMainWindow):
         self.btn_play.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
 
     def on_media_status(self, st):
-        if st == QMediaPlayer.MediaStatus.EndOfMedia:
+        if st == QMediaPlayer.MediaStatus.EndOfMedia and int(self.cfg.value("autonext", 1) or 0):
             self.step_play(1)  # pasa a la siguiente canción de la lista
 
     def on_pos(self, ms):
@@ -2430,7 +2528,8 @@ class Main(QMainWindow):
             return
         txt = "\n".join(os.path.basename(p) for p in paths[:10]) + ("\n…" if len(paths) > 10 else "")
         how = "a la papelera" if send2trash else "de forma PERMANENTE"
-        if QMessageBox.question(self, "Eliminar", f"¿Eliminar {how}?\n\n{txt}") != QMessageBox.StandardButton.Yes:
+        ask = int(self.cfg.value("confirm_delete", 1) or 0) or not send2trash  # sin papelera siempre se pregunta
+        if ask and QMessageBox.question(self, "Eliminar", f"¿Eliminar {how}?\n\n{txt}") != QMessageBox.StandardButton.Yes:
             return
         self.release_if(paths)
         for p in paths:
@@ -2530,6 +2629,7 @@ class Main(QMainWindow):
                 m.addAction("▶️ Buscar en YouTube (abre el navegador)", lambda: self.open_youtube(it.data(PATH_ROLE)))
                 m.addAction("📊 Espectrograma / calidad (varias = comparar)", self.open_spectrum)
                 m.addAction("🔄 Convertir formato…", self.convert_selected)
+                self.add_person_actions(m, self.val(it.data(PATH_ROLE), "artist"))
                 m.addAction("✏️ Renombrar archivo (F2)", self.rename_selected)
             m.addSeparator()
             m.addAction("✂️ Cortar (Ctrl+X)", lambda: self.clip_set("cut"))
@@ -2823,6 +2923,8 @@ class Main(QMainWindow):
         fs.addAction(self.act("🔑 Token de Discogs…", lambda: self.open_settings(3)))
 
         st = mb.addMenu("&Ajustes")
+        st.addAction(self.act("⚙ Opciones…", lambda: self.open_settings("general")))
+        st.addSeparator()
         st.addAction(self.act("🤖 Ajustes de IA…", lambda: self.open_settings(0)))
         st.addAction(self.act("🎨 Apariencia (tema y color)…", lambda: self.open_settings(1)))
         st.addAction(self.act("🌍 Idioma…", lambda: self.open_settings(2)))
@@ -2851,6 +2953,42 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         dlg.show()
         self._conv = dlg
+
+    def apply_field_visibility(self):
+        hidden = {x for x in str(self.cfg.value("hidden_fields", "") or "").split(",") if x}
+        for k, (lb, le) in self.field_widgets.items():
+            lb.setVisible(k not in hidden)
+            le.setVisible(k not in hidden)
+
+    def web_artist(self, kind, name):
+        name = (name or "").strip()
+        if not name:
+            return
+        if kind == "wiki":
+            lang = i18n.CUR if i18n.CUR in ("es", "en", "ru") else "es"
+            url = f"https://{lang}.wikipedia.org/wiki/Special:Search?go=Go&search=" + quote(name)
+        elif kind == "youtube":
+            url = "https://www.youtube.com/results?search_query=" + quote_plus(name)
+        else:
+            url = "https://open.spotify.com/search/" + quote(name)
+        QDesktopServices.openUrl(QUrl(url))
+        self.statusBar().showMessage(f"Abriendo «{name}» en el navegador…")
+
+    def add_person_actions(self, m, name):
+        name = (name or "").strip()
+        if not name:
+            return
+        m.addSeparator()
+        hd = m.addAction(f"👤 {name}")
+        hd.setEnabled(False)
+        m.addAction(T("📖 Historia del artista (Wikipedia)"), lambda: self.web_artist("wiki", name))
+        m.addAction(T("▶️ Buscar artista en YouTube"), lambda: self.web_artist("youtube", name))
+        m.addAction(T("🟢 Buscar artista en Spotify"), lambda: self.web_artist("spotify", name))
+
+    def person_menu(self, le, pos):
+        m = le.createStandardContextMenu()
+        self.add_person_actions(m, le.text())
+        m.exec(le.mapToGlobal(pos))
 
     def open_tag_source(self, source):
         paths = self.selected_paths()
@@ -2894,33 +3032,66 @@ class Main(QMainWindow):
             return
         self.open_youtube(p, external)
 
-    def open_settings(self, tab=0):
+    def open_settings(self, tab="ia"):
+        tab = {0: "ia", 1: "apariencia", 2: "idioma", 3: "fuentes"}.get(tab, tab)
+        snap = (self.theme, self.accent, i18n.CUR)
         dlg = QDialog(self)
         dlg.setWindowTitle("Ajustes")
-        dlg.resize(470, 400)
-        v = QVBoxLayout(dlg)
-        tabs = QTabWidget()
-        v.addWidget(tabs)
-        # --- IA (los mismos campos que usa el resto del programa)
-        w1 = QWidget()
-        l1 = QVBoxLayout(w1)
-        l1.addWidget(QLabel("Elige el proveedor, el modelo y pega tu clave."))
-        l1.addWidget(self.ai_cfg)
-        self.ai_cfg.show()
-        l1.addStretch(1)
-        tabs.addTab(w1, "Inteligencia artificial")
-        # --- apariencia
-        w2 = QWidget()
-        l2 = QVBoxLayout(w2)
-        f2 = QFormLayout()
+        dlg.resize(780, 540)
+        outer = QVBoxLayout(dlg)
+        body = QHBoxLayout()
+        outer.addLayout(body, 1)
+        nav = QTreeWidget()
+        nav.setHeaderHidden(True)
+        nav.setFixedWidth(210)
+        nav.setIndentation(14)
+        body.addWidget(nav)
+        right = QVBoxLayout()
+        body.addLayout(right, 1)
+        head = QLabel("")
+        head.setObjectName("title")
+        right.addWidget(head)
+        stack = QStackedWidget()
+        right.addWidget(stack, 1)
+        pages, titles, apply_fns = {}, [], []
+
+        def add_page(key, title, widget, parent=None):
+            it = QTreeWidgetItem([T(title)])
+            it.setData(0, Qt.ItemDataRole.UserRole, key)
+            (parent.addChild(it) if parent is not None else nav.addTopLevelItem(it))
+            if widget is not None:
+                pages[key] = stack.addWidget(widget)
+            titles.append((it, title))
+            return it
+
+        def page(*items):
+            w = QWidget()
+            lay = QVBoxLayout(w)
+            lay.setContentsMargins(4, 8, 4, 4)
+            for x in items:
+                lay.addWidget(x) if isinstance(x, QWidget) else lay.addLayout(x)
+            lay.addStretch(1)
+            return w
+
+        def chk(text, key, default):
+            c = QCheckBox(text)
+            c.setChecked(bool(int(self.cfg.value(key, default) or 0)))
+            apply_fns.append(lambda c=c, key=key: self.cfg.setValue(key, 1 if c.isChecked() else 0))
+            return c
+
+        # General
+        add_page("general", "General", page(
+            chk("Abrir la última carpeta al iniciar", "open_last", 1),
+            chk("Confirmar antes de eliminar (con papelera)", "confirm_delete", 1),
+            chk("Mostrar la guía rápida cada vez que se inicia", "guide_every", 0)))
+        # Apariencia
         theme_cb = QComboBox()
         theme_cb.addItem(T("Oscuro"), "dark")
         theme_cb.addItem(T("Claro"), "light")
         theme_cb.setCurrentIndex(0 if self.theme == "dark" else 1)
         theme_cb.currentIndexChanged.connect(lambda: self.set_theme(theme_cb.currentData()))
+        f2 = QFormLayout()
         f2.addRow("Tema", theme_cb)
-        l2.addLayout(f2)
-        l2.addWidget(QLabel("Color de acento"))
         row = QHBoxLayout()
         for col, name in ACCENTS:
             b = QPushButton()
@@ -2931,7 +3102,6 @@ class Main(QMainWindow):
             b.clicked.connect(lambda _=False, c=col: self.set_accent(c))
             row.addWidget(b)
         row.addStretch(1)
-        l2.addLayout(row)
         row2 = QHBoxLayout()
         bo = QPushButton("🎨 Otro color…")
         bo.clicked.connect(lambda: (lambda c: c.isValid() and self.set_accent(c.name()))(
@@ -2941,54 +3111,112 @@ class Main(QMainWindow):
         row2.addWidget(bo)
         row2.addWidget(br)
         row2.addStretch(1)
-        l2.addLayout(row2)
-        l2.addStretch(1)
-        tabs.addTab(w2, "Apariencia")
-        # --- idioma
-        w3 = QWidget()
-        l3 = QVBoxLayout(w3)
-        l3.addWidget(QLabel("Idioma de la interfaz"))
+        add_page("apariencia", "Apariencia", page(f2, QLabel("Color de acento"), row, row2))
+        # Idioma
         lang_cb = QComboBox()
         for code, name in i18n.LANGS:
             lang_cb.addItem(name, code)
         lang_cb.setCurrentIndex(max(0, [c for c, _ in i18n.LANGS].index(i18n.CUR)))
-        l3.addWidget(lang_cb)
-        l3.addWidget(QLabel("Algunos mensajes emergentes siguen en español."))
-        l3.addStretch(1)
-        tabs.addTab(w3, "Idioma")
-        # --- fuentes de etiquetas
-        w4 = QWidget()
-        l4 = QVBoxLayout(w4)
-        l4.addWidget(QLabel("MusicBrainz no necesita clave. Discogs necesita un token personal gratuito:"))
+        add_page("idioma", "Idioma", page(QLabel("Idioma de la interfaz"), lang_cb,
+                                          QLabel("Algunos mensajes emergentes siguen en español.")))
+        # Etiquetas (grupo)
+        grp = add_page("etiquetas", "Etiquetas", None)
+        hidden = {x for x in str(self.cfg.value("hidden_fields", "") or "").split(",") if x}
+        gl = QGridLayout()
+        boxes = {}
+        names = [(k, n) for k, n in FIELDS] + [("codec", "Códec"), ("bitrate", "Tasa de bits"), ("freq", "Frecuencia"),
+                                               ("dur", "Duración"), ("mode", "Modo"), ("size", "Tamaño")]
+        for i, (k, n) in enumerate(names):
+            c = QCheckBox(T(n))
+            c.setChecked(k not in hidden)
+            boxes[k] = c
+            gl.addWidget(c, i // 2, i % 2)
+        gw = QWidget()
+        gw.setLayout(gl)
+
+        def save_fields():
+            self.cfg.setValue("hidden_fields", ",".join(k for k, c in boxes.items() if not c.isChecked()))
+            self.apply_field_visibility()
+        apply_fns.append(save_fields)
+        add_page("panel", "Panel de etiquetas", page(QLabel("Campos que se muestran en el panel de metadatos:"), gw), grp)
+        size_cb = QComboBox()
+        for v in ("Original", "300", "500", "600", "800", "1000", "1200", "1600"):
+            size_cb.addItem(v if v == "Original" else v + " px", v)
+        size_cb.setCurrentIndex(max(0, size_cb.findData("Original" if self.cover_max is None else str(self.cover_max))))
+        apply_fns.append(lambda: self.set_cover_max(parse_side(size_cb.currentData())))
+        add_page("portadas", "Portadas", page(QLabel("Tamaño máximo de las portadas nuevas (nunca se agranda):"), size_cb), grp)
+        # Fuentes de etiquetas
         tok = QLineEdit(str(self.cfg.value("discogs_token", "") or ""))
         tok.setEchoMode(QLineEdit.EchoMode.Password)
         tok.setPlaceholderText("Token de Discogs")
-        tok.textChanged.connect(lambda t: self.cfg.setValue("discogs_token", t.strip()))
-        l4.addWidget(tok)
+        apply_fns.append(lambda: self.cfg.setValue("discogs_token", tok.text().strip()))
         lnk = QLabel('<a href="https://www.discogs.com/settings/developers">Conseguir mi token (discogs.com/settings/developers)</a>')
         lnk.setOpenExternalLinks(True)
-        l4.addWidget(lnk)
-        l4.addStretch(1)
-        tabs.addTab(w4, "Fuentes de etiquetas")
+        add_page("fuentes", "Fuentes de etiquetas", page(
+            QLabel("MusicBrainz no necesita clave. Discogs necesita un token personal gratuito:"), tok, lnk))
+        # Inteligencia artificial (los campos que usa el resto del programa)
+        self.ai_cfg.show()
+        add_page("ia", "Inteligencia artificial", page(QLabel("Elige el proveedor, el modelo y pega tu clave."), self.ai_cfg))
+        # Reproductor
+        add_page("reproductor", "Reproductor", page(chk("Pasar a la siguiente canción al terminar", "autonext", 1)))
+
+        nav.expandAll()
+
+        def on_nav(cur, _prev):
+            if cur is None:
+                return
+            key = cur.data(0, Qt.ItemDataRole.UserRole)
+            if key not in pages:
+                if cur.childCount():
+                    nav.setCurrentItem(cur.child(0))
+                return
+            stack.setCurrentIndex(pages[key])
+            head.setText(T(next(t for it, t in titles if it is cur)))
+        nav.currentItemChanged.connect(on_nav)
 
         def change_lang():
-            code = lang_cb.currentData()
-            i18n.set_lang(code)
-            self.cfg.setValue("lang", code)
+            i18n.set_lang(lang_cb.currentData())
+            self.cfg.setValue("lang", lang_cb.currentData())
             i18n.retranslate(self)
             i18n.retranslate(dlg)
+            for it, t in titles:
+                it.setText(0, T(t))
+            cur = nav.currentItem()
+            if cur is not None:
+                head.setText(T(next(t for it, t in titles if it is cur)))
         lang_cb.currentIndexChanged.connect(change_lang)
-        close = QPushButton("Cerrar")
-        close.clicked.connect(dlg.accept)
-        v.addWidget(close, 0, Qt.AlignmentFlag.AlignRight)
-        tabs.setCurrentIndex(tab)
+
+        btns = QHBoxLayout()
+        btns.addStretch(1)
+        okb, cb = QPushButton("Aceptar"), QPushButton("Cancelar")
+        okb.setObjectName("accent")
+        okb.clicked.connect(dlg.accept)
+        cb.clicked.connect(dlg.reject)
+        btns.addWidget(okb)
+        btns.addWidget(cb)
+        outer.addLayout(btns)
         i18n.retranslate(dlg)
-        dlg.exec()
-        # guarda la IA y devuelve los campos a la ventana principal antes de cerrar el diálogo
-        prov = self.provider.currentText()
-        self.cfg.setValue("provider", prov)
-        self.cfg.setValue(f"key_{prov}", self.key_le.text().strip())
-        self.cfg.setValue(f"model_{prov}", self.model_cb.currentText().strip())
+        first = next((it for it, _ in titles if it.data(0, Qt.ItemDataRole.UserRole) == tab), titles[0][0])
+        nav.setCurrentItem(first)
+        accepted = dlg.exec() == QDialog.DialogCode.Accepted
+        if accepted:
+            for fn in apply_fns:
+                fn()
+            prov = self.provider.currentText()
+            self.cfg.setValue("provider", prov)
+            self.cfg.setValue(f"key_{prov}", self.key_le.text().strip())
+            self.cfg.setValue(f"model_{prov}", self.model_cb.currentText().strip())
+        else:
+            if snap[0] != self.theme:
+                self.set_theme(snap[0])
+            if snap[1] != self.accent:
+                self.set_accent(snap[1])
+            if snap[2] != i18n.CUR:
+                i18n.set_lang(snap[2])
+                self.cfg.setValue("lang", snap[2])
+                i18n.retranslate(self)
+            self.provider.setCurrentText(str(self.cfg.value("provider", "Claude")))
+            self.on_provider(self.provider.currentText())
         self.ai_cfg.hide()
         self.ai_cfg.setParent(self)
         self.ai_cfg.hide()

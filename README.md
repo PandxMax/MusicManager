@@ -30,6 +30,7 @@
 - Mover entre árboles fácil: la **carpeta destino se resalta** al arrastrar, **Ctrl al soltar = copiar** y clic derecho → *Mover / Copiar al otro árbol*.
 - **Barra horizontal** en los árboles para ver nombres largos y carpetas muy anidadas.
 - **Cortar, copiar, pegar, renombrar y eliminar** archivos y carpetas (Ctrl+X, Ctrl+C, Ctrl+V, F2, Supr). Eliminar usa la papelera.
+- Botones **◀ ▶ ▲** (atrás, adelante, subir) como en el Explorador de Windows, también con `Alt+←/→/↑` y los botones laterales del ratón.
 - Vista de **iconos con portadas** o de **lista**.
 - **Búsqueda** de canciones, con opción de incluir subcarpetas.
 - Selección múltiple rápida: arrastra el ratón y baja con la rueda.
@@ -39,6 +40,9 @@ Edita **título, artista, álbum, artista del álbum, compositor, género, año,
 Compatible con **MP3, FLAC, OGG, Opus y M4A/MP4**. Los cambios quedan marcados hasta que pulsas **Guardar** (Ctrl+S).
 
 Además del editor, el panel muestra la **información técnica** de cada archivo: **códec, tasa de bits, frecuencia, duración, modo (CBR/VBR) y tamaño**.
+
+### 👤 Información del artista
+Clic derecho sobre el artista (en el panel de metadatos o en la lista): **historia en Wikipedia**, búsqueda en **YouTube** y en **Spotify**, todo en tu navegador.
 
 ### 🌐 Fuentes de etiquetas (MusicBrainz y Discogs)
 - Menú **Fuente de etiquetas**: busca la canción en **MusicBrainz** (gratis) o en **Discogs** (con un token personal gratuito).
@@ -86,6 +90,7 @@ Selecciona una o varias canciones y abre **Herramientas → Espectrograma**.
 ### 🎨 Personalización
 - **Tema oscuro o claro** y **color de acento** a tu gusto.
 - **Idiomas:** Español, English y Русский.
+- **Ajustes con árbol de categorías** (General, Apariencia, Idioma, Etiquetas, Fuentes de etiquetas, IA, Reproductor), con *Aceptar* y *Cancelar*. Elige qué campos ver en el panel, abrir la última carpeta al iniciar, confirmaciones y más.
 - Todo organizado en menús para ocupar el mínimo espacio.
 
 ---

@@ -59,3 +59,7 @@ NOVEDADES (ÚLTIMA VERSIÓN)
  - Panel de metadatos: ahora muestra Códec, Tasa de bits, Frecuencia, Duración, Modo y Tamaño.
  - Menú "Fuente de etiquetas": busca y aplica etiquetas y portada desde MusicBrainz (gratis)
    o Discogs (necesita un token gratuito: Ajustes > Fuentes de etiquetas).
+ - Botones ◀ ▶ ▲ encima de la lista (atrás, adelante, subir), también con Alt+←/→/↑ y los botones laterales del ratón.
+ - Clic derecho en el artista (en el panel o en la lista): historia en Wikipedia, YouTube y Spotify.
+ - Ajustes rediseñados con árbol de categorías (General, Apariencia, Idioma, Etiquetas, Fuentes de
+   etiquetas, Inteligencia artificial, Reproductor) y botones Aceptar / Cancelar.
