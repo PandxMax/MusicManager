@@ -1,5 +1,7 @@
 name: Crear EXE
 on: workflow_dispatch
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: windows-latest
@@ -11,3 +13,15 @@ jobs:
       - run: pyinstaller --noconfirm --clean --windowed --name MusicManager --icon MusicManager.ico --hidden-import logo_data --hidden-import spectro --hidden-import i18n --hidden-import convert --collect-all imageio_ffmpeg music_manager.py
       - uses: actions/upload-artifact@v4
         with: { name: MusicManager-Windows, path: dist/MusicManager }
+      # Publica una "Release" con el zip: de ahí se actualiza el programa solo (Ayuda > Buscar actualizaciones)
+      - name: Comprimir
+        shell: pwsh
+        run: Compress-Archive -Path dist/MusicManager/* -DestinationPath MusicManager-Windows.zip -Force
+      - name: Publicar versión
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(grep -m1 '^APP_VERSION' music_manager.py | sed 's/.*"\(.*\)".*/\1/')
+          gh release delete "v$V" --yes --cleanup-tag || true
+          gh release create "v$V" MusicManager-Windows.zip --title "Music Manager $V" --notes "Versión $V. Si ya tienes el programa, ábrelo y usa Ayuda > Buscar actualizaciones."
