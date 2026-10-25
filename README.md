@@ -6,7 +6,7 @@
 
 **Organiza tu música como un profesional: explora, mueve, edita etiquetas, portadas y letras, analiza la calidad real de tus archivos y deja que una IA te ayude con los géneros.**
 
-![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.07-7C5CFF)
+![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.08-7C5CFF)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![PyQt6](https://img.shields.io/badge/Interfaz-PyQt6-41CD52?logo=qt&logoColor=white)
@@ -58,6 +58,7 @@ Clic derecho sobre el artista (en el panel de metadatos o en la lista): **histor
 - Todo desde el **clic derecho** sobre la portada.
 
 ### 📝 Letras sincronizadas (LRCLIB)
+- **🔄 Se actualiza solo**: Ayuda ▸ Buscar actualizaciones descarga e instala la versión nueva desde GitHub.
 - **Portadas con varias opciones**, **lista de reproducción propia** (arrastrar, ordenar, guardar), disco giratorio y volumen desplegable.
 - **📊 Espectrograma en el mismo panel**, botones ☰ ⏮ ⏭ ⏹ en el reproductor, colores que cambian con la portada y búsqueda en Google Imágenes si no hay portada.
 - **✨ Portada automática**: un botón busca en iTunes y Deezer la portada en alta calidad y la pone sola.

@@ -119,3 +119,11 @@ VERSIÓN 1.07
    con Supr, guárdala/cárgala como .m3u8. Canciones bien separadas.
  - Clic derecho en una carpeta: "Reproducir carpeta" y "Añadir carpeta a la lista".
  - El espectrograma ya no agranda nada: aparece solo en el panel de abajo (donde van los metadatos).
+
+VERSIÓN 1.08
+------------
+ - Actualización desde el propio programa: Ayuda > "Buscar actualizaciones…" (y aviso al abrir, se puede
+   desactivar). Descarga la versión nueva desde GitHub, cierra el programa, reemplaza los archivos y lo
+   vuelve a abrir. Solo funciona en el .exe; sus ajustes se conservan.
+ - IMPORTANTE: la primera vez hay que descargar la 1.08 a mano (las anteriores no tienen esta función).
+   Desde ahí, cada versión nueva se instala sola. El flujo "Crear EXE" ahora publica una Release en GitHub.

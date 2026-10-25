@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog,
 )
 import mutagen
 import i18n
@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.07"
+APP_VERSION = "1.08"
 
 
 class TMenu(QMenu):
@@ -695,11 +695,68 @@ class AIWorker(AIBase):
             self.failed.emit(str(e))
 
 
+REPO = "PandxMax/MusicManager"
+
+
+def ver_tuple(v):
+    return tuple(int(x) for x in re.findall(r"\d+", v or "")) or (0,)
+
+
+class UpdateCheckWorker(QThread):
+    """Consulta en GitHub si hay una versión más nueva (https://github.com/PandxMax/MusicManager/releases)."""
+    result = pyqtSignal(dict)
+
+    def run(self):
+        info = {"ok": False}
+        try:
+            req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
+                                         headers={"User-Agent": f"MusicManager/{APP_VERSION}", "Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(req, timeout=12) as r:
+                d = json.loads(r.read().decode("utf-8"))
+            asset = next((a for a in d.get("assets", []) if a.get("name", "").lower().endswith(".zip")), None)
+            info = {"ok": True, "tag": d.get("tag_name", ""), "page": d.get("html_url", ""), "notes": d.get("body") or "",
+                    "url": asset["browser_download_url"] if asset else "", "size": asset.get("size", 0) if asset else 0}
+        except urllib.error.HTTPError as e:
+            info = {"ok": e.code == 404, "none": e.code == 404, "error": f"GitHub respondió {e.code}"}
+        except Exception as e:
+            info = {"ok": False, "error": str(getattr(e, "reason", e))}
+        self.result.emit(info)
+
+
+class UpdateDownloadWorker(QThread):
+    progress = pyqtSignal(int, int)
+    done = pyqtSignal(str)
+    failed = pyqtSignal(str)
+
+    def __init__(self, url, dest):
+        super().__init__()
+        self.url, self.dest = url, dest
+
+    def run(self):
+        try:
+            req = urllib.request.Request(self.url, headers={"User-Agent": f"MusicManager/{APP_VERSION}"})
+            with urllib.request.urlopen(req, timeout=30) as r, open(self.dest, "wb") as fh:
+                total, got = int(r.headers.get("Content-Length") or 0), 0
+                while True:
+                    if self.isInterruptionRequested():
+                        self.failed.emit("Cancelado")
+                        return
+                    chunk = r.read(1 << 16)
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+                    got += len(chunk)
+                    self.progress.emit(got, total)
+            self.done.emit(self.dest)
+        except Exception as e:
+            self.failed.emit(str(getattr(e, "reason", e)))
+
+
 class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.07 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.08 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3923,10 +3980,20 @@ class Main(QMainWindow):
 
         a = mb.addMenu("A&yuda")
         a.addAction(self.act("❓ Guía rápida", self.show_guide))
+        a.addAction(self.act("🔄 Buscar actualizaciones…", self.check_updates))
+        self.act_autoupd = self.act("Buscar actualizaciones al abrir el programa", self.toggle_auto_update, "", True)
+        self.act_autoupd.setChecked(bool(int(self.cfg.value("auto_update", 1) or 0)))
+        a.addAction(self.act_autoupd)
+        a.addSeparator()
         a.addAction(self.act("ℹ️ Acerca de Music Manager", self.show_about))
         mb.setCornerWidget(self._corner, Qt.Corner.TopRightCorner)
         i18n.set_lang(str(self.cfg.value("lang", "es")))
         i18n.retranslate(self)
+        QTimer.singleShot(5000, self.auto_check_updates)
+
+    def auto_check_updates(self):
+        if int(self.cfg.value("auto_update", 1) or 0):
+            self.check_updates(manual=False)
 
     def convert_selected(self):
         paths = self.selected_paths()
@@ -4250,6 +4317,105 @@ class Main(QMainWindow):
             "</ul><p>Puedes volver a ver esto en <b>Ayuda → Guía rápida</b>.</p>")
         box.exec()
 
+    # ------------------------------------------------------- Actualizaciones
+    def check_updates(self, manual=True):
+        if getattr(self, "upd_worker", None) is not None and self.upd_worker.isRunning():
+            return
+        self._upd_manual = manual
+        if manual:
+            self.statusBar().showMessage("Buscando actualizaciones…")
+        self.upd_worker = UpdateCheckWorker()
+        self.upd_worker.result.connect(self.on_update_info)
+        self.upd_worker.start()
+
+    def on_update_info(self, info):
+        manual = getattr(self, "_upd_manual", True)
+        if not info.get("ok"):
+            if manual:
+                QMessageBox.warning(self, "Actualizaciones", f"No se pudo consultar GitHub.\n{info.get('error', '')}")
+            return
+        if info.get("none") or ver_tuple(info.get("tag")) <= ver_tuple(APP_VERSION):
+            if manual:
+                QMessageBox.information(self, "Actualizaciones", f"Ya tienes la última versión ({APP_VERSION}).")
+            self.statusBar().clearMessage()
+            return
+        tag = info["tag"].lstrip("vV")
+        notes = (info.get("notes") or "").strip()
+        box = QMessageBox(self)
+        box.setWindowTitle("Hay una versión nueva")
+        box.setText(f"Versión {tag} disponible (tienes la {APP_VERSION}).")
+        if notes:
+            box.setInformativeText(notes[:600])
+        can_auto = bool(info.get("url")) and getattr(sys, "frozen", False) and sys.platform == "win32"
+        b_up = box.addButton("⬇ Actualizar ahora" if can_auto else "Abrir la página de descarga", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Más tarde", QMessageBox.ButtonRole.RejectRole)
+        i18n.retranslate(box)
+        box.exec()
+        if box.clickedButton() is not b_up:
+            return
+        if can_auto:
+            self.download_update(info)
+        else:
+            QDesktopServices.openUrl(QUrl(info.get("page") or f"https://github.com/{REPO}/releases/latest"))
+
+    def download_update(self, info):
+        import tempfile
+        dest = os.path.join(tempfile.gettempdir(), "MusicManager-update.zip")
+        dlg = QProgressDialog("Descargando la actualización…", "Cancelar", 0, 100, self)
+        dlg.setWindowTitle("Actualizando Music Manager")
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.setAutoClose(False)
+        dlg.setAutoReset(False)
+        w = UpdateDownloadWorker(info["url"], dest)
+        self.upd_dl = w
+
+        def prog(got, total):
+            if total:
+                dlg.setValue(int(got * 100 / total))
+            dlg.setLabelText(f"Descargando la actualización… {got / 1048576:.1f}" + (f" / {total / 1048576:.1f} MB" if total else " MB"))
+        w.progress.connect(prog)
+        w.failed.connect(lambda m: (dlg.close(), QMessageBox.warning(self, "Actualizaciones", f"No se pudo descargar: {m}")))
+        w.done.connect(lambda p: (dlg.close(), self.apply_update(p)))
+        dlg.canceled.connect(w.requestInterruption)
+        w.start()
+        dlg.show()
+
+    def apply_update(self, zip_path):
+        """Cierra el programa, copia los archivos nuevos encima y lo vuelve a abrir."""
+        import tempfile, subprocess
+        app_dir = os.path.dirname(sys.executable)
+        exe = sys.executable
+        stage = os.path.join(tempfile.gettempdir(), "mm_update_new")
+        bat = os.path.join(tempfile.gettempdir(), "mm_update.bat")
+        script = (
+            "@echo off\r\n"
+            f"set PID={os.getpid()}\r\n"
+            ":wait\r\n"
+            "tasklist /FI \"PID eq %PID%\" 2>nul | find \"%PID%\" >nul\r\n"
+            "if not errorlevel 1 (ping -n 2 127.0.0.1 >nul & goto wait)\r\n"
+            f"rmdir /s /q \"{stage}\" 2>nul\r\n"
+            f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"Expand-Archive -LiteralPath '{zip_path}' -DestinationPath '{stage}' -Force\"\r\n"
+            f"xcopy \"{stage}\\*\" \"{app_dir}\" /E /Y /Q /I >nul\r\n"
+            f"rmdir /s /q \"{stage}\" 2>nul\r\n"
+            f"del \"{zip_path}\" 2>nul\r\n"
+            f"start \"\" \"{exe}\"\r\n"
+            "del \"%~f0\"\r\n"
+        )
+        try:
+            with open(bat, "w", encoding="mbcs", errors="replace") as fh:
+                fh.write(script)
+            subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000 | 0x00000008, close_fds=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Actualizaciones", f"No se pudo preparar la actualización: {e}")
+            return
+        QMessageBox.information(self, "Actualizando", "Music Manager se cerrará, se actualizará solo y volverá a abrirse en unos segundos.")
+        self.close()
+        QApplication.quit()
+
+    def toggle_auto_update(self, on):
+        self.cfg.setValue("auto_update", 1 if on else 0)
+
     def show_about(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("Acerca de Music Manager")
@@ -4271,6 +4437,8 @@ class Main(QMainWindow):
         log.setHtml(
             "<h3>📜 Historial de versiones</h3>"
             f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>Actualización desde el propio programa: Ayuda ▸ «Buscar actualizaciones…» descarga la versión nueva y se reemplaza sola (también avisa al abrir).</li></ul>"
+            "<h4>Versión 1.07</h4><ul>"
             "<li>✨ Portada automática: muestra varias opciones (iTunes y Deezer) para elegir; Google Imágenes solo si no hay ninguna.</li>"
             "<li>Volumen en una sola barrita que se despliega al pasar el ratón, y un disco que gira con la portada que suena.</li>"
             "<li>Metadatos: solo «Deshacer cambios» y «Guardar cambios»; se quitó la palabra «Portada» sobre la imagen.</li>"
