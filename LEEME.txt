@@ -86,3 +86,8 @@ CORRECCIONES
  - Panel de portada rediseñado y botón "📊 Espectro" junto a los datos técnicos.
 
 VERSIÓN 1.03 (cada cambio sube la versión; el historial está en Ayuda > Acerca de)
+
+VERSIÓN 1.04
+------------
+ - El panel derecho tiene dos botones, "🎼 Géneros" y "📝 Letra", que se turnan el mismo espacio
+   (debajo de la portada). La letra ya no se abre junto a los metadatos, así la ventana no se desborda.

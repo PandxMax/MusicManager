@@ -76,6 +76,7 @@ _ROWS = [
     ("Letras", "Lyrics", "Тексты песен"),
     ("Preferir la letra sincronizada (con minutos) al buscar en LRCLIB", "Prefer synced lyrics (with timestamps) from LRCLIB", "Предпочитать синхронизированный текст (с таймкодами) из LRCLIB"),
     ("Guardar también un archivo .lrc junto a la canción", "Also save a .lrc file next to the song", "Также сохранять файл .lrc рядом с песней"),
+    ("🎼 Géneros", "🎼 Genres", "🎼 Жанры"),
     ("Aceptar", "OK", "ОК"), ("Silenciar", "Mute", "Выключить звук"), ("Quitar silencio", "Unmute", "Включить звук"),
     ("Acerca de Music Manager", "About Music Manager", "О программе Music Manager"), ("Cancelar", "Cancel", "Отмена"),
     ("&Fuente de etiquetas", "&Tag source", "&Источник тегов"),

@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.03"
+APP_VERSION = "1.04"
 
 
 class TMenu(QMenu):
@@ -344,6 +344,8 @@ QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
 QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 8px; font-size: 11px; }
+QPushButton#tabbtn { border-radius: 10px; padding: 7px 10px; }
+QPushButton#tabbtn:checked { background: @accent; color: white; border-color: @accent; font-weight: 600; }
 QPushButton#chipbtn { background: @accent_soft; border: 1px solid @accent; border-radius: 10px; padding: 2px 10px; font-size: 11px; }
 QPushButton#chipbtn:hover { background: @accent; color: white; }
 QPushButton#iconbtn { background: @surface2; border: 1px solid @border; border-radius: 10px; font-size: 16px; padding: 0; }
@@ -672,7 +674,7 @@ class LrclibWorker(QThread):
     got = pyqtSignal(str, str)  # ruta, letra ("" si no hubo)
     finished_all = pyqtSignal()
     failed = pyqtSignal(str)
-    UA = "MusicManager/1.03 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.04 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, jobs, prefer_synced=True):
         super().__init__()
@@ -1280,7 +1282,7 @@ class Main(QMainWindow):
         super().__init__()
         self.setWindowTitle(f"Music Manager {APP_VERSION}")
         self.resize(1500, 840)
-        self.setMinimumSize(1180, 640)
+        self.setMinimumSize(1100, 640)
         self.cfg = QSettings("MusicManager", "MusicManager")
         self.pending, self.edited, self.lyrics_edited, self._loading = {}, set(), False, False
         self.cur_paths, self.current_dir = [], ""
@@ -1344,7 +1346,7 @@ class Main(QMainWindow):
         self.act_view = self.act("☰ Lista", self.toggle_view, "Cambiar entre iconos y lista")
         self.act_tree2 = self.act("🗂 2.º árbol", self.toggle_tree2, "Mostrar un segundo árbol de carpetas", True)
         self.act_orient = self.act("⇄ Árboles lado a lado", self.toggle_orient, "Colocar los árboles en vertical u horizontal")
-        self.act_lyr = self.act("📝 Letra", self.toggle_lyr, "Mostrar u ocultar el panel de letra", True)
+        self.act_lyr = self.act("📝 Letra", self.toggle_lyr, "Cambiar el panel derecho entre géneros y letra", True)
         self.search = QLineEdit()
         self.search.setPlaceholderText("🔍 Buscar canción…")
         self.search.setClearButtonEnabled(True)
@@ -1456,13 +1458,7 @@ class Main(QMainWindow):
         b2.clicked.connect(self.save_all)
         b3 = QPushButton("✏️ Renombrar archivo…")
         b3.clicked.connect(self.rename_selected)
-        b4 = QPushButton("📝 Letra")
-        b4.setCheckable(True)
-        b4.setToolTip("Ver o editar la letra de la canción (también se puede poner con IA)")
-        b4.toggled.connect(self.act_lyr.setChecked)
-        self.act_lyr.toggled.connect(b4.setChecked)
         row = QHBoxLayout()
-        row.addWidget(b4)
         row.addWidget(b1)
         row.addWidget(b3)
         row.addWidget(b2)
@@ -1479,13 +1475,11 @@ class Main(QMainWindow):
         self.btn_lyr = QPushButton("🔎 Buscar letra en LRCLIB (sincronizada)")
         self.btn_lyr.clicked.connect(self.run_lyrics)
         lv.addWidget(self.btn_lyr)
-        self.lyr_box.hide()
 
         bottom = QWidget()
         bl = QHBoxLayout(bottom)
         bl.setContentsMargins(0, 0, 0, 0)
-        bl.addWidget(meta_box, 3)
-        bl.addWidget(self.lyr_box, 2)
+        bl.addWidget(meta_box)
 
         middle = QSplitter(Qt.Orientation.Vertical)
         self.list_pane = QWidget()
@@ -1603,7 +1597,23 @@ class Main(QMainWindow):
         rv = QVBoxLayout(rightw)
         rv.setContentsMargins(4, 0, 0, 0)
         rv.addWidget(cover_box)        # fija: no se mueve
-        rv.addWidget(ai_scroll, 1)     # esta parte sí se desplaza
+        tabs_row = QHBoxLayout()
+        tabs_row.setSpacing(6)
+        self.btn_tab_gen, self.btn_tab_lyr = QPushButton("🎼 Géneros"), QPushButton("📝 Letra")
+        for i, b in enumerate((self.btn_tab_gen, self.btn_tab_lyr)):
+            b.setCheckable(True)
+            b.setObjectName("tabbtn")
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(lambda _=False, i=i: self.show_right_tab(i))
+            tabs_row.addWidget(b, 1)
+        self.btn_tab_gen.setChecked(True)
+        self.btn_tab_gen.setToolTip("Sugerir géneros y subgéneros con IA")
+        self.btn_tab_lyr.setToolTip("Ver, editar o buscar la letra de la canción")
+        self.right_stack = QStackedWidget()
+        self.right_stack.addWidget(ai_scroll)     # 0: géneros (se desplaza)
+        self.right_stack.addWidget(self.lyr_box)  # 1: letra
+        rv.addLayout(tabs_row)
+        rv.addWidget(self.right_stack, 1)
         rightw.setMinimumWidth(360)
 
         main = QSplitter()
@@ -2880,8 +2890,16 @@ class Main(QMainWindow):
         self.cfg.setValue("accent", self.accent)
         apply_theme(QApplication.instance(), self.theme, self.accent or None)
 
+    def show_right_tab(self, i):
+        self.act_lyr.blockSignals(True)
+        self.act_lyr.setChecked(i == 1)
+        self.act_lyr.blockSignals(False)
+        self.toggle_lyr(i == 1)
+
     def toggle_lyr(self, on):
-        self.lyr_box.setVisible(on)
+        self.right_stack.setCurrentIndex(1 if on else 0)
+        self.btn_tab_gen.setChecked(not on)
+        self.btn_tab_lyr.setChecked(on)
         self.cfg.setValue("show_lyr", 1 if on else 0)
 
     def apply_filter(self, text=""):
@@ -3519,6 +3537,8 @@ class Main(QMainWindow):
         log.setHtml(
             "<h3>📜 Historial de versiones</h3>"
             f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>Géneros y Letra comparten el panel derecho con dos botones: se acabó el desbordamiento lateral de la ventana.</li></ul>"
+            "<h4>Versión 1.03</h4><ul>"
             "<li>El panel de carpetas ya no se puede aplastar al abrir la letra.</li>"
             "<li>LRCLIB: reintentos automáticos si el servicio está saturado (error 503).</li>"
             "<li>Panel de portada más cuidado: esquinas redondeadas, sombra y botones con iconos.</li>"
