@@ -148,3 +148,8 @@ VERSIÓN 1.11
  - Actualización automática más robusta: descomprime la versión nueva antes de cerrar (sin depender de
    PowerShell), cierra el proceso por completo, reintenta si hay archivos en uso, usa rutas completas de
    Windows y deja un registro (%TEMP%\mm_update.log). Al abrir, avisa si la actualización salió bien o mal.
+
+VERSIÓN 1.12
+------------
+ - Al abrir el programa por primera vez después de actualizarlo, aparece una pantallita con lo que cambió
+   (todas las versiones que te saltaste). Se puede volver a ver en Ayuda > "Novedades de esta versión".

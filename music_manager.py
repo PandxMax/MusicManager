@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.11"
+APP_VERSION = "1.12"
 
 
 class TMenu(QMenu):
@@ -706,6 +706,83 @@ class AIWorker(AIBase):
             self.failed.emit(str(e))
 
 
+CHANGELOG = [
+    ('1.12', [
+        'Al actualizar, aparece una pantallita con las novedades de la versión (Ayuda ▸ «Novedades de esta versión» para verla cuando quieras).',
+    ]),
+    ('1.11', [
+        'Actualización automática más robusta: descomprime antes de cerrar, cierra el proceso por completo, reintenta si hay archivos en uso y avisa al abrir si salió bien o mal.',
+    ]),
+    ('1.10', [
+        'Clic derecho en el artista: ahora también «Buscar en Tidal» y «Buscar en Qobuz».',
+    ]),
+    ('1.09', [
+        'Volumen: la barra aparece hacia arriba, flotando (no mueve nada).',
+        'Botón flotante ☰ al costado: despliega por encima de portada, géneros y letra la lista de reproducción; arriba muestra lo que suena ahora, y puedes arrastrar canciones y crear/guardar listas con nombre.',
+        'Cuadritos de fondo en la barra de posición que bailan con el ritmo real de la canción y caen al detenerla.',
+    ]),
+    ('1.08', [
+        'Actualización desde el propio programa: Ayuda ▸ «Buscar actualizaciones…» descarga la versión nueva y se reemplaza sola (también avisa al abrir).',
+    ]),
+    ('1.07', [
+        '✨ Portada automática: muestra varias opciones (iTunes y Deezer) para elegir; Google Imágenes solo si no hay ninguna.',
+        'Volumen en una sola barrita que se despliega al pasar el ratón, y un disco que gira con la portada que suena.',
+        'Metadatos: solo «Deshacer cambios» y «Guardar cambios»; se quitó la palabra «Portada» sobre la imagen.',
+        'Lista de reproducción propia: arrastra canciones o carpetas, ordénalas, guárdala o cárgala (.m3u8). «Reproducir carpeta» con clic derecho. Canciones separadas y legibles.',
+        'El espectrograma aparece solo en el panel de abajo (no agranda la ventana).',
+    ]),
+    ('1.06', [
+        'El espectrograma, la comparación y el análisis de calidad ahora reemplazan a los metadatos y la letra en la misma ventana; un botón «Volver» los recupera.',
+        'Reproductor: botones de lista de reproducción, anterior, siguiente y detener junto a reproducir.',
+        'Los colores del programa se adaptan a la portada de la canción que suena (se puede desactivar en Ver).',
+        'Si no se encuentra una portada, se abre Google Imágenes con «artista título portada» y el programa ofrece ponerla al copiar la imagen.',
+    ]),
+    ('1.05', [
+        'Botón ✨ de portada automática: busca en iTunes y Deezer la portada en alta calidad (hasta 1200 px) y la pone sola en las canciones seleccionadas.',
+    ]),
+    ('1.04', [
+        'Géneros y Letra comparten el panel derecho con dos botones: se acabó el desbordamiento lateral de la ventana.',
+    ]),
+    ('1.03', [
+        'El panel de carpetas ya no se puede aplastar al abrir la letra.',
+        'LRCLIB: reintentos automáticos si el servicio está saturado (error 503).',
+        'Panel de portada más cuidado: esquinas redondeadas, sombra y botones con iconos.',
+        'Botón «📊 Espectro» junto a los datos técnicos de la canción.',
+    ]),
+    ('1.02', [
+        'Letras sincronizadas desde LRCLIB (con los minutos de cada línea y archivo .lrc); se quitó la letra con IA.',
+        'Botones de portada (cambiar, guardar, quitar, ver) y datos de la imagen.',
+        'Se quitaron títulos y textos repetidos del panel de metadatos y de la portada.',
+    ]),
+    ('1.01', [
+        'Menús en lugar de barra de herramientas; reproductor compacto en la línea de estado.',
+        'Botones atrás / adelante / subir para navegar por las carpetas.',
+        'Árboles de carpetas con barra horizontal, destino resaltado y copiar con Ctrl.',
+        'Espectrograma y análisis de calidad (comparación de varias canciones).',
+        'Convertir formatos: MP3, FLAC, M4A, OGG, Opus y WAV.',
+        'Fuentes de etiquetas: MusicBrainz y Discogs.',
+        'Información técnica del archivo (códec, tasa de bits, frecuencia…).',
+        'Clic derecho en el artista: Wikipedia, YouTube, Spotify, Tidal y Qobuz.',
+        'Ajustes con categorías, tema y color de acento, y 3 idiomas (ES / EN / RU).',
+        'Volumen: silenciar, rueda del ratón y globos con el minuto y el volumen.',
+    ]),
+    ('1.0', [
+        'Explorador con arrastrar y soltar entre dos árboles.',
+        'Editor de etiquetas, portadas (copiar, pegar, redimensionar) y letras.',
+        'IA (Claude, ChatGPT, Gemini) para géneros y letras.',
+        'Reproductor integrado y búsqueda en YouTube.',
+    ]),
+]
+
+
+def changelog_html(entries, current=None):
+    out = []
+    for v, items in entries:
+        tag = " <small>(actual)</small>" if v == current else ""
+        out.append(f"<h4>Versión {v}{tag}</h4><ul>" + "".join(f"<li>{i}</li>" for i in items) + "</ul>")
+    return "".join(out)
+
+
 REPO = "PandxMax/MusicManager"
 
 
@@ -767,7 +844,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.11 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.12 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4312,6 +4389,7 @@ class Main(QMainWindow):
         self.act_autoupd.setChecked(bool(int(self.cfg.value("auto_update", 1) or 0)))
         a.addAction(self.act_autoupd)
         a.addSeparator()
+        a.addAction(self.act("🆕 Novedades de esta versión", lambda: self.show_whats_new(True)))
         a.addAction(self.act("ℹ️ Acerca de Music Manager", self.show_about))
         mb.setCornerWidget(self._corner, Qt.Corner.TopRightCorner)
         i18n.set_lang(str(self.cfg.value("lang", "es")))
@@ -4320,6 +4398,7 @@ class Main(QMainWindow):
 
     def auto_check_updates(self):
         self.report_update_result()
+        self.show_whats_new()
         if int(self.cfg.value("auto_update", 1) or 0):
             self.check_updates(manual=False)
 
@@ -4816,6 +4895,39 @@ class Main(QMainWindow):
     def toggle_auto_update(self, on):
         self.cfg.setValue("auto_update", 1 if on else 0)
 
+    def show_whats_new(self, force=False):
+        """Pantallita con lo que cambió, la primera vez que se abre una versión nueva."""
+        last = str(self.cfg.value("last_version", "") or "")
+        self.cfg.setValue("last_version", APP_VERSION)
+        if not force:
+            if last == APP_VERSION or (last and ver_tuple(last) > ver_tuple(APP_VERSION)):
+                return
+        if force or not last:
+            entries = [e for e in CHANGELOG if e[0] == APP_VERSION]
+        else:
+            entries = [e for e in CHANGELOG if ver_tuple(e[0]) > ver_tuple(last)]
+        if not entries:
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("🎉 Novedades")
+        dlg.resize(520, 440)
+        v = QVBoxLayout(dlg)
+        head = QLabel(f"<h2 style='margin:0'>🎉 Music Manager {APP_VERSION}</h2>"
+                      + (f"<p style='margin:2px 0'>Se actualizó desde la versión {last}. Esto es lo nuevo:</p>" if last and not force
+                         else "<p style='margin:2px 0'>Esto es lo nuevo en esta versión:</p>"))
+        head.setTextFormat(Qt.TextFormat.RichText)
+        head.setWordWrap(True)
+        v.addWidget(head)
+        tb = QTextBrowser()
+        tb.setHtml(changelog_html(entries))
+        v.addWidget(tb, 1)
+        ok = QPushButton("¡Entendido!")
+        ok.setObjectName("accent")
+        ok.clicked.connect(dlg.accept)
+        v.addWidget(ok, 0, Qt.AlignmentFlag.AlignRight)
+        i18n.retranslate(dlg)
+        dlg.exec()
+
     def show_about(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("Acerca de Music Manager")
@@ -4834,58 +4946,7 @@ class Main(QMainWindow):
         v.addLayout(top)
         log = QTextBrowser()
         log.setOpenExternalLinks(True)
-        log.setHtml(
-            "<h3>📜 Historial de versiones</h3>"
-            f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
-            "<li>Actualización automática más robusta: descomprime antes de cerrar, cierra el proceso por completo, reintenta si hay archivos en uso y avisa al abrir si salió bien o mal.</li></ul>"
-            "<h4>Versión 1.10</h4><ul>"
-            "<li>Clic derecho en el artista: ahora también «Buscar en Tidal» y «Buscar en Qobuz».</li></ul>"
-            "<h4>Versión 1.09</h4><ul>"
-            "<li>Volumen: la barra aparece hacia arriba, flotando (no mueve nada).</li>"
-            "<li>Botón flotante ☰ al costado: despliega por encima de portada, géneros y letra la lista de reproducción; arriba muestra lo que suena ahora, y puedes arrastrar canciones y crear/guardar listas con nombre.</li>"
-            "<li>Cuadritos de fondo en la barra de posición que bailan con el ritmo real de la canción y caen al detenerla.</li></ul>"
-            "<h4>Versión 1.08</h4><ul>"
-            "<li>Actualización desde el propio programa: Ayuda ▸ «Buscar actualizaciones…» descarga la versión nueva y se reemplaza sola (también avisa al abrir).</li></ul>"
-            "<h4>Versión 1.07</h4><ul>"
-            "<li>✨ Portada automática: muestra varias opciones (iTunes y Deezer) para elegir; Google Imágenes solo si no hay ninguna.</li>"
-            "<li>Volumen en una sola barrita que se despliega al pasar el ratón, y un disco que gira con la portada que suena.</li>"
-            "<li>Metadatos: solo «Deshacer cambios» y «Guardar cambios»; se quitó la palabra «Portada» sobre la imagen.</li>"
-            "<li>Lista de reproducción propia: arrastra canciones o carpetas, ordénalas, guárdala o cárgala (.m3u8). «Reproducir carpeta» con clic derecho. Canciones separadas y legibles.</li>"
-            "<li>El espectrograma aparece solo en el panel de abajo (no agranda la ventana).</li></ul>"
-            "<h4>Versión 1.06</h4><ul>"
-            "<li>El espectrograma, la comparación y el análisis de calidad ahora reemplazan a los metadatos y la letra en la misma ventana; un botón «Volver» los recupera.</li>"
-            "<li>Reproductor: botones de lista de reproducción, anterior, siguiente y detener junto a reproducir.</li>"
-            "<li>Los colores del programa se adaptan a la portada de la canción que suena (se puede desactivar en Ver).</li>"
-            "<li>Si no se encuentra una portada, se abre Google Imágenes con «artista título portada» y el programa ofrece ponerla al copiar la imagen.</li></ul>"
-            "<h4>Versión 1.05</h4><ul>"
-            "<li>Botón ✨ de portada automática: busca en iTunes y Deezer la portada en alta calidad (hasta 1200 px) y la pone sola en las canciones seleccionadas.</li></ul>"
-            "<h4>Versión 1.04</h4><ul>"
-            "<li>Géneros y Letra comparten el panel derecho con dos botones: se acabó el desbordamiento lateral de la ventana.</li></ul>"
-            "<h4>Versión 1.03</h4><ul>"
-            "<li>El panel de carpetas ya no se puede aplastar al abrir la letra.</li>"
-            "<li>LRCLIB: reintentos automáticos si el servicio está saturado (error 503).</li>"
-            "<li>Panel de portada más cuidado: esquinas redondeadas, sombra y botones con iconos.</li>"
-            "<li>Botón «📊 Espectro» junto a los datos técnicos de la canción.</li></ul>"
-            "<h4>Versión 1.02</h4><ul>"
-            "<li>Letras sincronizadas desde LRCLIB (con los minutos de cada línea y archivo .lrc); se quitó la letra con IA.</li>"
-            "<li>Botones de portada (cambiar, guardar, quitar, ver) y datos de la imagen.</li>"
-            "<li>Se quitaron títulos y textos repetidos del panel de metadatos y de la portada.</li></ul>"
-            "<h4>Versión 1.01</h4><ul>"
-            "<li>Menús en lugar de barra de herramientas; reproductor compacto en la línea de estado.</li>"
-            "<li>Botones atrás / adelante / subir para navegar por las carpetas.</li>"
-            "<li>Árboles de carpetas con barra horizontal, destino resaltado y copiar con Ctrl.</li>"
-            "<li>Espectrograma y análisis de calidad (comparación de varias canciones).</li>"
-            "<li>Convertir formatos: MP3, FLAC, M4A, OGG, Opus y WAV.</li>"
-            "<li>Fuentes de etiquetas: MusicBrainz y Discogs.</li>"
-            "<li>Información técnica del archivo (códec, tasa de bits, frecuencia…).</li>"
-            "<li>Clic derecho en el artista: Wikipedia, YouTube, Spotify, Tidal y Qobuz.</li>"
-            "<li>Ajustes con categorías, tema y color de acento, y 3 idiomas (ES / EN / RU).</li>"
-            "<li>Volumen: silenciar, rueda del ratón y globos con el minuto y el volumen.</li></ul>"
-            "<h4>Versión 1.0</h4><ul>"
-            "<li>Explorador con arrastrar y soltar entre dos árboles.</li>"
-            "<li>Editor de etiquetas, portadas (copiar, pegar, redimensionar) y letras.</li>"
-            "<li>IA (Claude, ChatGPT, Gemini) para géneros y letras.</li>"
-            "<li>Reproductor integrado y búsqueda en YouTube.</li></ul>")
+        log.setHtml("<h3>📜 Historial de versiones</h3>" + changelog_html(CHANGELOG, APP_VERSION))
         v.addWidget(log, 1)
         ok = QPushButton("Cerrar")
         ok.clicked.connect(dlg.accept)
