@@ -311,3 +311,7 @@ VERSIÓN 1.41
 ------------
  - Nuevo logo: panda con auriculares escuchando música.
  - Pantalla de carga animada: el panda saca canciones de una carpeta.
+
+VERSIÓN 1.42
+------------
+ - Logo y pantalla de carga rediseñados con un estilo más profesional.

@@ -120,7 +120,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.41"
+APP_VERSION = "1.42"
 
 
 class TMenu(QMenu):
@@ -820,6 +820,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.42', [
+        'Logo rediseñado con un estilo más profesional: panda con auriculares y ondas de sonido sobre fondo oscuro, en los colores del programa.',
+        'La pantalla de carga usa el mismo estilo nuevo.',
+    ]),
     ('1.41', [
         'Nuevo logo: un panda con auriculares escuchando música (también en el icono del programa).',
         'Nueva pantalla de carga animada: el panda abre una carpeta y van saliendo canciones volando mientras el programa se prepara.',
@@ -1131,7 +1135,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.41 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.42 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
