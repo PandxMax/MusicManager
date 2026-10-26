@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.30"
+APP_VERSION = "1.31"
 
 
 class TMenu(QMenu):
@@ -740,6 +740,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.31', [
+        'Metadatos: las etiquetas técnicas (formato, bitrate, frecuencia, duración, modo, tamaño) se ven siempre, también sin canción seleccionada, así nada salta de sitio.',
+        'El botón «Guardar» ahora está en la cabecera de los metadatos (arriba a la derecha) y solo se activa cuando hay cambios.',
+    ]),
     ('1.30', [
         'Metadatos: los campos quedan pegados a las etiquetas técnicas (sin hueco en medio); el espacio sobrante queda abajo.',
         'El botón «Guardar» ahora está al costado derecho de la portada (aparece solo cuando hay cambios).',
@@ -1008,7 +1012,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.30 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.31 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2298,10 +2302,18 @@ class Main(QMainWindow):
         for k in ("codec", "bitrate", "freq", "dur", "mode", "size"):
             chip = QLabel("")
             chip.setObjectName("chip")
-            chip.hide()
             self.tech[k] = chip
             tbl.addWidget(chip)
+        self.fill_tech([])
         tb_l.addWidget(chips_w, 1, Qt.AlignmentFlag.AlignTop)
+        self.save_btn = QPushButton("💾  Guardar cambios")
+        self.save_btn.setObjectName("accent")
+        self.save_btn.setToolTip("Escribe los cambios en el archivo (Ctrl+S)")
+        self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.save_btn.setFixedHeight(28)
+        self.save_btn.clicked.connect(self.save_all)
+        self.save_btn.setEnabled(False)
+        tb_l.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
@@ -2385,19 +2397,6 @@ class Main(QMainWindow):
         self.cover_lbl.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cover_lbl.customContextMenuRequested.connect(self.cover_menu)
         self.cover_lbl.setToolTip("Clic derecho: cambiar, quitar, copiar, pegar, guardar o redimensionar")
-        self.save_btn = QPushButton("💾")
-        self.save_btn.setObjectName("accent")
-        self.save_btn.setFixedSize(32, 32)
-        self.save_btn.setToolTip("Hay cambios sin guardar: guardar (Ctrl+S)")
-        self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.save_btn.clicked.connect(self.save_all)
-        sp = self.save_btn.sizePolicy()
-        sp.setRetainSizeWhenHidden(True)   # que no se mueva nada al aparecer
-        self.save_btn.setSizePolicy(sp)
-        self.save_btn.hide()
-        right = QVBoxLayout()
-        right.addWidget(self.save_btn)
-        right.addStretch(1)
         ch = QHBoxLayout()
         ch.setSpacing(8)
         left = QVBoxLayout()
@@ -2424,7 +2423,6 @@ class Main(QMainWindow):
         ch.addStretch(1)
         ch.addLayout(left)
         ch.addWidget(self.cover_lbl)
-        ch.addLayout(right)
         ch.addStretch(1)
         cv.setContentsMargins(6, 4, 6, 4)
         cv.setSpacing(3)
@@ -3640,7 +3638,7 @@ class Main(QMainWindow):
         """Muestra el botón «Guardar» sobre la portada solo si la selección actual tiene cambios."""
         try:
             d = bool(self.edited or self.lyrics_edited or any(self.pending.get(p) for p in self.cur_paths))
-            self.save_btn.setVisible(d)
+            self.save_btn.setEnabled(d)
         except AttributeError:
             pass
 
@@ -3712,15 +3710,16 @@ class Main(QMainWindow):
     def fill_tech(self, paths):
         icons = {"codec": "🎵", "bitrate": "⚡", "freq": "🔊", "dur": "⏱", "mode": "⚙", "size": "💾"}
         if not paths:
-            for chip in self.tech.values():
-                chip.hide()
+            for k, chip in self.tech.items():
+                chip.setText(f"{icons[k]} -")
+                chip.show()
             return
         infos = [tech_info(p) for p in paths[:150]]
         for k, chip in self.tech.items():
             vs = {i[k] for i in infos}
             v = next(iter(vs)) if len(vs) == 1 else "‹varios›"
             chip.setText(f"{icons[k]} {v}")
-            chip.setVisible(v != "—")
+            chip.show()
 
     def show_current(self, path, n):
         self._loading = True
