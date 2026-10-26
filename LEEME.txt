@@ -212,3 +212,8 @@ VERSIÓN 1.21
  - La fila de abajo con los metadatos tiene siempre el mismo tamaño y posición. Solo cambia mientras está el
    espectrograma (ahí sí se puede estirar) y al cerrarlo vuelve exactamente a la misma posición.
  - Sin canción seleccionada, los campos de metadatos están vacíos con una sola línea "-".
+
+VERSIÓN 1.22
+------------
+ - Al arrastrar archivos o carpetas ya no sale el signo de "prohibido".
+ - La carpeta que queda debajo del cursor se resalta con un recuadro de color mientras arrastras, para soltar encima.

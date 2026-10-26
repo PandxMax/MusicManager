@@ -50,7 +50,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.21"
+APP_VERSION = "1.22"
 
 
 class TMenu(QMenu):
@@ -709,6 +709,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.22', [
+        'Al arrastrar archivos o carpetas ya no aparece el signo de «prohibido», y la carpeta que tienes debajo se resalta para soltar encima.',
+    ]),
     ('1.21', [
         'La división entre la lista y la portada (y entre metadatos y géneros) ya no se puede mover: se queda quieta.',
         'Con los metadatos a la vista, la fila de abajo tiene siempre el mismo tamaño y posición; al cerrar el espectrograma vuelve exactamente al mismo sitio.',
@@ -942,7 +945,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.21 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.22 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1989,7 +1992,7 @@ class SongList(QListWidget):
         hover_timer.start()
         result = Qt.DropAction.IgnoreAction
         try:
-            result = drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction, Qt.DropAction.CopyAction)
+            result = drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction, Qt.DropAction.MoveAction)
             hover_timer.stop()
             if result == Qt.DropAction.IgnoreAction:   # Qt no aceptó el soltar: lo resolvemos nosotros
                 lp = self.viewport().mapFromGlobal(QCursor.pos())
@@ -2009,20 +2012,37 @@ class SongList(QListWidget):
         return it if it is not None and it.data(KIND_ROLE) == "dir" else None
 
     def _set_hover(self, it):
-        if self._hover is not None and self._hover is not it:
-            self._hover.setData(Qt.ItemDataRole.BackgroundRole, None)
-        self._hover = it
-        if it is not None:
-            it.setBackground(QBrush(QColor(124, 92, 255, 90)))
+        if self._hover is not it:
+            self._hover = it
+            self.viewport().update()
+
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        if self._hover is not None:   # resalta la carpeta de destino (se dibuja a mano: no depende de los estilos)
+            try:
+                r = QRectF(self.visualItemRect(self._hover)).adjusted(1, 1, -1, -1)
+                p = QPainter(self.viewport())
+                p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                base = self.palette().color(QPalette.ColorRole.Highlight)
+                p.setBrush(QColor(base.red(), base.green(), base.blue(), 95))
+                p.setPen(QPen(base, 2))
+                p.drawRoundedRect(r, 10, 10)
+                p.end()
+            except RuntimeError:
+                self._hover = None
+
+    def _cursor_dir(self):
+        lp = self.viewport().mapFromGlobal(QCursor.pos())
+        return self._dir_at(lp) if self.viewport().rect().contains(lp) else None
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls():
             e.acceptProposedAction()
 
     def dragMoveEvent(self, e):
-        it = self._dir_at(e.position().toPoint())
-        self._set_hover(it)
-        if it is not None and e.mimeData().hasUrls():
+        # se acepta siempre (así no sale el signo de «prohibido»); solo se resalta y se suelta sobre las carpetas
+        self._set_hover(self._cursor_dir())
+        if e.mimeData().hasUrls():
             e.acceptProposedAction()
         else:
             e.ignore()
@@ -2032,14 +2052,14 @@ class SongList(QListWidget):
         e.accept()
 
     def dropEvent(self, e):
-        it = self._dir_at(e.position().toPoint())
+        it = self._cursor_dir()
         self._set_hover(None)
+        e.acceptProposedAction()
         if it is None:
-            e.ignore()
             return
         paths = [u.toLocalFile() for u in e.mimeData().urls() if u.isLocalFile()]
-        e.setDropAction(Qt.DropAction.CopyAction)
-        e.accept()
+        if it.data(PATH_ROLE) in paths:
+            return
         self.dropped.emit(paths, it.data(PATH_ROLE))
 
 
