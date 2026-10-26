@@ -296,3 +296,9 @@ VERSIÓN 1.38
  - Portadas: se buscan también en SoundCloud (además de iTunes y Deezer).
  - Descargar a MP3: ahora acepta enlaces de YouTube y de SoundCloud.
  - Deezer: no se pueden bajar canciones completas (DRM); el programa lo explica si pegas un enlace.
+
+VERSIÓN 1.39
+------------
+ - Nuevo botón «Ajustes de la canción» junto al reproductor: graves, medios, agudos, volumen, tempo, tono, velocidad, bucle, recorte, eco, reverberación, estéreo, quitar voz y más.
+ - Escucha una muestra antes de guardar; guarda como canción nueva o reemplaza la original (conserva etiquetas y portada).
+ - Los botones con emojis ahora tienen iconos dibujados que siguen el tema.

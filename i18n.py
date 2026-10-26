@@ -47,6 +47,7 @@ _ROWS = [
     ("Guardar junto a los originales", "Save next to the originals", "Сохранить рядом с оригиналами"),
     ("Guardar en otra carpeta…", "Save in another folder…", "Сохранить в другую папку…"),
     ("▶ Convertir", "▶ Convert", "▶ Конвертировать"),
+    ("🎚 Ajustes de la canción…", "🎚 Song settings…", "🎚 Настройки песни…"),
     ("🤖 Ajustes de IA…", "🤖 AI settings…", "🤖 Настройки ИИ…"),
     ("🎨 Apariencia (tema y color)…", "🎨 Appearance (theme & color)…", "🎨 Оформление (тема и цвет)…"),
     ("🌍 Idioma…", "🌍 Language…", "🌍 Язык…"),
@@ -144,7 +145,23 @@ def tr(s):
     return d[CUR] if d else s
 
 
-def _apply(obj, attr, get, set_):
+def _deco(obj, text):
+    """Si el texto empieza con un emoji, lo cambia por un icono dibujado y devuelve el texto sin el emoji."""
+    try:
+        import icons
+        kind, rest = icons.split(text)
+        if kind and hasattr(obj, "setIcon"):
+            white = hasattr(obj, "objectName") and obj.objectName() == "accent"
+            from PyQt6.QtGui import QAction
+            ctx = "menu" if isinstance(obj, QAction) else ("check" if obj.isCheckable() else None)
+            obj.setIcon(icons.vicon(kind, "white" if white else None, ctx))
+            return rest
+    except Exception:
+        pass
+    return text
+
+
+def _apply(obj, attr, get, set_, deco=False):
     cur = get()
     if not cur:
         return
@@ -155,25 +172,36 @@ def _apply(obj, attr, get, set_):
             orig = cur
         else:
             obj.setProperty(ok, None)
+            if deco:
+                shown = _deco(obj, cur)
+                if shown != cur:
+                    set_(shown)
             return
     new = tr(orig)
+    if deco:
+        new = _deco(obj, new)
     obj.setProperty(ok, orig)
     obj.setProperty(lk, new)
     if new != cur:
         set_(new)
 
 
+def deco(obj):
+    """Aplica icono/traducción a un botón o acción cuyo texto se acaba de cambiar desde el programa."""
+    _apply(obj, "t", obj.text, obj.setText, True)
+
+
 def retranslate(root):
     objs = [root] + root.findChildren(QObject)
     for o in objs:
         if isinstance(o, QAction):
-            _apply(o, "t", o.text, o.setText)
+            _apply(o, "t", o.text, o.setText, True)
             _apply(o, "tip", o.toolTip, o.setToolTip)
         elif isinstance(o, QMenu):
             _apply(o, "m", o.title, o.setTitle)
         elif isinstance(o, QWidget):
             if isinstance(o, QAbstractButton):
-                _apply(o, "t", o.text, o.setText)
+                _apply(o, "t", o.text, o.setText, True)
             elif isinstance(o, QLabel):
                 _apply(o, "t", o.text, o.setText)
             elif isinstance(o, QGroupBox):

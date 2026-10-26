@@ -40,6 +40,7 @@ else:
     _SPLASH = None
 import mutagen
 import i18n
+import icons
 from i18n import tr as T
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover
@@ -84,7 +85,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.38"
+APP_VERSION = "1.39"
 
 
 class TMenu(QMenu):
@@ -784,6 +785,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.39', [
+        'Nuevo botón «Ajustes de la canción» junto al reproductor (también en Herramientas): graves, medios, agudos, volumen, normalizar, tempo, tono, velocidad (tasa), recorte, bucle (repetir), al revés, eco, reverberación, ancho estéreo, mono, quitar la voz y entrada/salida gradual.',
+        'Puedes escuchar una muestra de 30 s con los ajustes antes de guardar, y guardarla como canción nueva «(editada)» o reemplazar la original. Se conservan las etiquetas y la portada (MP3, M4A, MP4 y FLAC).',
+        'Botones de verdad: los emojis de los botones, menús y del reproductor (guardar, atrás/adelante, actualizar, volumen, IA, buscar, descargar…) se sustituyen por iconos dibujados que siguen el tema y el color del programa.',
+    ]),
     ('1.38', [
         'Portadas: además de iTunes y Deezer, ahora también se buscan en SoundCloud (aparecen como opción para elegir).',
         'Herramientas → «Descargar de YouTube / SoundCloud a MP3»: ahora también acepta enlaces de SoundCloud.',
@@ -1083,7 +1089,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.38 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.39 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1733,6 +1739,10 @@ class GlyphButton(QPushButton):
             p.drawPolygon(QPolygonF([QPointF(x - 7, y - 6.5), QPointF(x - 7, y + 6.5), QPointF(x + 3.5, y)]))
         elif k == "stop":
             p.drawRoundedRect(QRectF(x - 5.5, y - 5.5, 11, 11), 2, 2)
+        elif k != "list":   # el resto de iconos vienen de icons.py (por ejemplo «fx»)
+            p.save()
+            icons.draw_glyph(p, k, full.adjusted(5, 5, -5, -5), col)
+            p.restore()
         else:   # lista
             for dy in (-5, 0, 5):
                 p.drawRoundedRect(QRectF(x - 7, y + dy - 1.3, 14, 2.6), 1.3, 1.3)
@@ -2573,8 +2583,11 @@ class Main(QMainWindow):
         lpv.setSpacing(4)
         navbar = QHBoxLayout()
         navbar.setSpacing(2)
-        self.btn_back, self.btn_fwd, self.btn_up = QPushButton("◀"), QPushButton("▶"), QPushButton("▲")
-        self.btn_refresh = QPushButton("⟳")
+        self.btn_back, self.btn_fwd, self.btn_up = QPushButton(), QPushButton(), QPushButton()
+        self.btn_refresh = QPushButton()
+        for b, ic in ((self.btn_back, "arrow_l"), (self.btn_fwd, "arrow_r"), (self.btn_up, "arrow_u"),
+                      (self.btn_refresh, "refresh")):
+            b.setIcon(icons.vicon(ic))
         for b, tip, fn in ((self.btn_back, "Atrás (Alt+←)", self.nav_back), (self.btn_fwd, "Adelante (Alt+→)", self.nav_fwd),
                            (self.btn_up, "Subir a la carpeta superior (Alt+↑)", self.nav_up),
                            (self.btn_refresh, "Actualizar la carpeta (F5)", self.refresh_dir)):
@@ -3024,14 +3037,14 @@ class Main(QMainWindow):
             self.list.setGridSize(QSize(self.icon_px + 38, self.icon_px + 60))
             self.list.setSpacing(6)
             self.list.setWordWrap(True)
-            self.act_view.setText("☰ Lista")
+            self.act_view.setText("☰ Lista"); i18n.deco(self.act_view)
         else:
             self.list.setViewMode(QListView.ViewMode.ListMode)
             self.list.setIconSize(QSize(self.list_px, self.list_px))
             self.list.setGridSize(QSize())
             self.list.setSpacing(2)
             self.list.setWordWrap(False)
-            self.act_view.setText("🔳 Iconos")
+            self.act_view.setText("🔳 Iconos"); i18n.deco(self.act_view)
         self.list.setMovement(QListView.Movement.Static)
         self.list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.list.verticalScrollBar().setSingleStep(48)
@@ -3281,7 +3294,8 @@ class Main(QMainWindow):
         self.seek = ClickSlider(Qt.Orientation.Horizontal)
         self.time_lbl = QLabel("0:00 / 0:00")
         self.time_lbl.setObjectName("hint")
-        self.btn_mute = QPushButton("🔊")
+        self.btn_mute = QPushButton()
+        self.btn_mute.setIcon(icons.vicon("vol3"))
         self.btn_mute.setObjectName("tbtn")
         self.btn_mute.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_mute.setToolTip("Silenciar")
@@ -3299,6 +3313,10 @@ class Main(QMainWindow):
         self.btn_list.setToolTip("Lista de reproducción")
         self.btn_list.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_list.clicked.connect(self.show_playlist)
+        self.btn_fx = GlyphButton("fx")
+        self.btn_fx.setToolTip("Ajustes de la canción: graves, agudos, tempo, tono, velocidad, bucle, eco…")
+        self.btn_fx.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fx.clicked.connect(self.open_fx)
         h.addWidget(self.btn_list)
         h.addWidget(self.btn_prev)
         h.addWidget(self.btn_play)
@@ -3313,6 +3331,7 @@ class Main(QMainWindow):
         sg.addWidget(self.seek, 0, 0)
         h.addWidget(seekbox)
         h.addWidget(self.time_lbl)
+        h.addWidget(self.btn_fx)
         self.volbox = VolBox(self.btn_mute, self.vol)
         h.addWidget(self.volbox)
         self.disc = SpinDisc(40)
@@ -3337,7 +3356,7 @@ class Main(QMainWindow):
             self.btn_mute.clicked.connect(self.toggle_mute)
         else:
             self.set_now("Sin reproductor integrado", "El doble clic abrirá tu reproductor predeterminado")
-            for w in (self.btn_prev, self.btn_play, self.btn_stop, self.btn_next, self.btn_list, self.seek, self.vol):
+            for w in (self.btn_prev, self.btn_play, self.btn_stop, self.btn_next, self.btn_list, self.seek, self.vol, self.btn_fx):
                 w.setEnabled(False)
         return bar
 
@@ -3682,7 +3701,9 @@ class Main(QMainWindow):
         v.addSpacing(46)   # deja libre el botón flotante
         panel.hide()
         self.pl_panel = panel
-        fab = QPushButton("☰", central)
+        fab = QPushButton(central)
+        fab.setIcon(icons.vicon("menu", "white"))
+        fab.setIconSize(QSize(20, 20))
         fab.setObjectName("fab")
         fab.setFixedSize(40, 40)
         fab.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3718,14 +3739,14 @@ class Main(QMainWindow):
         """Muestra u oculta el panel flotante de la lista de reproducción."""
         if self.pl_panel.isVisible():
             self.pl_panel.hide()
-            self.pl_fab.setText("☰")
+            self.pl_fab.setIcon(icons.vicon("menu", "white"))
         else:
             self.layout_overlay()
             self.pl_refresh()
             self.pl_update_np()
             self.pl_panel.show()
             self.pl_panel.raise_()
-            self.pl_fab.setText("✕")
+            self.pl_fab.setIcon(icons.vicon("close", "white"))
             self.pl_fab.raise_()
 
     def step_play(self, d):
@@ -3766,7 +3787,7 @@ class Main(QMainWindow):
     def update_vol_icon(self):
         v = self.vol.value()
         muted = self.player is not None and self.audio.isMuted()
-        self.btn_mute.setText("🔇" if muted or v == 0 else ("🔈" if v < 34 else "🔉" if v < 67 else "🔊"))
+        self.btn_mute.setIcon(icons.vicon("vol0" if muted or v == 0 else ("vol1" if v < 34 else "vol2" if v < 67 else "vol3")))
         self.btn_mute.setToolTip(T("Quitar silencio") if muted else T("Silenciar"))
 
     def on_state(self, st):
@@ -4537,6 +4558,7 @@ class Main(QMainWindow):
         self.left_split.setOrientation(Qt.Orientation.Horizontal if horiz else Qt.Orientation.Vertical)
         self.cfg.setValue("trees_h", 1 if horiz else 0)
         self.act_orient.setText("⇅ Árboles apilados" if horiz else "⇄ Árboles lado a lado")
+        i18n.deco(self.act_orient)
         sizes = self.main_split.sizes()
         left = 620 if (horiz and self.tree2_box.isVisible()) else 290
         self.main_split.setSizes([left, max(300, sum(sizes) - left)])
@@ -5141,6 +5163,8 @@ class Main(QMainWindow):
         t.addAction(self.act("✨ Portadas automáticas (alta calidad)", self.auto_cover,
                              "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
+        t.addAction(self.act("🎚 Ajustes de la canción…", self.open_fx,
+                             "Graves, agudos, tempo, tono, velocidad, bucle, eco… y guardar como canción nueva o reemplazar"))
         t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
         t.addAction(self.act("⬇ Descargar de YouTube / SoundCloud a MP3…", self.open_ytdl,
                              "Descarga el audio de un enlace de YouTube o SoundCloud como MP3 para luego editarlo"))
@@ -5195,6 +5219,43 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         dlg.show()
         self._conv = dlg
+
+    def fx_release(self, path):
+        """path=None: pausa el reproductor (para oír la muestra). path=archivo: suelta ese archivo si suena."""
+        if self.player is None:
+            return
+        if path is None:
+            if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+                self.player.pause()
+        elif self.playing_path and os.path.normpath(self.playing_path) == os.path.normpath(path):
+            self.player.stop()
+            self.player.setSource(QUrl())
+
+    def open_fx(self):
+        import fx
+        path = self.playing_path if self.playing_path and os.path.isfile(self.playing_path) else None
+        if path is None:
+            sel = [p for p in self.selected_paths() if os.path.isfile(p)]
+            path = sel[0] if sel else None
+        if path is None:
+            self.statusBar().showMessage("Reproduce o selecciona una canción para ajustarla.")
+            return
+        off = 0.0
+        if self.player is not None and self.playing_path and os.path.normpath(self.playing_path) == os.path.normpath(path):
+            off = self.player.position() / 1000.0
+        dlg = fx.FxDialog(path, self, offset=off, release=self.fx_release, on_saved=self.fx_done)
+        i18n.retranslate(dlg)
+        dlg.show()
+        self._fx = dlg
+
+    def fx_done(self, path, replaced):
+        find_folder_image.cache_clear()
+        folder = os.path.dirname(path)
+        if os.path.normpath(folder) != os.path.normpath(self.current_dir or ""):
+            self.open_dir(folder)
+        self.load_folder(folder, select=[path])
+        self.statusBar().showMessage(("Canción reemplazada con los ajustes: " if replaced else "Canción nueva guardada: ")
+                                     + os.path.basename(path))
 
     def open_ytdl(self):
         import ytdl
@@ -5819,6 +5880,8 @@ if __name__ == "__main__":
             pass
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Music Manager")
+    _deco = icons.IconDeco(app)
+    app.installEventFilter(_deco)
     w = Main()
     w.show()
     if _SPLASH is not None:
