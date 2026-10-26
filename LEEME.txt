@@ -320,3 +320,7 @@ VERSIÓN 1.43
 ------------
  - Portadas de la lista en segundo plano: la ventana ya no se traba.
  - Caché de miniaturas: volver a una carpeta es casi instantáneo; cada hora se borran las que no se usaron.
+
+VERSIÓN 1.44
+------------
+ - Se quitó la pantalla de carga del panda: el programa se abre directamente.

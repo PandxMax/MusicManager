@@ -21,57 +21,6 @@ from PyQt6.QtWidgets import (
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
     QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen,
 )
-if __name__ == "__main__":   # pantalla de carga inmediata: el resto de importaciones (pesadas) ocurre detrás
-    from PyQt6.QtGui import QPainter as _P, QPixmap as _Pm, QColor as _C, QFont as _F
-    from PyQt6.QtCore import QTimer as _QT
-    _app = QApplication(sys.argv)
-    _FRAMES = []
-    try:   # panda animado sacando canciones de una carpeta
-        import logo_data as _ld
-        for _b in _ld.SPLASH_FRAMES_B64:
-            _pm = _Pm()
-            if _pm.loadFromData(base64.b64decode("".join(_b))) and not _pm.isNull():
-                _pm.setDevicePixelRatio(2.0)
-                _FRAMES.append(_pm)
-    except Exception:
-        _FRAMES = []
-    if not _FRAMES:   # por si no se pudieran cargar los fotogramas
-        _pm = _Pm(420, 180)
-        _pm.fill(_C("#14141c"))
-        _p = _P(_pm)
-        _p.setPen(_C("#7C5CFF")); _p.setBrush(_C("#7C5CFF")); _p.drawRect(0, 0, 420, 6)
-        _p.setPen(_C("#ffffff")); _f = _F(); _f.setPointSize(20); _f.setBold(True); _p.setFont(_f)
-        _p.drawText(0, 40, 420, 60, Qt.AlignmentFlag.AlignCenter, "♪ Music Manager")
-        _f.setPointSize(10); _f.setBold(False); _p.setFont(_f); _p.setPen(_C("#b8b8c8"))
-        _p.drawText(0, 100, 420, 40, Qt.AlignmentFlag.AlignCenter, "Cargando…")
-        _p.end()
-        _FRAMES = [_pm]
-    _SPLASH = QSplashScreen(_FRAMES[0])
-    _T0 = time.monotonic()
-
-    def _splash_frame():
-        if _SPLASH is not None and len(_FRAMES) > 1:
-            _SPLASH.setPixmap(_FRAMES[int((time.monotonic() - _T0) / 0.09) % len(_FRAMES)])
-
-    _SPLASH_TIMER = _QT()
-    _SPLASH_TIMER.timeout.connect(_splash_frame)
-    _SPLASH_TIMER.start(45)
-    _SPLASH.show()
-    _app.processEvents()
-else:
-    _SPLASH, _FRAMES = None, []
-
-    def _splash_frame():
-        pass
-
-
-def _splash_pump():
-    """Avanza la animación de la pantalla de carga mientras el programa se prepara."""
-    if _SPLASH is not None:
-        _splash_frame()
-        QApplication.processEvents()
-
-
 import mutagen
 import i18n
 import icons
@@ -82,7 +31,6 @@ from mutagen.mp4 import MP4, MP4Cover
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import USLT, APIC, SYLT, COMM
 from mutagen.easyid3 import EasyID3
-_splash_pump()
 
 
 def _comm_get(id3, key):
@@ -121,7 +69,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.43"
+APP_VERSION = "1.44"
 
 
 class TMenu(QMenu):
@@ -821,6 +769,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.44', [
+        'Se quitó la pantalla de carga del panda: el programa se abre directamente.',
+    ]),
     ('1.43', [
         'Más fluido: las portadas de la lista se cargan en segundo plano, así la ventana ya no se traba mientras aparecen.',
         'Las miniaturas se guardan en caché: volver a una carpeta que ya abriste es casi instantáneo.',
@@ -1141,7 +1092,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.43 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.44 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5934,14 +5885,6 @@ if __name__ == "__main__":
     app.setApplicationName("Music Manager")
     _deco = icons.IconDeco(app)
     app.installEventFilter(_deco)
-    _splash_pump()
     w = Main()
-    if _SPLASH is not None:   # deja ver al menos una vuelta completa de la animación del panda
-        while time.monotonic() - _T0 < 1.2:
-            _splash_pump()
-            time.sleep(0.03)
     w.show()
-    if _SPLASH is not None:
-        _SPLASH_TIMER.stop()
-        _SPLASH.finish(w)
     sys.exit(app.exec())
