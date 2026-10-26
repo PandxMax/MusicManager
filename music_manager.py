@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.26"
+APP_VERSION = "1.27"
 
 
 class TMenu(QMenu):
@@ -726,6 +726,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.27', [
+        'Nuevo botón ⟳ «Actualizar» junto a atrás/adelante/subir, y clic derecho en el espacio en blanco → «Actualizar» (también F5), para que aparezcan las canciones que añades desde fuera.',
+        'Herramientas → «Descargar de YouTube a MP3»: pega el enlace, descarga el audio y se selecciona en la lista para ponerle metadatos y portada.',
+    ]),
     ('1.26', [
         'Se quitaron los botones «Deshacer cambios» y «Guardar cambios» de los metadatos.',
         'Cuando hay un cambio en el archivo aparece un botón «Guardar» encima de la portada (y desaparece al guardar).',
@@ -979,7 +983,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.26 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.27 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2302,8 +2306,10 @@ class Main(QMainWindow):
         navbar = QHBoxLayout()
         navbar.setSpacing(2)
         self.btn_back, self.btn_fwd, self.btn_up = QPushButton("◀"), QPushButton("▶"), QPushButton("▲")
+        self.btn_refresh = QPushButton("⟳")
         for b, tip, fn in ((self.btn_back, "Atrás (Alt+←)", self.nav_back), (self.btn_fwd, "Adelante (Alt+→)", self.nav_fwd),
-                           (self.btn_up, "Subir a la carpeta superior (Alt+↑)", self.nav_up)):
+                           (self.btn_up, "Subir a la carpeta superior (Alt+↑)", self.nav_up),
+                           (self.btn_refresh, "Actualizar la carpeta (F5)", self.refresh_dir)):
             b.setObjectName("tbtn")
             b.setFixedWidth(36)
             b.setToolTip(tip)
@@ -2335,6 +2341,7 @@ class Main(QMainWindow):
         QShortcut(QKeySequence("Alt+Left"), self, activated=self.nav_back)
         QShortcut(QKeySequence("Alt+Right"), self, activated=self.nav_fwd)
         QShortcut(QKeySequence("Alt+Up"), self, activated=self.nav_up)
+        QShortcut(QKeySequence("F5"), self, activated=self.refresh_dir)
         self.list.viewport().installEventFilter(self)
 
         # ---------- columna derecha: portada + IA
@@ -2828,6 +2835,16 @@ class Main(QMainWindow):
                 self.nav_to(p)
                 return
         self.update_nav()
+
+    def refresh_dir(self):
+        """Vuelve a leer la carpeta (para ver archivos añadidos desde fuera) y los árboles."""
+        if not self.current_dir or not os.path.isdir(self.current_dir):
+            return
+        for p in [p for p in list(self.meta) if os.path.dirname(p) == self.current_dir and not os.path.exists(p)]:
+            self.meta.pop(p, None)
+        find_folder_image.cache_clear()
+        self.load_folder(self.current_dir, select=self.selected_paths() or None)
+        self.statusBar().showMessage("Carpeta actualizada.")
 
     def nav_up(self):
         par = os.path.dirname(self.current_dir.rstrip("\\/")) if self.current_dir else ""
@@ -4413,6 +4430,8 @@ class Main(QMainWindow):
             self.list.clearSelection()
             it.setSelected(True)
         m = TMenu(self)
+        m.addAction("⟳ Actualizar (F5)", self.refresh_dir)
+        m.addSeparator()
         if it is not None:
             if it.data(KIND_ROLE) == "dir":
                 m.addAction("📂 Abrir carpeta", lambda: self.open_dir(it.data(PATH_ROLE)))
@@ -4832,6 +4851,8 @@ class Main(QMainWindow):
                              "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
         t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
+        t.addAction(self.act("⬇ Descargar de YouTube a MP3…", self.open_ytdl,
+                             "Descarga el audio de un enlace de YouTube como MP3 para luego editarlo"))
 
         fs = mb.addMenu("&Fuente de etiquetas")
         fs.addAction(self.act("🎼 Buscar en MusicBrainz…", lambda: self.open_tag_source("musicbrainz")))
@@ -4883,6 +4904,23 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         dlg.show()
         self._conv = dlg
+
+    def open_ytdl(self):
+        import ytdl
+        dest = self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else (
+            QStandardPaths.writableLocation(QStandardPaths.StandardLocation.MusicLocation) or os.path.expanduser("~"))
+        dlg = ytdl.YoutubeDialog(dest, self, on_done=self.ytdl_done)
+        i18n.retranslate(dlg)
+        dlg.show()
+        self._ytdl = dlg
+
+    def ytdl_done(self, folder, files):
+        if os.path.normpath(folder) != os.path.normpath(self.current_dir or ""):
+            self.open_dir(folder)
+        find_folder_image.cache_clear()
+        self.load_folder(folder, select=files or None)
+        if files:
+            self.statusBar().showMessage("Descargado. Edita los metadatos, ponle portada y guarda.")
 
     def apply_field_visibility(self):
         hidden = {x for x in str(self.cfg.value("hidden_fields", "") or "").split(",") if x}

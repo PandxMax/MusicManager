@@ -3,3 +3,4 @@ mutagen
 send2trash
 numpy
 imageio-ffmpeg
+yt-dlp

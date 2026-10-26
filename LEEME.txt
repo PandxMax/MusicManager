@@ -238,3 +238,8 @@ VERSIÓN 1.26
  - Se quitaron los botones Deshacer/Guardar cambios de los metadatos.
  - Si hay cambios en el archivo aparece un botón "Guardar" encima de la portada.
  - Al cambiar de canción o de carpeta con cambios sin guardar sale una ventana: Guardar / Descartar / Cancelar.
+
+VERSIÓN 1.27
+------------
+ - Botón ⟳ Actualizar junto a atrás/adelante/subir; clic derecho en el espacio en blanco -> Actualizar; tecla F5.
+ - Herramientas -> Descargar de YouTube a MP3: pega el enlace, se descarga y queda seleccionado para editar metadatos y portada.
