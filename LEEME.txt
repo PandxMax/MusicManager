@@ -284,3 +284,9 @@ VERSIÓN 1.35
 VERSIÓN 1.36
 ------------
  - Metadatos como en las propiedades de Windows: Título, Intérprete, Álbum, Intérprete del álbum, Compositor, Género, Año, Pista, Número de disco, Comentario y Directorio (solo lectura). Se quitó BPM.
+
+VERSIÓN 1.37
+------------
+ - Metadatos más compactos y estables (etiquetas técnicas pequeñas con sitio reservado; botón de guardar solo con el icono).
+ - La rueda del ratón ya no desplaza toda la ventana.
+ - Cambios sin guardar: "¿Desea guardar los cambios?" con Sí / No.

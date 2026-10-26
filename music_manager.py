@@ -84,7 +84,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.36"
+APP_VERSION = "1.37"
 
 
 class TMenu(QMenu):
@@ -227,7 +227,7 @@ def _pop(tags, key):
 
 @lru_cache(maxsize=4096)
 def _tech(path, mtime):
-    out = {"codec": "—", "enc": "—", "tag": "—", "bitrate": "—", "freq": "—", "dur": "—", "mode": "—", "size": "—"}
+    out = {"codec": "—", "enc": "—", "enc_full": "", "tag": "—", "bitrate": "—", "freq": "—", "dur": "—", "mode": "—", "size": "—"}
     try:
         out["size"] = f"{os.path.getsize(path) / 1048576:.2f} MB"
         f = mutagen.File(path)
@@ -240,7 +240,8 @@ def _tech(path, mtime):
             lay = {1: "I", 2: "II", 3: "III"}.get(getattr(i, "layer", 3), "III")
             mv = {1: "MPEG-1", 2: "MPEG-2", 2.5: "MPEG-2.5"}.get(getattr(i, "version", 1), "MPEG")
             enc = str(getattr(i, "encoder_info", "") or "").strip()
-            out["enc"] = f"{mv} Layer {lay}" + (f" · {enc}" if enc else "")
+            out["enc"] = f"{mv} L{ {'I': 1, 'II': 2, 'III': 3}[lay] }"
+            out["enc_full"] = f"{mv} Layer {lay}" + (f" · {enc}" if enc else "")
         elif kind == "MP4":
             c = str(getattr(i, "codec", "") or "")
             out["tag"] = "MP4 (iTunes)"
@@ -411,6 +412,7 @@ QToolBar QToolButton:checked { background: @accent; color: white; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
+QLabel#techchip { background: @surface2; border: 1px solid @border; border-radius: 9px; padding: 1px 6px; font-size: 10px; }
 QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 7px; font-size: 11px; }
 QPushButton#tabbtn { border-radius: 10px; padding: 7px 10px; }
 QFrame#plpanel { background: @window; border: 1px solid @border; border-radius: 14px; }
@@ -682,6 +684,12 @@ def make_options(val):
     return opts
 
 
+class NoWheelScroll(QScrollArea):
+    """Área con barras (solo se usa con la barra, no con la rueda: así nada se mueve sin querer)."""
+    def wheelEvent(self, e):
+        e.accept()
+
+
 class AIBase(QThread):
     """Cliente común para Claude, ChatGPT y Gemini."""
     failed = pyqtSignal(str)
@@ -776,6 +784,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.37', [
+        'Metadatos más compactos y estables: las etiquetas técnicas son más pequeñas y tienen su sitio reservado (los campos ya no bajan ni suben), y el botón de guardar es solo el icono 💾, pegado a la derecha.',
+        'La rueda del ratón ya no desplaza toda la ventana.',
+        'La ventana de cambios sin guardar ahora pregunta solo «¿Desea guardar los cambios?» con Sí / No.',
+    ]),
     ('1.36', [
         'Metadatos: ahora son los mismos que ves en las propiedades de Windows: Título, Intérprete, Álbum, Intérprete del álbum, Compositor, Género, Año, Pista, Número de disco y Comentario, más el Directorio (solo lectura). Se quitó BPM.',
     ]),
@@ -1065,7 +1078,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.36 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.37 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2470,20 +2483,23 @@ class Main(QMainWindow):
         tbl.setContentsMargins(0, 0, 0, 0)
         for k in ("codec", "enc", "tag", "bitrate", "freq", "dur", "mode", "size"):
             chip = QLabel("")
-            chip.setObjectName("chip")
+            chip.setObjectName("techchip")
             self.tech[k] = chip
             tbl.addWidget(chip)
         self.fill_tech([])
         tb_l.addWidget(chips_w, 1, Qt.AlignmentFlag.AlignTop)
-        self.save_btn = QPushButton("💾  Guardar cambios")
+        self.save_btn = QPushButton("💾")
         self.save_btn.setObjectName("accent")
-        self.save_btn.setToolTip("Escribe los cambios en el archivo (Ctrl+S)")
+        self.save_btn.setToolTip("Guardar cambios (Ctrl+S)")
         self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.save_btn.setFixedHeight(28)
+        self.save_btn.setFixedSize(34, 26)
         self.save_btn.clicked.connect(self.save_all)
         self.save_btn.setEnabled(False)
         tb_l.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+        self.tech_bar.setFixedHeight(52)      # sitio para dos filas de etiquetas: nada de lo de abajo sube ni baja
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
+        grid.setVerticalSpacing(6)
+        grid.setContentsMargins(10, 8, 10, 8)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
         self.dir_le = QLineEdit()
@@ -2492,13 +2508,16 @@ class Main(QMainWindow):
         dl = QLabel("Directorio")
         self.field_widgets["dir"] = (dl, self.dir_le)
         grid.addWidget(dl, 6, 0)
-        grid.addWidget(self.dir_le, 6, 1, 1, 3)
-        self.btn_ai_meta = QPushButton("✨ Rellenar metadatos con IA…")
+        dir_row = QHBoxLayout()
+        dir_row.setSpacing(8)
+        dir_row.addWidget(self.dir_le, 1)
+        self.btn_ai_meta = QPushButton("✨ Rellenar con IA…")
         self.btn_ai_meta.setToolTip("Escribe el nombre y el artista y la IA busca y rellena los datos")
         self.btn_ai_meta.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_ai_meta.clicked.connect(self.open_meta_ai)
-        grid.addWidget(self.btn_ai_meta, 7, 0, 1, 4)
-        grid.setRowStretch(8, 1)          # el espacio que sobra va abajo, no entre las etiquetas y los campos
+        dir_row.addWidget(self.btn_ai_meta)
+        grid.addLayout(dir_row, 6, 1, 1, 3)
+        grid.setRowStretch(7, 1)          # el espacio que sobra va abajo, no entre las etiquetas y los campos
 
         # ---------- letra (oculta; se muestra con el botón «📝 Letra»)
         self.lyr_box = QGroupBox("Letra")
@@ -2751,7 +2770,7 @@ class Main(QMainWindow):
         cl = QVBoxLayout(central)
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(0)
-        sa = QScrollArea()          # si la ventana es muy pequeña, aparecen barras en vez de cortar el contenido
+        sa = NoWheelScroll()          # si la ventana es muy pequeña, aparecen barras en vez de cortar el contenido
         sa.setWidgetResizable(True)
         sa.setFrameShape(QFrame.Shape.NoFrame)
         sa.setStyleSheet("QScrollArea { background: transparent; border: none; }")
@@ -3828,20 +3847,25 @@ class Main(QMainWindow):
         except AttributeError:
             pass
 
+    def yes_no_save(self):
+        """«¿Desea guardar los cambios?» con solo Sí / No. Devuelve True si responde Sí."""
+        mb = QMessageBox(self)
+        mb.setIcon(QMessageBox.Icon.Question)
+        mb.setWindowTitle("Cambios sin guardar")
+        mb.setText("¿Desea guardar los cambios?")
+        yes = mb.addButton("Sí", QMessageBox.ButtonRole.YesRole)
+        mb.addButton("No", QMessageBox.ButtonRole.NoRole)
+        mb.setDefaultButton(yes)
+        mb.exec()
+        return mb.clickedButton() is yes
+
     def ask_unsaved(self, paths=None):
         """Pregunta qué hacer con los cambios sin guardar. Devuelve False si el usuario quiere quedarse."""
         self.apply_form()
         ps = [p for p in (paths if paths is not None else self.pending) if self.pending.get(p)]
         if not ps:
             return True
-        r = QMessageBox.question(
-            self, "Cambios sin guardar",
-            f"Hay cambios sin guardar en {len(ps)} archivo(s). ¿Quieres guardarlos?",
-            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Save)
-        if r == QMessageBox.StandardButton.Cancel:
-            return False
-        if r == QMessageBox.StandardButton.Save:
+        if self.yes_no_save():
             self.save_all()
         else:
             for p in ps:
@@ -3908,6 +3932,7 @@ class Main(QMainWindow):
             vs = {i[k] for i in infos}
             v = next(iter(vs)) if len(vs) == 1 else "‹varios›"
             chip.setText(f"{icons[k]} {v}")
+            chip.setToolTip(infos[0].get("enc_full", "") if (k == "enc" and len(infos) == 1) else "")
             chip.show()
 
     def show_current(self, path, n):
@@ -4786,13 +4811,7 @@ class Main(QMainWindow):
     def closeEvent(self, e):
         self.apply_form()
         if any(self.pending.values()):
-            r = QMessageBox.question(
-                self, "Cambios sin guardar", "Tienes cambios sin guardar. ¿Quieres guardarlos antes de salir?",
-                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel)
-            if r == QMessageBox.StandardButton.Cancel:
-                e.ignore()
-                return
-            if r == QMessageBox.StandardButton.Save:
+            if self.yes_no_save():
                 self.save_all()
         self.cfg.setValue("geometry", self.saveGeometry())
         self.cfg.setValue("split_main2", self.main_split.saveState())
