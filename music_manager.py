@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.24"
+APP_VERSION = "1.25"
 
 
 class TMenu(QMenu):
@@ -726,6 +726,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.25', [
+        'Al guardar, el programa avisa al Explorador de Windows para que refresque el icono y muestre la portada del archivo.',
+        'Los archivos .mp4 de solo audio no muestran portada en Windows: al guardar una portada, el programa ofrece renombrarlos a .m4a (es el mismo archivo y así Windows sí muestra la imagen).',
+    ]),
     ('1.24', [
         'El programa abre más rápido: aparece una pantalla de carga al instante y lo pesado (reproductor, comprobar actualizaciones, guía) se carga después de mostrar la ventana.',
         'El ejecutable es más ligero (se quitaron módulos que no se usan), así que arranca antes.',
@@ -970,7 +974,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.24 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.25 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3883,6 +3887,7 @@ class Main(QMainWindow):
             return
         self.release_if(list(self.pending))
         errors, ok, skipped = [], 0, set()
+        saved_paths = []
         for path, ch in list(self.pending.items()):
             try:
                 easy = {k: v for k, v in ch.items() if k in EASY_KEYS}
@@ -3897,6 +3902,7 @@ class Main(QMainWindow):
                     except OSError:
                         pass
                 ok += 1
+                saved_paths.append(path)
                 del self.pending[path]
                 self.meta.pop(path, None)
                 self.tags_cache.pop(path, None)
@@ -3904,6 +3910,9 @@ class Main(QMainWindow):
                 self.chosen.discard(path)
             except Exception as e:
                 errors.append(f"{os.path.basename(path)}: {e}")
+        saved_with_cover = [p for p in saved_paths if os.path.exists(p)]
+        self.offer_m4a_rename(saved_with_cover)
+        self.refresh_shell([p for p in saved_paths])
         self.load_folder(self.current_dir)
         msg = f"{ok} archivo(s) guardado(s)."
         if skipped:
@@ -3911,6 +3920,55 @@ class Main(QMainWindow):
         self.statusBar().showMessage(msg)
         if errors:
             QMessageBox.warning(self, "Errores al guardar", "\n".join(errors))
+
+    def refresh_shell(self, paths):
+        """Avisa al Explorador de Windows de que los archivos cambiaron (así refresca icono y portada)."""
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+            sh = ctypes.windll.shell32
+            for p in paths:
+                sh.SHChangeNotify(0x00002000, 0x0005 | 0x1000, ctypes.c_wchar_p(os.path.normpath(p)), None)   # UPDATEITEM
+            if paths:
+                d = os.path.normpath(os.path.dirname(paths[0]))
+                sh.SHChangeNotify(0x00001000, 0x0005 | 0x1000, ctypes.c_wchar_p(d), None)                       # UPDATEDIR
+        except Exception:
+            pass
+
+    def offer_m4a_rename(self, paths):
+        """Windows no saca la portada de los .mp4: renombrarlos a .m4a (mismo archivo) hace que sí la muestre."""
+        mp4 = [p for p in paths if p.lower().endswith(".mp4") and inspect_file(p).get("cover")]
+        if not mp4:
+            return
+        ans = QMessageBox.question(
+            self, "Portada en el Explorador",
+            f"{len(mp4)} archivo(s) son .mp4 y Windows no muestra la portada de esos.\n\n"
+            "¿Renombrarlos a .m4a? Es el mismo archivo (mismo audio); solo cambia la extensión y así el "
+            "Explorador sí enseña la imagen.")
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        mapping = {}
+        for p in mp4:
+            new = os.path.splitext(p)[0] + ".m4a"
+            if os.path.exists(new):
+                continue
+            try:
+                self.release_if([p])
+                os.rename(p, new)
+                mapping[p] = new
+            except OSError:
+                pass
+        if not mapping:
+            return
+        for lst in list(self.pl_lists.values()) + [self.playlist]:   # en el sitio, para no romper la lista activa
+            lst[:] = [mapping.get(x, x) for x in lst]
+        if self.playing_path in mapping:
+            self.playing_path = mapping[self.playing_path]
+        for old in mapping:
+            self.meta.pop(old, None)
+            self.tags_cache.pop(old, None)
+        self.refresh_shell(list(mapping.values()))
 
     # -------------------------------------------------------------- IA
     def on_provider(self, name):

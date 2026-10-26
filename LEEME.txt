@@ -227,3 +227,8 @@ VERSIÓN 1.24
 ------------
  - Arranque más rápido: pantalla de carga al instante y las tareas pesadas se hacen después de mostrar la ventana.
  - Ejecutable más ligero (módulos sin usar excluidos).
+
+VERSIÓN 1.25
+------------
+ - Al guardar se avisa al Explorador de Windows para que refresque el icono y la portada.
+ - Los .mp4 de solo audio no muestran portada en Windows: tras guardar una portada se ofrece renombrarlos a .m4a.
