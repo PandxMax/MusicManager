@@ -84,7 +84,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.37"
+APP_VERSION = "1.38"
 
 
 class TMenu(QMenu):
@@ -784,6 +784,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.38', [
+        'Portadas: además de iTunes y Deezer, ahora también se buscan en SoundCloud (aparecen como opción para elegir).',
+        'Herramientas → «Descargar de YouTube / SoundCloud a MP3»: ahora también acepta enlaces de SoundCloud.',
+        'Deezer: no se pueden descargar canciones completas (están protegidas con DRM); si pegas un enlace de Deezer el programa te lo explica en vez de fallar.',
+    ]),
     ('1.37', [
         'Metadatos más compactos y estables: las etiquetas técnicas son más pequeñas y tienen su sitio reservado (los campos ya no bajan ni suben), y el botón de guardar es solo el icono 💾, pegado a la derecha.',
         'La rueda del ratón ya no desplaza toda la ventana.',
@@ -1075,10 +1080,10 @@ class FlowLayout(QLayout):
 
 
 class CoverWorker(QThread):
-    """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
+    """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.37 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.38 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1138,6 +1143,31 @@ class CoverWorker(QThread):
             out.append((self.score(artist, album, ar, alb.get("title")), "Deezer", f"{alb.get('title', '')} — {ar}", urls))
         return out
 
+    def soundcloud(self, artist, title, album):
+        """Portadas de SoundCloud usando yt-dlp (búsqueda sin clave de API)."""
+        try:
+            import yt_dlp
+        except ImportError:
+            return []
+        q = f"{artist} {title}".strip()
+        if not q:
+            return []
+        opts = {"quiet": True, "no_warnings": True, "skip_download": True, "extract_flat": False,
+                "socket_timeout": 15, "logger": type("L", (), {"debug": lambda *a: 0, "info": lambda *a: 0,
+                                                              "warning": lambda *a: 0, "error": lambda *a: 0})()}
+        out = []
+        with yt_dlp.YoutubeDL(opts) as y:
+            info = y.extract_info(f"scsearch5:{q}", download=False) or {}
+        for e in info.get("entries") or []:
+            th = e.get("thumbnail") or next((t.get("url") for t in reversed(e.get("thumbnails") or []) if t.get("url")), None)
+            if not th:
+                continue
+            urls = [re.sub(r"-(large|t\d+x\d+|original|crop|badge|small|tiny|mini)\.", "-t500x500.", th), th]
+            ar = e.get("uploader") or e.get("artist") or ""
+            out.append((self.score(artist, title, ar, e.get("title")), "SoundCloud",
+                        f"{e.get('title', '')} — {ar}", urls))
+        return out
+
     def download(self, cand):
         score, src, label, urls = cand
         for u in urls:
@@ -1154,7 +1184,7 @@ class CoverWorker(QThread):
             if self.isInterruptionRequested():
                 break
             cands = []
-            for finder in (self.itunes, self.deezer):
+            for finder in (self.itunes, self.deezer, self.soundcloud):
                 try:
                     cands += finder(artist, title, album)
                 except Exception:
@@ -4078,7 +4108,7 @@ class Main(QMainWindow):
         self.cov_groups = [groups[k] for k in order]
         self.cov_ok, self.cov_total, self.cov_fail = 0, len(todo), []
         self.cov_queue, self.cov_busy, self.cov_wdone, self.cov_first, self.cov_reported = [], False, False, False, False
-        self.statusBar().showMessage(f"Buscando opciones de portada para {len(self.cov_groups)} álbum(es) en iTunes y Deezer…")
+        self.statusBar().showMessage(f"Buscando opciones de portada para {len(self.cov_groups)} álbum(es) en iTunes, Deezer y SoundCloud…")
         self.cov_worker = CoverWorker([g["q"] for g in self.cov_groups], 1200)
         self.cov_worker.group_done.connect(self.cov_group_done)
         self.cov_worker.finished_all.connect(self.cov_finished)
@@ -5112,8 +5142,8 @@ class Main(QMainWindow):
                              "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
         t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
-        t.addAction(self.act("⬇ Descargar de YouTube a MP3…", self.open_ytdl,
-                             "Descarga el audio de un enlace de YouTube como MP3 para luego editarlo"))
+        t.addAction(self.act("⬇ Descargar de YouTube / SoundCloud a MP3…", self.open_ytdl,
+                             "Descarga el audio de un enlace de YouTube o SoundCloud como MP3 para luego editarlo"))
 
         fs = mb.addMenu("&Fuente de etiquetas")
         fs.addAction(self.act("🎼 Buscar en MusicBrainz…", lambda: self.open_tag_source("musicbrainz")))

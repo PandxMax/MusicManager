@@ -1,4 +1,4 @@
-"""Descargar el audio de un vídeo de YouTube como MP3 (con yt-dlp + ffmpeg)."""
+"""Descargar el audio de YouTube o SoundCloud como MP3 (con yt-dlp + ffmpeg)."""
 import os
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit, QPushButton,
@@ -77,16 +77,16 @@ class DlWorker(QThread):
 class YoutubeDialog(QDialog):
     def __init__(self, outdir, parent=None, on_done=None):
         super().__init__(parent)
-        self.setWindowTitle("⬇ Descargar de YouTube a MP3")
+        self.setWindowTitle("⬇ Descargar de YouTube / SoundCloud a MP3")
         self.resize(560, 420)
         self.on_done, self.worker = on_done, None
         v = QVBoxLayout(self)
-        v.addWidget(QLabel("Pega el enlace del vídeo. Descarga solo música o contenido que tengas derecho a guardar "
+        v.addWidget(QLabel("Pega el enlace de YouTube o SoundCloud. Descarga solo música o contenido que tengas derecho a guardar "
                            "(tuyo, con licencia libre o con permiso). Eres responsable del uso que le des."))
         v.itemAt(0).widget().setWordWrap(True)
         f = QFormLayout()
         self.url = QLineEdit()
-        self.url.setPlaceholderText("https://www.youtube.com/watch?v=…")
+        self.url.setPlaceholderText("https://www.youtube.com/watch?v=…  o  https://soundcloud.com/artista/cancion")
         self.dir = QLineEdit(outdir)
         pick = QPushButton("📂")
         pick.setFixedWidth(40)
@@ -129,6 +129,11 @@ class YoutubeDialog(QDialog):
         url, out = self.url.text().strip(), self.dir.text().strip()
         if not url.lower().startswith("http"):
             self.status.setText("Pega un enlace válido (empieza con https://).")
+            return
+        if "deezer." in url.lower():
+            self.status.setText("Deezer no permite descargar canciones completas (están protegidas).")
+            self.logbox.setPlainText("Las canciones de Deezer están cifradas (DRM) y solo hay 30 s de muestra pública, "
+                                     "así que no se pueden bajar. Busca la misma canción en YouTube o SoundCloud y pega ese enlace.")
             return
         if not out or not os.path.isdir(out):
             self.status.setText("Elige una carpeta de destino que exista.")

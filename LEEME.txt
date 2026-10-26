@@ -290,3 +290,9 @@ VERSIÓN 1.37
  - Metadatos más compactos y estables (etiquetas técnicas pequeñas con sitio reservado; botón de guardar solo con el icono).
  - La rueda del ratón ya no desplaza toda la ventana.
  - Cambios sin guardar: "¿Desea guardar los cambios?" con Sí / No.
+
+VERSIÓN 1.38
+------------
+ - Portadas: se buscan también en SoundCloud (además de iTunes y Deezer).
+ - Descargar a MP3: ahora acepta enlaces de YouTube y de SoundCloud.
+ - Deezer: no se pueden bajar canciones completas (DRM); el programa lo explica si pegas un enlace.
