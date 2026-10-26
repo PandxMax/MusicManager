@@ -49,7 +49,8 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.17"
+THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
+APP_VERSION = "1.18"
 
 
 class TMenu(QMenu):
@@ -478,7 +479,7 @@ def rounded_pm(pm, r=14):
     return out
 
 
-def note_icon(size=THUMB):
+def note_icon(size=THUMB_GEN):
     pm = QPixmap(size, size)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
@@ -504,7 +505,7 @@ def make_icon(data):
     pm = QPixmap()
     if not pm.loadFromData(data) or pm.isNull():
         return None
-    return QIcon(pm.scaled(THUMB, THUMB, Qt.AspectRatioMode.KeepAspectRatio,
+    return QIcon(pm.scaled(THUMB_GEN, THUMB_GEN, Qt.AspectRatioMode.KeepAspectRatio,
                            Qt.TransformationMode.SmoothTransformation))
 
 
@@ -707,6 +708,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.18', [
+        'El espectrograma ocupa toda la fila de abajo (también bajo la portada) y la portada se queda arriba a la derecha, sin estirarse.',
+        'Ctrl + rueda del ratón sobre los archivos cambia su tamaño, de grandes a pequeños (en vista de iconos y de lista).',
+    ]),
     ('1.17', [
         'Los botones Espectro, MusicBrainz y Discogs pasaron a la derecha de la barra de la lista.',
         'Los botones del reproductor (lista, anterior, siguiente y detener) ahora están dibujados con el color del programa y cambian junto con el botón de reproducir.',
@@ -922,7 +927,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.17 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.18 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2000,6 +2005,8 @@ class Main(QMainWindow):
         self.meta, self.tags_cache = {}, {}
         self.suggestions, self.chosen, self.ai_rows = {}, set(), []
         self.protected, self.worker, self.icons_mode = set(), None, True
+        self.icon_px = max(40, min(160, int(self.cfg.value("icon_px", THUMB) or THUMB)))
+        self.list_px = max(20, min(80, int(self.cfg.value("list_px", 44) or 44)))
         self.row_index = {}
         self.playing_path, self.lyr_worker, self.player = None, None, None
         self.playlist, self.pl_active, self.pl_lists, self.pl_name = [], False, {}, "Cola actual"
@@ -2190,7 +2197,6 @@ class Main(QMainWindow):
         bl.setContentsMargins(0, 0, 0, 0)
         bl.addWidget(meta_box)
 
-        middle = QSplitter(Qt.Orientation.Vertical)
         self.list_pane = QWidget()
         lpv = QVBoxLayout(self.list_pane)
         lpv.setContentsMargins(0, 0, 0, 0)
@@ -2228,13 +2234,10 @@ class Main(QMainWindow):
         navbar.addSpacing(8)
         lpv.addLayout(navbar)
         lpv.addWidget(self.list, 1)
-        middle.addWidget(self.list_pane)
         QShortcut(QKeySequence("Alt+Left"), self, activated=self.nav_back)
         QShortcut(QKeySequence("Alt+Right"), self, activated=self.nav_fwd)
         QShortcut(QKeySequence("Alt+Up"), self, activated=self.nav_up)
         self.list.viewport().installEventFilter(self)
-        middle.addWidget(bottom)
-        middle.setSizes([430, 300])
 
         # ---------- columna derecha: portada + IA
         cover_box = QGroupBox()
@@ -2321,12 +2324,11 @@ class Main(QMainWindow):
         ai_scroll.setFrameShape(QFrame.Shape.NoFrame)
         ai_scroll.setMinimumHeight(180)
         ai_scroll.setWidget(ai_box)
-        rightw = QWidget()
-        self.rightw_w = rightw
-        rv = QVBoxLayout(rightw)
+        # parte baja de la columna derecha: pestañas Géneros / Letra
+        rightlow = QWidget()
+        rv = QVBoxLayout(rightlow)
         rv.setContentsMargins(4, 0, 0, 0)
         rv.setSpacing(4)
-        rv.addWidget(cover_box)        # fija: no se mueve
         tabs_row = QHBoxLayout()
         tabs_row.setSpacing(6)
         self.btn_tab_gen, self.btn_tab_lyr = QPushButton("🎼 Géneros"), QPushButton("📝 Letra")
@@ -2344,19 +2346,61 @@ class Main(QMainWindow):
         self.right_stack.addWidget(self.lyr_box)  # 1: letra
         rv.addLayout(tabs_row)
         rv.addWidget(self.right_stack, 1)
-        rightw.setMinimumWidth(330)
+        rightlow.setMinimumWidth(330)
+
+        # la portada queda arriba a la derecha, siempre de su tamaño (no se estira)
+        coverw = QWidget()
+        cvw = QVBoxLayout(coverw)
+        cvw.setContentsMargins(4, 0, 0, 0)
+        cvw.setSpacing(0)
+        cvw.addWidget(cover_box)
+        cvw.addStretch(1)
+        coverw.setMinimumWidth(330)
+        self.cover_col = coverw
+
+        top_split = QSplitter(Qt.Orientation.Horizontal)       # fila de arriba: lista | portada
+        top_split.addWidget(self.list_pane)
+        top_split.addWidget(coverw)
+        bottom_split = QSplitter(Qt.Orientation.Horizontal)    # fila de abajo: metadatos | géneros/letra
+        bottom_split.addWidget(bottom)
+        bottom_split.addWidget(rightlow)
+        for sp in (top_split, bottom_split):
+            sp.setStretchFactor(0, 1)
+            sp.setStretchFactor(1, 0)
+            sp.setCollapsible(0, False)
+            sp.setCollapsible(1, False)
+            sp.setSizes([900, 330])
+        self._cols_sync = False
+
+        def sync_cols(src, dst):
+            if not self._cols_sync:
+                self._cols_sync = True
+                dst.setSizes(src.sizes())
+                self._cols_sync = False
+        top_split.splitterMoved.connect(lambda *a: (sync_cols(top_split, bottom_split), self.layout_overlay()))
+        bottom_split.splitterMoved.connect(lambda *a: (sync_cols(bottom_split, top_split), self.layout_overlay()))
+        self.top_split, self.bottom_split = top_split, bottom_split
+        self.bottom_stack = QStackedWidget()                   # página 0: metadatos…; página 1: espectrograma a todo el ancho
+        self.bottom_stack.addWidget(bottom_split)
+        middle = QSplitter(Qt.Orientation.Vertical)
+        middle.addWidget(top_split)
+        middle.addWidget(self.bottom_stack)
+        middle.setCollapsible(0, False)
+        middle.setCollapsible(1, False)
+        middle.setStretchFactor(0, 1)
+        middle.setStretchFactor(1, 1)
+        middle.setSizes([430, 300])
 
         main = QSplitter()
         main.addWidget(self.left_split)
         main.addWidget(middle)
-        main.addWidget(rightw)
         main.setStretchFactor(1, 1)
         self.left_split.setMinimumWidth(210)
-        for i in range(3):
+        for i in range(2):
             main.setCollapsible(i, False)
-        main.setSizes([280, 900, 330])
+        main.setSizes([280, 1230])
         self.main_split, self.mid_split = main, middle
-        for sp in (main, middle, self.left_split):
+        for sp in (main, middle, top_split, bottom_split, self.left_split):
             self.style_splitter(sp)
         central = QWidget()
         cl = QVBoxLayout(central)
@@ -2381,13 +2425,14 @@ class Main(QMainWindow):
         if int(self.cfg.value("trees_h", 0) or 0):
             self.toggle_orient()
         try:
-            for key, sp in (("split_main", self.main_split), ("split_mid", self.mid_split)):
+            for key, sp in (("split_main2", self.main_split), ("split_rows2", self.mid_split), ("split_cols2", self.top_split)):
                 st = self.cfg.value(key)
                 if st:
                     sp.restoreState(st)
+            self.bottom_split.setSizes(self.top_split.sizes())
             sz = self.main_split.sizes()  # si una sesión anterior dejó el árbol aplastado, lo restaura
             if sz and sz[0] < 210:
-                self.main_split.setSizes([290, max(600, sz[1] - 290 + sz[0]), sz[2]])
+                self.main_split.setSizes([290, max(600, sz[1] - 290 + sz[0])])
         except Exception:
             pass
 
@@ -2581,14 +2626,14 @@ class Main(QMainWindow):
         self.icons_mode = icons
         if icons:
             self.list.setViewMode(QListView.ViewMode.IconMode)
-            self.list.setIconSize(QSize(THUMB, THUMB))
-            self.list.setGridSize(QSize(134, 156))
+            self.list.setIconSize(QSize(self.icon_px, self.icon_px))
+            self.list.setGridSize(QSize(self.icon_px + 38, self.icon_px + 60))
             self.list.setSpacing(6)
             self.list.setWordWrap(True)
             self.act_view.setText("☰ Lista")
         else:
             self.list.setViewMode(QListView.ViewMode.ListMode)
-            self.list.setIconSize(QSize(44, 44))
+            self.list.setIconSize(QSize(self.list_px, self.list_px))
             self.list.setGridSize(QSize())
             self.list.setSpacing(2)
             self.list.setWordWrap(False)
@@ -2601,6 +2646,19 @@ class Main(QMainWindow):
         # botones laterales del ratón = atrás / adelante, como en el Explorador
         if obj is self.centralWidget() and ev.type() in (QEvent.Type.Resize, QEvent.Type.Show):
             self.layout_overlay()
+        if obj is self.list.viewport() and ev.type() == QEvent.Type.Wheel and (ev.modifiers() & Qt.KeyboardModifier.ControlModifier):
+            d = ev.angleDelta().y()
+            if d:
+                step = 12 if self.icons_mode else 4
+                if self.icons_mode:
+                    self.icon_px = max(40, min(160, self.icon_px + (step if d > 0 else -step)))
+                    self.cfg.setValue("icon_px", self.icon_px)
+                else:
+                    self.list_px = max(20, min(80, self.list_px + (step if d > 0 else -step)))
+                    self.cfg.setValue("list_px", self.list_px)
+                self.set_view(self.icons_mode)
+                self.statusBar().showMessage(f"Tamaño de los archivos: {self.icon_px if self.icons_mode else self.list_px} px (Ctrl + rueda)", 2500)
+            return True
         if obj is self.btn_mute and ev.type() == QEvent.Type.Wheel:
             self.vol.wheelEvent(ev)   # rueda sobre el altavoz = subir/bajar volumen
             return True
@@ -3227,6 +3285,7 @@ class Main(QMainWindow):
         self.pl_fab = fab
         central.installEventFilter(self)
         self.main_split.splitterMoved.connect(lambda *a: self.layout_overlay())
+        self.mid_split.splitterMoved.connect(lambda *a: self.layout_overlay())
         self.pl_refresh()
         self.pl_update_np()
         i18n.retranslate(panel)
@@ -3236,9 +3295,9 @@ class Main(QMainWindow):
         c = self.centralWidget()
         if c is None or getattr(self, "pl_panel", None) is None:
             return
-        r = self.rightw_w
+        r = self.cover_col
         tl = r.mapTo(c, QPoint(0, 0))
-        self.pl_panel.setGeometry(tl.x(), tl.y(), max(300, r.width()), r.height())
+        self.pl_panel.setGeometry(tl.x(), tl.y(), max(300, r.width()), max(200, c.height() - tl.y()))
         self.pl_fab.move(c.width() - self.pl_fab.width() - 16, c.height() - self.pl_fab.height() - 12)
         if self.pl_panel.isVisible():
             self.pl_panel.raise_()
@@ -3934,7 +3993,7 @@ class Main(QMainWindow):
         self.act_orient.setText("⇅ Árboles apilados" if horiz else "⇄ Árboles lado a lado")
         sizes = self.main_split.sizes()
         left = 620 if (horiz and self.tree2_box.isVisible()) else 290
-        self.main_split.setSizes([left, max(300, sum(sizes) - left - sizes[2]), sizes[2]])
+        self.main_split.setSizes([left, max(300, sum(sizes) - left)])
 
     # ------------------------------------------- Copiar / cortar / pegar / eliminar
     def selection_paths(self):
@@ -4224,8 +4283,9 @@ class Main(QMainWindow):
             if r == QMessageBox.StandardButton.Save:
                 self.save_all()
         self.cfg.setValue("geometry", self.saveGeometry())
-        self.cfg.setValue("split_main", self.main_split.saveState())
-        self.cfg.setValue("split_mid", self.mid_split.saveState())
+        self.cfg.setValue("split_main2", self.main_split.saveState())
+        self.cfg.setValue("split_rows2", self.mid_split.saveState())
+        self.cfg.setValue("split_cols2", self.top_split.saveState())
         if self.player is not None:
             self.player.stop()
         super().closeEvent(e)
@@ -4426,11 +4486,8 @@ class Main(QMainWindow):
         pane.setMinimumHeight(260)
         self.spec_pane, self.spec_widget = pane, sw
         self._spec_sizes = self.mid_split.sizes()
-        self.bottom_w.hide()
-        for w in (self.btn_tab_gen, self.btn_tab_lyr, self.right_stack):   # géneros/letra se ocultan; la portada se queda
-            w.hide()
-        self.mid_split.addWidget(pane)
-        pane.show()
+        self.bottom_stack.addWidget(pane)
+        self.bottom_stack.setCurrentWidget(pane)   # reemplaza metadatos + géneros/letra; la portada se queda arriba
         total = max(sum(self._spec_sizes), 600)
         self.mid_split.setSizes([int(total * 0.36), int(total * 0.64)])
         i18n.retranslate(pane)
@@ -4444,14 +4501,13 @@ class Main(QMainWindow):
             self.spec_widget.shutdown()
         except Exception:
             pass
+        self.bottom_stack.setCurrentIndex(0)
+        self.bottom_stack.removeWidget(pane)
         pane.hide()
         pane.setParent(None)
         pane.deleteLater()
         self.spec_pane = self.spec_widget = None
         if restore:
-            self.bottom_w.show()
-            for w in (self.btn_tab_gen, self.btn_tab_lyr, self.right_stack):
-                w.show()
             sz = getattr(self, "_spec_sizes", None)
             if sz and len(sz) >= 2:
                 self.mid_split.setSizes(sz[:2])

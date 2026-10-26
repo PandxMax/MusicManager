@@ -183,3 +183,11 @@ VERSIÓN 1.17
  - Los botones Espectro / MusicBrainz / Discogs pasaron al lado DERECHO de la barra de la lista.
  - Botones del reproductor (☰ lista, ⏮, ⏭, ⏹) dibujados con el color del programa: cambian de color
    junto con el botón de reproducir cuando el programa toma el color de la portada.
+
+VERSIÓN 1.18
+------------
+ - El espectrograma ocupa TODA la fila de abajo (metadatos y géneros/letra se reemplazan, también bajo la
+   portada). La portada se queda arriba a la derecha con su tamaño, sin estirarse hacia abajo.
+   (Por dentro, las columnas se reorganizaron en dos filas que se mantienen alineadas.)
+ - Ctrl + rueda del ratón sobre los archivos cambia su tamaño de grandes a pequeños (iconos y lista);
+   se recuerda al reabrir. Las miniaturas se generan más nítidas para que no se vean borrosas al agrandar.
