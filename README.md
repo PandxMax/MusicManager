@@ -164,3 +164,7 @@ En Windows también puedes hacer doble clic en `CREAR_PROGRAMA.bat` para crear e
 Hecho con 🎶 para quien ama tener su música en orden.
 
 </div>
+
+## 📱 Versión para Android
+
+En la carpeta [`android/`](android/) está la app para Android (Kotlin + Jetpack Compose). Se compila con GitHub Actions («Crear APK») y el APK queda en [Releases](../../releases). Más detalles en [`android/README.md`](android/README.md).
