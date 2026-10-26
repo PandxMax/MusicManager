@@ -137,3 +137,8 @@ VERSIÓN 1.09
    (＋), cambia entre ellas, guarda/importa .m3u8. "Cola actual" es la lista por defecto.
  - Cuadritos de fondo en la barra de posición: bailan con el ritmo REAL de la canción (se analiza el audio
    al empezar a sonar) y, al detener la música, caen hacia abajo y desaparecen.
+
+VERSIÓN 1.10
+------------
+ - Clic derecho en el artista: además de Wikipedia, YouTube y Spotify, ahora "Buscar artista en Tidal"
+   y "Buscar artista en Qobuz" (se abren en el navegador).

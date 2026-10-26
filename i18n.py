@@ -71,6 +71,8 @@ _ROWS = [
     ("📖 Historia del artista (Wikipedia)", "📖 Artist history (Wikipedia)", "📖 История исполнителя (Википедия)"),
     ("▶️ Buscar artista en YouTube", "▶️ Search artist on YouTube", "▶️ Искать исполнителя на YouTube"),
     ("🟢 Buscar artista en Spotify", "🟢 Search artist on Spotify", "🟢 Искать исполнителя в Spotify"),
+    ("🌊 Buscar artista en Tidal", "🌊 Search artist on Tidal", "🌊 Искать исполнителя в Tidal"),
+    ("🎧 Buscar artista en Qobuz", "🎧 Search artist on Qobuz", "🎧 Искать исполнителя в Qobuz"),
     ("General", "General", "Общие"), ("Etiquetas", "Tags", "Теги"), ("Panel de etiquetas", "Tag panel", "Панель тегов"),
     ("Portadas", "Covers", "Обложки"), ("Reproductor", "Player", "Плеер"),
     ("Abrir la última carpeta al iniciar", "Open the last folder on start", "Открывать последнюю папку при запуске"),

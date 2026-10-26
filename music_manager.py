@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.09"
+APP_VERSION = "1.10"
 
 
 class TMenu(QMenu):
@@ -767,7 +767,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.09 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.10 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4356,6 +4356,10 @@ class Main(QMainWindow):
             url = f"https://{lang}.wikipedia.org/wiki/Special:Search?go=Go&search=" + quote(name)
         elif kind == "youtube":
             url = "https://www.youtube.com/results?search_query=" + quote_plus(name)
+        elif kind == "tidal":
+            url = "https://tidal.com/search?q=" + quote(name)
+        elif kind == "qobuz":
+            url = "https://www.qobuz.com/search?q=" + quote_plus(name)
         else:
             url = "https://open.spotify.com/search/" + quote(name)
         QDesktopServices.openUrl(QUrl(url))
@@ -4371,6 +4375,8 @@ class Main(QMainWindow):
         m.addAction(T("📖 Historia del artista (Wikipedia)"), lambda: self.web_artist("wiki", name))
         m.addAction(T("▶️ Buscar artista en YouTube"), lambda: self.web_artist("youtube", name))
         m.addAction(T("🟢 Buscar artista en Spotify"), lambda: self.web_artist("spotify", name))
+        m.addAction(T("🌊 Buscar artista en Tidal"), lambda: self.web_artist("tidal", name))
+        m.addAction(T("🎧 Buscar artista en Qobuz"), lambda: self.web_artist("qobuz", name))
 
     def person_menu(self, le, pos):
         m = le.createStandardContextMenu()
@@ -4764,6 +4770,8 @@ class Main(QMainWindow):
         log.setHtml(
             "<h3>📜 Historial de versiones</h3>"
             f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>Clic derecho en el artista: ahora también «Buscar en Tidal» y «Buscar en Qobuz».</li></ul>"
+            "<h4>Versión 1.09</h4><ul>"
             "<li>Volumen: la barra aparece hacia arriba, flotando (no mueve nada).</li>"
             "<li>Botón flotante ☰ al costado: despliega por encima de portada, géneros y letra la lista de reproducción; arriba muestra lo que suena ahora, y puedes arrastrar canciones y crear/guardar listas con nombre.</li>"
             "<li>Cuadritos de fondo en la barra de posición que bailan con el ritmo real de la canción y caen al detenerla.</li></ul>"
@@ -4801,7 +4809,7 @@ class Main(QMainWindow):
             "<li>Convertir formatos: MP3, FLAC, M4A, OGG, Opus y WAV.</li>"
             "<li>Fuentes de etiquetas: MusicBrainz y Discogs.</li>"
             "<li>Información técnica del archivo (códec, tasa de bits, frecuencia…).</li>"
-            "<li>Clic derecho en el artista: Wikipedia, YouTube y Spotify.</li>"
+            "<li>Clic derecho en el artista: Wikipedia, YouTube, Spotify, Tidal y Qobuz.</li>"
             "<li>Ajustes con categorías, tema y color de acento, y 3 idiomas (ES / EN / RU).</li>"
             "<li>Volumen: silenciar, rueda del ratón y globos con el minuto y el volumen.</li></ul>"
             "<h4>Versión 1.0</h4><ul>"
