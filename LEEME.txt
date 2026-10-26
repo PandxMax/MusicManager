@@ -142,3 +142,9 @@ VERSIÓN 1.10
 ------------
  - Clic derecho en el artista: además de Wikipedia, YouTube y Spotify, ahora "Buscar artista en Tidal"
    y "Buscar artista en Qobuz" (se abren en el navegador).
+
+VERSIÓN 1.11
+------------
+ - Actualización automática más robusta: descomprime la versión nueva antes de cerrar (sin depender de
+   PowerShell), cierra el proceso por completo, reintenta si hay archivos en uso, usa rutas completas de
+   Windows y deja un registro (%TEMP%\mm_update.log). Al abrir, avisa si la actualización salió bien o mal.

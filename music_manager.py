@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.10"
+APP_VERSION = "1.11"
 
 
 class TMenu(QMenu):
@@ -767,7 +767,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.10 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.11 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4319,6 +4319,7 @@ class Main(QMainWindow):
         QTimer.singleShot(5000, self.auto_check_updates)
 
     def auto_check_updates(self):
+        self.report_update_result()
         if int(self.cfg.value("auto_update", 1) or 0):
             self.check_updates(manual=False)
 
@@ -4715,36 +4716,102 @@ class Main(QMainWindow):
         dlg.show()
 
     def apply_update(self, zip_path):
-        """Cierra el programa, copia los archivos nuevos encima y lo vuelve a abrir."""
-        import tempfile, subprocess
-        app_dir = os.path.dirname(sys.executable)
+        """Descomprime la versión nueva (con el programa aún abierto), lo cierra del todo, copia los archivos
+        encima y lo vuelve a abrir. Deja un registro en %TEMP%\\mm_update.log para saber qué pasó."""
+        import tempfile, subprocess, zipfile
         exe = sys.executable
-        stage = os.path.join(tempfile.gettempdir(), "mm_update_new")
-        bat = os.path.join(tempfile.gettempdir(), "mm_update.bat")
-        script = (
-            "@echo off\r\n"
-            f"set PID={os.getpid()}\r\n"
-            ":wait\r\n"
-            "tasklist /FI \"PID eq %PID%\" 2>nul | find \"%PID%\" >nul\r\n"
-            "if not errorlevel 1 (ping -n 2 127.0.0.1 >nul & goto wait)\r\n"
-            f"rmdir /s /q \"{stage}\" 2>nul\r\n"
-            f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"Expand-Archive -LiteralPath '{zip_path}' -DestinationPath '{stage}' -Force\"\r\n"
-            f"xcopy \"{stage}\\*\" \"{app_dir}\" /E /Y /Q /I >nul\r\n"
-            f"rmdir /s /q \"{stage}\" 2>nul\r\n"
-            f"del \"{zip_path}\" 2>nul\r\n"
-            f"start \"\" \"{exe}\"\r\n"
-            "del \"%~f0\"\r\n"
-        )
+        app_dir = os.path.dirname(exe)
+        tmp = tempfile.gettempdir()
+        stage = os.path.join(tmp, "mm_update_new")
+        bat = os.path.join(tmp, "mm_update.bat")
+        log = os.path.join(tmp, "mm_update.log")
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
+            shutil.rmtree(stage, ignore_errors=True)
+            with zipfile.ZipFile(zip_path) as z:
+                z.extractall(stage)
+            root = stage
+            name = os.path.basename(exe)
+            if not os.path.exists(os.path.join(root, name)):   # por si el zip trae una carpeta raíz
+                for d in os.listdir(stage):
+                    sub = os.path.join(stage, d)
+                    if os.path.isdir(sub) and os.path.exists(os.path.join(sub, name)):
+                        root = sub
+                        break
+                else:
+                    raise RuntimeError(f"El archivo descargado no contiene {name}.")
+            pid = os.getpid()
+            sysd = "%SystemRoot%\\System32\\"
+            script = "\r\n".join([
+                "@echo off",
+                f'set "LOG={log}"',
+                'echo Inicio de la actualizacion > "%LOG%"',
+                "set /a N=0",
+                ":wait",
+                f'{sysd}tasklist.exe /FI "PID eq {pid}" /NH 2>nul | {sysd}find.exe "{pid}" >nul',
+                "if errorlevel 1 goto go",
+                "set /a N+=1",
+                f"if %N% GEQ 15 {sysd}taskkill.exe /F /PID {pid} >nul 2>&1",
+                f"{sysd}ping.exe -n 2 127.0.0.1 >nul",
+                "if %N% GEQ 40 goto fail",
+                "goto wait",
+                ":go",
+                f"{sysd}ping.exe -n 3 127.0.0.1 >nul",
+                "set /a T=0",
+                ":copy",
+                f'{sysd}xcopy.exe "{root}\\*" "{app_dir}" /E /Y /Q /I >> "%LOG%" 2>&1',
+                "if not errorlevel 1 goto ok",
+                "set /a T+=1",
+                "echo intento %T% fallido >> \"%LOG%\"",
+                "if %T% GEQ 8 goto fail",
+                f"{sysd}ping.exe -n 3 127.0.0.1 >nul",
+                "goto copy",
+                ":ok",
+                'echo OK >> "%LOG%"',
+                f'rmdir /s /q "{stage}" 2>nul',
+                f'del "{zip_path}" 2>nul',
+                f'start "" "{exe}"',
+                "exit /b 0",
+                ":fail",
+                'echo FALLO >> "%LOG%"',
+                f'start "" "{exe}"',
+                "exit /b 1",
+                "",
+            ])
             with open(bat, "w", encoding="mbcs", errors="replace") as fh:
                 fh.write(script)
-            subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000 | 0x00000008, close_fds=True)
+            subprocess.Popen(["cmd.exe", "/c", bat], creationflags=0x08000200, close_fds=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as e:
-            QMessageBox.warning(self, "Actualizaciones", f"No se pudo preparar la actualización: {e}")
+            QApplication.restoreOverrideCursor()
+            QMessageBox.warning(self, "Actualizaciones", f"No se pudo preparar la actualización:\n{e}")
             return
-        QMessageBox.information(self, "Actualizando", "Music Manager se cerrará, se actualizará solo y volverá a abrirse en unos segundos.")
+        QApplication.restoreOverrideCursor()
+        QMessageBox.information(self, "Actualizando", "Music Manager se cerrará, se actualizará solo y volverá a abrirse en unos segundos.\n"
+                                "Si no se abre, ábrelo tú: se habrá actualizado igual.")
+        self.cfg.sync()
         self.close()
         QApplication.quit()
+        QTimer.singleShot(1500, lambda: os._exit(0))   # asegura que el proceso termine del todo y se liberen los archivos
+
+    def report_update_result(self):
+        """Al abrir: si hubo una actualización pendiente de informar, dice cómo terminó."""
+        import tempfile
+        log = os.path.join(tempfile.gettempdir(), "mm_update.log")
+        if not os.path.exists(log):
+            return
+        try:
+            with open(log, encoding="mbcs", errors="replace") as fh:
+                txt = fh.read()
+            os.remove(log)
+        except OSError:
+            return
+        if "FALLO" in txt:
+            QMessageBox.warning(self, "Actualización", "La última actualización no se pudo instalar.\n\n"
+                                "Descarga el .zip nuevo desde la página de GitHub (Releases) y reemplaza la carpeta.\n\n"
+                                f"Detalle técnico:\n{txt[-500:]}")
+        elif "OK" in txt:
+            self.statusBar().showMessage(f"✔ Music Manager se actualizó correctamente (versión {APP_VERSION}).", 15000)
 
     def toggle_auto_update(self, on):
         self.cfg.setValue("auto_update", 1 if on else 0)
@@ -4770,6 +4837,8 @@ class Main(QMainWindow):
         log.setHtml(
             "<h3>📜 Historial de versiones</h3>"
             f"<h4>Versión {APP_VERSION} <small>(actual)</small></h4><ul>"
+            "<li>Actualización automática más robusta: descomprime antes de cerrar, cierra el proceso por completo, reintenta si hay archivos en uso y avisa al abrir si salió bien o mal.</li></ul>"
+            "<h4>Versión 1.10</h4><ul>"
             "<li>Clic derecho en el artista: ahora también «Buscar en Tidal» y «Buscar en Qobuz».</li></ul>"
             "<h4>Versión 1.09</h4><ul>"
             "<li>Volumen: la barra aparece hacia arriba, flotando (no mueve nada).</li>"
