@@ -11,7 +11,7 @@ from functools import lru_cache
 from urllib.parse import quote_plus, quote
 
 from PyQt6.QtCore import (QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
-                          QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
+                          QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
 from PyQt6.QtGui import (QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
                          QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent, QPen)
 from PyQt6.QtWidgets import (
@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout,
 )
 import mutagen
 import i18n
@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.13"
+APP_VERSION = "1.14"
 
 
 class TMenu(QMenu):
@@ -707,6 +707,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.14', [
+        'Corregido: la ventana ya no se sale de la pantalla ni se corta por los lados (se ajusta al tamaño de tu pantalla al abrir).',
+        'La fila de datos técnicos y los botones (Espectro, MusicBrainz, Discogs) pasa a otra línea cuando no cabe, en vez de ensanchar la ventana.',
+        'Si aun así la ventana es muy pequeña, aparecen barras de desplazamiento en lugar de cortar el contenido.',
+    ]),
     ('1.13', [
         'Junto a «📊 Espectro» hay ahora dos botones, «🎼 MusicBrainz» y «💿 Discogs», para buscar y poner las etiquetas de la canción.',
     ]),
@@ -843,11 +848,70 @@ class UpdateDownloadWorker(QThread):
             self.failed.emit(str(getattr(e, "reason", e)))
 
 
+class FlowLayout(QLayout):
+    """Reparte los widgets en filas y pasa a otra línea cuando no caben (así no ensancha la ventana)."""
+    def __init__(self, parent=None, hspacing=4, vspacing=4):
+        super().__init__(parent)
+        self._items, self.hs, self.vs = [], hspacing, vspacing
+
+    def addItem(self, it):
+        self._items.append(it)
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, i):
+        return self._items[i] if 0 <= i < len(self._items) else None
+
+    def takeAt(self, i):
+        return self._items.pop(i) if 0 <= i < len(self._items) else None
+
+    def expandingDirections(self):
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, w):
+        return self._do(QRect(0, 0, w, 0), True)
+
+    def setGeometry(self, r):
+        super().setGeometry(r)
+        self._do(r, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        sz = QSize(0, 0)
+        for it in self._items:
+            if not it.isEmpty():
+                sz = sz.expandedTo(it.minimumSize())
+        m = self.contentsMargins()
+        return QSize(sz.width() + m.left() + m.right(), sz.height() + m.top() + m.bottom())
+
+    def _do(self, rect, test):
+        m = self.contentsMargins()
+        r = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
+        x, y, lh = r.x(), r.y(), 0
+        for it in self._items:
+            if it.isEmpty():
+                continue
+            sh = it.sizeHint()
+            if x + sh.width() > r.right() + 1 and lh > 0:
+                x, y, lh = r.x(), y + lh + self.vs, 0
+            if not test:
+                it.setGeometry(QRect(x, y, sh.width(), sh.height()))
+            x += sh.width() + self.hs
+            lh = max(lh, sh.height())
+        return y + lh - rect.y() + m.bottom()
+
+
 class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.13 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.14 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1873,8 +1937,9 @@ class Main(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"Music Manager {APP_VERSION}")
-        self.resize(1500, 840)
-        self.setMinimumSize(1100, 640)
+        scr = QApplication.primaryScreen().availableGeometry()
+        self.resize(min(1500, scr.width() - 30), min(840, scr.height() - 30))   # nunca más grande que la pantalla
+        self.setMinimumSize(min(1000, scr.width() - 30), min(620, scr.height() - 30))
         self.cfg = QSettings("MusicManager", "MusicManager")
         self.pending, self.edited, self.lyrics_edited, self._loading = {}, set(), False, False
         self.cur_paths, self.current_dir = [], ""
@@ -1909,6 +1974,7 @@ class Main(QMainWindow):
                 self.restoreGeometry(g)
             except Exception:
                 pass
+        self.fit_to_screen()
         self.apply_field_visibility()
         if not int(self.cfg.value("welcomed", 0) or 0) or int(self.cfg.value("guide_every", 0) or 0):
             self.cfg.setValue("welcomed", 1)  # primera vez (o si lo activas): muestra la guía rápida
@@ -2025,16 +2091,14 @@ class Main(QMainWindow):
         # información técnica: etiquetas de solo lectura (chips) en la cabecera del cuadro
         self.tech = {}
         self.tech_bar = QWidget()
-        tbl = QHBoxLayout(self.tech_bar)
+        tbl = FlowLayout(self.tech_bar, 4, 4)
         tbl.setContentsMargins(0, 0, 0, 4)
-        tbl.setSpacing(4)
         for k in ("codec", "bitrate", "freq", "dur", "mode", "size"):
             chip = QLabel("")
             chip.setObjectName("chip")
             chip.hide()
             self.tech[k] = chip
             tbl.addWidget(chip)
-        tbl.addStretch(1)
         self.btn_spec = QPushButton("📊 Espectro")
         self.btn_spec.setObjectName("chipbtn")
         self.btn_spec.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -2235,7 +2299,12 @@ class Main(QMainWindow):
         cl = QVBoxLayout(central)
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(0)
-        cl.addWidget(main, 1)
+        sa = QScrollArea()          # si la ventana es muy pequeña, aparecen barras en vez de cortar el contenido
+        sa.setWidgetResizable(True)
+        sa.setFrameShape(QFrame.Shape.NoFrame)
+        sa.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        sa.setWidget(main)
+        cl.addWidget(sa, 1)
         self.setCentralWidget(central)
         self.build_pl_panel(central)
         self.statusBar().addPermanentWidget(self.player_bar)   # reproductor en la línea de estado, a la derecha
@@ -4068,6 +4137,20 @@ class Main(QMainWindow):
     def style_splitter(self, sp):
         sp.setHandleWidth(9)
         sp.setChildrenCollapsible(False)
+
+    def fit_to_screen(self):
+        """Si la ventana (por tamaño guardado o cambio de pantalla) no cabe, la ajusta y la mete en la pantalla."""
+        if self.isMaximized() or self.isFullScreen():
+            return
+        scr = (self.screen() or QApplication.primaryScreen()).availableGeometry()
+        w, h = min(self.width(), scr.width()), min(self.height(), scr.height())
+        if (w, h) != (self.width(), self.height()):
+            self.resize(w, h)
+        g = self.frameGeometry()
+        x = max(scr.left(), min(g.x(), scr.right() - g.width() + 1))
+        y = max(scr.top(), min(g.y(), scr.bottom() - g.height() + 1))
+        if (x, y) != (g.x(), g.y()):
+            self.move(x, y)
 
     def closeEvent(self, e):
         self.apply_form()

@@ -159,3 +159,10 @@ VERSIÓN 1.13
  - Junto al botón "📊 Espectro" (encima de los campos) hay dos botones nuevos: "🎼 MusicBrainz" y
    "💿 Discogs". Buscan la canción seleccionada, muestran los resultados y aplican las etiquetas.
    (Discogs necesita el token gratuito: Ajustes > Fuentes de etiquetas.)
+
+VERSIÓN 1.14
+------------
+ - Corregido el desborde lateral: la ventana ya no es más grande que tu pantalla (antes se abría a 1500 px
+   de ancho aunque la pantalla fuera menor y se cortaban los lados). Se ajusta y se mete en pantalla al abrir.
+ - La fila de datos técnicos + botones (Espectro, MusicBrainz, Discogs) salta de línea si no cabe.
+ - Si la ventana es muy pequeña, aparecen barras de desplazamiento en vez de cortar el contenido.
