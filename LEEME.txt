@@ -247,4 +247,8 @@ VERSIÓN 1.27
 VERSIÓN 1.28
 ------------
  - Los MP3 se guardan en ID3v2.3 con UTF-16 (formato que entiende el Explorador de Windows para mostrar la portada).
- - Herramientas -> Reparar portadas para el Explorador de Windows: reescribe las etiquetas de MP3 ya existentes sin tocar el audio.
+
+VERSIÓN 1.29
+------------
+ - Se quitó "Reparar portadas": basta con guardar; los MP3 siempre se escriben en el formato que entiende el Explorador de Windows.
+ - Portadas FLAC con sus medidas para que Windows las muestre como miniatura.
