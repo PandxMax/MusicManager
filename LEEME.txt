@@ -276,3 +276,7 @@ VERSIÓN 1.33
 VERSIÓN 1.34
 ------------
  - Botón "Rellenar metadatos con IA" debajo de los metadatos: pide canción y artista, la IA busca los datos y los rellena (los revisas antes de aplicar).
+
+VERSIÓN 1.35
+------------
+ - Datos técnicos: ahora también se ve la etiqueta que usa el archivo (ID3v2.3/2.4, Vorbis Comment, MP4) y el codec con detalle (MPEG-1 Layer III · LAME, AAC-LC...).

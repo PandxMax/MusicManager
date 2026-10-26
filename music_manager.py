@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.34"
+APP_VERSION = "1.35"
 
 
 class TMenu(QMenu):
@@ -210,12 +210,31 @@ def _pop(tags, key):
 
 @lru_cache(maxsize=4096)
 def _tech(path, mtime):
-    out = {"codec": "—", "bitrate": "—", "freq": "—", "dur": "—", "mode": "—", "size": "—"}
+    out = {"codec": "—", "enc": "—", "tag": "—", "bitrate": "—", "freq": "—", "dur": "—", "mode": "—", "size": "—"}
     try:
         out["size"] = f"{os.path.getsize(path) / 1048576:.2f} MB"
         f = mutagen.File(path)
         i = f.info
         kind = type(f).__name__
+        t = getattr(f, "tags", None)
+        if kind == "MP3":
+            ver = getattr(t, "version", None)
+            out["tag"] = ("ID3v%d.%d" % (ver[0], ver[1])) if ver else "Sin etiquetas"
+            lay = {1: "I", 2: "II", 3: "III"}.get(getattr(i, "layer", 3), "III")
+            mv = {1: "MPEG-1", 2: "MPEG-2", 2.5: "MPEG-2.5"}.get(getattr(i, "version", 1), "MPEG")
+            enc = str(getattr(i, "encoder_info", "") or "").strip()
+            out["enc"] = f"{mv} Layer {lay}" + (f" · {enc}" if enc else "")
+        elif kind == "MP4":
+            c = str(getattr(i, "codec", "") or "")
+            out["tag"] = "MP4 (iTunes)"
+            out["enc"] = ("ALAC" if "alac" in c.lower() else
+                          {"mp4a.40.2": "AAC-LC", "mp4a.40.5": "HE-AAC", "mp4a.40.29": "HE-AAC v2"}.get(c, c.upper() or "AAC"))
+        elif kind == "FLAC":
+            out["tag"] = "Vorbis Comment"
+            out["enc"] = f"FLAC {getattr(i, 'bits_per_sample', 16)} bits"
+        elif kind in ("OggVorbis", "OggOpus"):
+            out["tag"] = "Vorbis Comment"
+            out["enc"] = "Vorbis" if kind == "OggVorbis" else "Opus"
         if kind == "MP4":
             out["codec"] = "ALAC" if "alac" in str(getattr(i, "codec", "")).lower() else "AAC"
         else:
@@ -740,6 +759,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.35', [
+        'Datos técnicos: ahora también se ve la etiqueta que usa el archivo (ID3v2.3, ID3v2.4, Vorbis Comment, MP4…) y el codec con detalle (por ejemplo «MPEG-1 Layer III · LAME 3.100» o «AAC-LC»).',
+    ]),
     ('1.34', [
         'Nuevo botón «✨ Rellenar metadatos con IA…» debajo de los metadatos: pide el nombre de la canción y el artista, la IA busca los datos (álbum, género, año, pista…) y los rellena. Antes de aplicar puedes revisarlos y corregirlos.',
     ]),
@@ -1023,7 +1045,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.34 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.35 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2426,7 +2448,7 @@ class Main(QMainWindow):
         chips_w = QWidget()
         tbl = FlowLayout(chips_w, 4, 4)
         tbl.setContentsMargins(0, 0, 0, 0)
-        for k in ("codec", "bitrate", "freq", "dur", "mode", "size"):
+        for k in ("codec", "enc", "tag", "bitrate", "freq", "dur", "mode", "size"):
             chip = QLabel("")
             chip.setObjectName("chip")
             self.tech[k] = chip
@@ -3845,7 +3867,7 @@ class Main(QMainWindow):
         self.update_suggestions()
 
     def fill_tech(self, paths):
-        icons = {"codec": "🎵", "bitrate": "⚡", "freq": "🔊", "dur": "⏱", "mode": "⚙", "size": "💾"}
+        icons = {"codec": "🎵", "enc": "🧩", "tag": "🏷", "bitrate": "⚡", "freq": "🔊", "dur": "⏱", "mode": "⚙", "size": "💾"}
         if not paths:
             for k, chip in self.tech.items():
                 chip.setText(f"{icons[k]} -")
