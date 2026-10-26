@@ -191,3 +191,10 @@ VERSIÓN 1.18
    (Por dentro, las columnas se reorganizaron en dos filas que se mantienen alineadas.)
  - Ctrl + rueda del ratón sobre los archivos cambia su tamaño de grandes a pequeños (iconos y lista);
    se recuerda al reabrir. Las miniaturas se generan más nítidas para que no se vean borrosas al agrandar.
+
+VERSIÓN 1.19
+------------
+ - Corregido: después de arrastrar archivos y soltarlos donde estaban, quedaba el recuadro de selección
+   fantasma y la selección "pegada". Ahora el estado de la lista se limpia tras cada arrastre.
+ - Corregido: soltar carpetas/archivos sobre otra carpeta dentro de la misma lista.
+ - Corregido: la pestaña "Comparación" del espectrograma se desplaza para verla completa.

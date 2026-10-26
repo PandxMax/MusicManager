@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand,
 )
 import mutagen
 import i18n
@@ -50,7 +50,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.18"
+APP_VERSION = "1.19"
 
 
 class TMenu(QMenu):
@@ -708,6 +708,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.19', [
+        'Corregido: tras arrastrar archivos y soltarlos en el mismo sitio, ya no queda el recuadro de selección fantasma ni la selección «pegada».',
+        'Corregido: se puede soltar carpetas y archivos sobre otra carpeta dentro de la misma lista.',
+        'Corregido: la pestaña Comparación del espectrograma ahora se desplaza y se puede ver completa, aunque la ventana sea pequeña.',
+    ]),
     ('1.18', [
         'El espectrograma ocupa toda la fila de abajo (también bajo la portada) y la portada se queda arriba a la derecha, sin estirarse.',
         'Ctrl + rueda del ratón sobre los archivos cambia su tamaño, de grandes a pequeños (en vista de iconos y de lista).',
@@ -927,7 +932,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.18 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.19 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1909,8 +1914,21 @@ class SongList(QListWidget):
         md.setUrls([QUrl.fromLocalFile(i.data(PATH_ROLE)) for i in items])
         return md
 
+    def reset_state(self):
+        """Tras un arrastre propio, Qt puede quedarse «seleccionando» (recuadro fantasma y selección pegada). Lo limpia."""
+        try:
+            self.setState(QAbstractItemView.State.NoState)
+        except Exception:
+            pass
+        for rb in self.findChildren(QRubberBand):
+            rb.hide()
+        self._selecting = False
+        self.viewport().update()
+
     # ---- iniciar el arrastre
     def mousePressEvent(self, e):
+        if not (QApplication.mouseButtons() & ~Qt.MouseButton.LeftButton) and self.state() != QAbstractItemView.State.NoState:
+            self.reset_state()
         if e.button() == Qt.MouseButton.LeftButton:
             self._press = e.position().toPoint()
             self._press_item = self.itemAt(self._press)
@@ -1933,6 +1951,7 @@ class SongList(QListWidget):
         super().mouseReleaseEvent(e)
         if e.button() == Qt.MouseButton.LeftButton:
             self._selecting = False
+            self.reset_state()
             self.selection_done.emit()
 
     def begin_drag(self, item):
@@ -1949,6 +1968,9 @@ class SongList(QListWidget):
             drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction, Qt.DropAction.CopyAction)
         finally:
             self._selecting = False
+            self._set_hover(None)
+            self.reset_state()
+            QTimer.singleShot(0, self.reset_state)   # y otra vez cuando termina el evento, por si Qt lo vuelve a activar
 
     # ---- recibir: solo se puede soltar sobre una carpeta de la lista
     def _dir_at(self, pos):

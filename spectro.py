@@ -407,7 +407,8 @@ class SpectrumDialog(QWidget):
         self.tabs.addTab(sc, "Espectrogramas")
         # pestaña 2: comparación
         self.cmp_host = QWidget(); self.cmp_lay = QVBoxLayout(self.cmp_host)
-        self.tabs.addTab(self.cmp_host, "Comparación")
+        cmp_sc = QScrollArea(); cmp_sc.setWidgetResizable(True); cmp_sc.setFrameShape(QFrame.Shape.NoFrame); cmp_sc.setWidget(self.cmp_host)
+        self.tabs.addTab(cmp_sc, "Comparación")
         self.cmp_hint = QLabel("Selecciona 2 o más canciones para compararlas." if len(paths) < 2 else "Esperando el análisis…")
         self.cmp_lay.addWidget(self.cmp_hint)
         self.curve = None
