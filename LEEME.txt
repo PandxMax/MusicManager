@@ -198,3 +198,10 @@ VERSIÓN 1.19
    fantasma y la selección "pegada". Ahora el estado de la lista se limpia tras cada arrastre.
  - Corregido: soltar carpetas/archivos sobre otra carpeta dentro de la misma lista.
  - Corregido: la pestaña "Comparación" del espectrograma se desplaza para verla completa.
+
+VERSIÓN 1.20
+------------
+ - Con los metadatos a la vista, la barra para estirar la fila de abajo está bloqueada y no se ve;
+   solo se puede estirar cuando el espectrograma está abierto.
+ - Arrastrar archivos/carpetas sobre otra carpeta de la misma lista: ahora el programa resuelve el soltar
+   por sí mismo (y resalta la carpeta de destino), sin depender de los eventos de arrastre de Qt.

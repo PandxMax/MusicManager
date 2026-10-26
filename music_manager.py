@@ -50,7 +50,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.19"
+APP_VERSION = "1.20"
 
 
 class TMenu(QMenu):
@@ -408,6 +408,7 @@ QSlider::handle:horizontal { background: white; border: 2px solid @accent; width
                              margin: -6px 0; border-radius: 8px; }
 QSplitter::handle { background: @border; border-radius: 3px; margin: 2px; }
 QSplitter::handle:hover { background: @accent; }
+QSplitter::handle:disabled { background: transparent; }
 QStatusBar { background: @surface; border-top: 1px solid @border; color: @muted; }
 QMenu { background: @surface; border: 1px solid @border; border-radius: 10px; padding: 6px; }
 QMenu::item { padding: 7px 24px; border-radius: 6px; }
@@ -708,6 +709,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.20', [
+        'Con los metadatos a la vista, la barra roja para estirar la fila de abajo ya no aparece (solo se puede estirar con el espectrograma abierto).',
+        'Corregido: ahora sí se puede arrastrar un archivo o carpeta sobre otra carpeta de la misma lista; la carpeta de destino se resalta al pasar por encima.',
+    ]),
     ('1.19', [
         'Corregido: tras arrastrar archivos y soltarlos en el mismo sitio, ya no queda el recuadro de selección fantasma ni la selección «pegada».',
         'Corregido: se puede soltar carpetas y archivos sobre otra carpeta dentro de la misma lista.',
@@ -932,7 +937,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.19 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.20 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1964,9 +1969,30 @@ class SongList(QListWidget):
         drag = QDrag(self)
         drag.setMimeData(self.mimeData(items))
         drag.setPixmap(item.icon().pixmap(QSize(72, 72)))
+        paths = [i.data(PATH_ROLE) for i in items]
+        # resalta la carpeta de esta lista que está bajo el cursor mientras arrastras (no depende de los eventos de Qt)
+        hover_timer = QTimer(self)
+        hover_timer.setInterval(50)
+
+        def hover_tick():
+            lp = self.viewport().mapFromGlobal(QCursor.pos())
+            it = self._dir_at(lp) if self.viewport().rect().contains(lp) else None
+            if it is not None and it.data(PATH_ROLE) in paths:
+                it = None
+            self._set_hover(it)
+        hover_timer.timeout.connect(hover_tick)
+        hover_timer.start()
+        result = Qt.DropAction.IgnoreAction
         try:
-            drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction, Qt.DropAction.CopyAction)
+            result = drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction, Qt.DropAction.CopyAction)
+            hover_timer.stop()
+            if result == Qt.DropAction.IgnoreAction:   # Qt no aceptó el soltar: lo resolvemos nosotros
+                lp = self.viewport().mapFromGlobal(QCursor.pos())
+                it = self._dir_at(lp) if self.viewport().rect().contains(lp) else None
+                if it is not None and it.data(PATH_ROLE) not in paths:
+                    self.dropped.emit(paths, it.data(PATH_ROLE))
         finally:
+            hover_timer.stop()
             self._selecting = False
             self._set_hover(None)
             self.reset_state()
@@ -2424,6 +2450,7 @@ class Main(QMainWindow):
         self.main_split, self.mid_split = main, middle
         for sp in (main, middle, top_split, bottom_split, self.left_split):
             self.style_splitter(sp)
+        self.set_rows_locked(True)
         central = QWidget()
         cl = QVBoxLayout(central)
         cl.setContentsMargins(0, 0, 0, 0)
@@ -4275,6 +4302,14 @@ class Main(QMainWindow):
             hay = (it.text() + " " + " ".join(tags.values())).lower()
             it.setHidden(bool(t) and t not in hay)
 
+    def set_rows_locked(self, locked):
+        """Con los metadatos a la vista, la división entre la fila de arriba y la de abajo no se estira (se ve mejor);
+        solo se puede mover cuando está el espectrograma."""
+        h = self.mid_split.handle(1)
+        if h is not None:
+            h.setEnabled(not locked)
+            h.setCursor(Qt.CursorShape.ArrowCursor if locked else Qt.CursorShape.SplitVCursor)
+
     def style_splitter(self, sp):
         sp.setHandleWidth(9)
         sp.setChildrenCollapsible(False)
@@ -4510,6 +4545,7 @@ class Main(QMainWindow):
         self._spec_sizes = self.mid_split.sizes()
         self.bottom_stack.addWidget(pane)
         self.bottom_stack.setCurrentWidget(pane)   # reemplaza metadatos + géneros/letra; la portada se queda arriba
+        self.set_rows_locked(False)                # con el espectrograma sí se puede estirar
         total = max(sum(self._spec_sizes), 600)
         self.mid_split.setSizes([int(total * 0.36), int(total * 0.64)])
         i18n.retranslate(pane)
@@ -4525,6 +4561,7 @@ class Main(QMainWindow):
             pass
         self.bottom_stack.setCurrentIndex(0)
         self.bottom_stack.removeWidget(pane)
+        self.set_rows_locked(True)
         pane.hide()
         pane.setParent(None)
         pane.deleteLater()
