@@ -232,3 +232,9 @@ VERSIÓN 1.25
 ------------
  - Al guardar se avisa al Explorador de Windows para que refresque el icono y la portada.
  - Los .mp4 de solo audio no muestran portada en Windows: tras guardar una portada se ofrece renombrarlos a .m4a.
+
+VERSIÓN 1.26
+------------
+ - Se quitaron los botones Deshacer/Guardar cambios de los metadatos.
+ - Si hay cambios en el archivo aparece un botón "Guardar" encima de la portada.
+ - Al cambiar de canción o de carpeta con cambios sin guardar sale una ventana: Guardar / Descartar / Cancelar.

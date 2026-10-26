@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.25"
+APP_VERSION = "1.26"
 
 
 class TMenu(QMenu):
@@ -726,6 +726,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.26', [
+        'Se quitaron los botones «Deshacer cambios» y «Guardar cambios» de los metadatos.',
+        'Cuando hay un cambio en el archivo aparece un botón «Guardar» encima de la portada (y desaparece al guardar).',
+        'Si cambias a otra canción (o carpeta) con cambios sin guardar, sale una ventana para guardar, descartar o quedarte.',
+    ]),
     ('1.25', [
         'Al guardar, el programa avisa al Explorador de Windows para que refresque el icono y muestre la portada del archivo.',
         'Los archivos .mp4 de solo audio no muestran portada en Windows: al guardar una portada, el programa ofrece renombrarlos a .m4a (es el mismo archivo y así Windows sí muestra la imagen).',
@@ -974,7 +979,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.25 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.26 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2241,7 +2246,7 @@ class Main(QMainWindow):
         for i, (k, n) in enumerate(FIELDS):
             r, c = divmod(i, 2)
             le = QLineEdit()
-            le.textEdited.connect(lambda _, key=k: self.edited.add(key))
+            le.textEdited.connect(lambda _, key=k: (self.edited.add(key), self.update_dirty()))
             self.inputs[k] = le
             le.setPlaceholderText("-")     # sin canción seleccionada: solo una línea, se rellena al elegir una
             le.setEnabled(False)
@@ -2271,17 +2276,6 @@ class Main(QMainWindow):
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
-        b1 = QPushButton("↩ Deshacer cambios")
-        b1.setToolTip("Descarta los cambios pendientes de la selección")
-        b1.clicked.connect(self.undo_changes)
-        b2 = QPushButton("💾 Guardar cambios")
-        b2.setObjectName("accent")
-        b2.setToolTip("Escribe los cambios en los archivos (Ctrl+S)")
-        b2.clicked.connect(self.save_all)
-        row = QHBoxLayout()
-        row.addWidget(b1)
-        row.addWidget(b2)
-        grid.addLayout(row, 6, 0, 1, 4)
 
         # ---------- letra (oculta; se muestra con el botón «📝 Letra»)
         self.lyr_box = QGroupBox("Letra")
@@ -2358,6 +2352,12 @@ class Main(QMainWindow):
         self.cover_lbl.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cover_lbl.customContextMenuRequested.connect(self.cover_menu)
         self.cover_lbl.setToolTip("Clic derecho: cambiar, quitar, copiar, pegar, guardar o redimensionar")
+        self.save_btn = QPushButton("💾 Guardar")
+        self.save_btn.setObjectName("accent")
+        self.save_btn.setToolTip("Hay cambios sin guardar en este archivo: escribe los cambios (Ctrl+S)")
+        self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.save_btn.clicked.connect(self.save_all)
+        self.save_btn.hide()
         ch = QHBoxLayout()
         ch.setSpacing(8)
         left = QVBoxLayout()
@@ -2387,6 +2387,7 @@ class Main(QMainWindow):
         ch.addStretch(1)
         cv.setContentsMargins(6, 4, 6, 4)
         cv.setSpacing(3)
+        cv.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         cv.addLayout(ch)
         cv.addWidget(self.info_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
         self.status_lbl.hide()
@@ -2836,6 +2837,10 @@ class Main(QMainWindow):
     def load_folder(self, path, keep=True, select=None):
         if not path or not os.path.isdir(path):
             return
+        if self.current_dir and os.path.normpath(path) != os.path.normpath(self.current_dir):
+            if any(self.pending.values()) or self.edited or self.lyrics_edited:
+                if not self.ask_unsaved():
+                    return
         if not self._nav_busy and self.current_dir and os.path.normpath(path) != os.path.normpath(self.current_dir):
             if not self.back_stack or self.back_stack[-1] != self.current_dir:
                 self.back_stack.append(self.current_dir)
@@ -2856,6 +2861,7 @@ class Main(QMainWindow):
                        key=lambda f: f.lower())
         self.gen += 1
         self.thumb_queue = []
+        self._loading_dir = True
         self.list.clear()
         if not self.chk_sub.isChecked():
             for name, dp in subdirs(path):
@@ -2874,6 +2880,7 @@ class Main(QMainWindow):
             if m is None:
                 self.thumb_queue.append(f)
         self.row_index = {self.list.item(r).data(PATH_ROLE): r for r in range(self.list.count())}
+        self._loading_dir = False
         self.update_nav()
         if keep_paths:
             self.list.blockSignals(True)
@@ -2947,6 +2954,7 @@ class Main(QMainWindow):
                 it.setBackground(QBrush(QColor(70, 130, 220, 70)))
             else:
                 it.setData(Qt.ItemDataRole.BackgroundRole, None)
+        self.update_dirty()
         n = sum(1 for v in self.pending.values() if v)
         self.pend_lbl.setText(f"●  {n} archivo(s) con cambios sin guardar · Ctrl+S" if n else "")
         self.pend_lbl.setStyleSheet("color: #e67e00; padding-right: 10px; font-weight: 600;")
@@ -3576,12 +3584,62 @@ class Main(QMainWindow):
     def on_lyrics_edit(self):
         if not self._loading:
             self.lyrics_edited = True
+            self.update_dirty()
+
+    def update_dirty(self):
+        """Muestra el botón «Guardar» sobre la portada solo si la selección actual tiene cambios."""
+        try:
+            d = bool(self.edited or self.lyrics_edited or any(self.pending.get(p) for p in self.cur_paths))
+            self.save_btn.setVisible(d)
+        except AttributeError:
+            pass
+
+    def ask_unsaved(self, paths=None):
+        """Pregunta qué hacer con los cambios sin guardar. Devuelve False si el usuario quiere quedarse."""
+        self.apply_form()
+        ps = [p for p in (paths if paths is not None else self.pending) if self.pending.get(p)]
+        if not ps:
+            return True
+        r = QMessageBox.question(
+            self, "Cambios sin guardar",
+            f"Hay cambios sin guardar en {len(ps)} archivo(s). ¿Quieres guardarlos?",
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save)
+        if r == QMessageBox.StandardButton.Cancel:
+            return False
+        if r == QMessageBox.StandardButton.Save:
+            self.save_all()
+        else:
+            for p in ps:
+                self.pending.pop(p, None)
+                self.chosen.discard(p)
+                self.meta.pop(p, None)
+            self.mark_items()
+        return True
 
     def on_select(self):
         self.sel_timer.stop()
+        new_paths = self.selected_paths()
+        if (self.cur_paths and set(new_paths) != set(self.cur_paths) and not getattr(self, "_in_prompt", False)
+                and not getattr(self, "_loading_dir", False)):
+            self._in_prompt = True
+            try:
+                ok = self.ask_unsaved(list(self.cur_paths))
+            finally:
+                self._in_prompt = False
+            if not ok:   # se queda donde estaba: vuelve a marcar la selección anterior
+                self.list.blockSignals(True)
+                self.list.clearSelection()
+                for p in self.cur_paths:
+                    r = self.row_index.get(p)
+                    if r is not None:
+                        self.list.item(r).setSelected(True)
+                self.list.blockSignals(False)
+                return
+            new_paths = self.selected_paths()
         if (self.edited or self.lyrics_edited) and self.cur_paths:
             self.apply_form()  # no pierdas lo que escribiste al cambiar de canción
-        paths = self.selected_paths()
+        paths = new_paths
         self.cur_paths = paths
         self.edited.clear()
         self.lyrics_edited = False
