@@ -243,3 +243,8 @@ VERSIÓN 1.27
 ------------
  - Botón ⟳ Actualizar junto a atrás/adelante/subir; clic derecho en el espacio en blanco -> Actualizar; tecla F5.
  - Herramientas -> Descargar de YouTube a MP3: pega el enlace, se descarga y queda seleccionado para editar metadatos y portada.
+
+VERSIÓN 1.28
+------------
+ - Los MP3 se guardan en ID3v2.3 con UTF-16 (formato que entiende el Explorador de Windows para mostrar la portada).
+ - Herramientas -> Reparar portadas para el Explorador de Windows: reescribe las etiquetas de MP3 ya existentes sin tocar el audio.

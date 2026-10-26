@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.27"
+APP_VERSION = "1.28"
 
 
 class TMenu(QMenu):
@@ -148,6 +148,14 @@ def read_tags(path):
     return tags
 
 
+def _save(f):
+    """Guarda. Los MP3 van en ID3v2.3 + UTF-16: es lo que el Explorador de Windows entiende para mostrar la portada."""
+    if isinstance(f, MP3) or type(f).__name__ == "EasyMP3":
+        f.save(v2_version=3)
+    else:
+        f.save()
+
+
 def write_tags(path, changes):
     f = mutagen.File(path, easy=True)
     if f is None:
@@ -164,7 +172,7 @@ def write_tags(path, changes):
                 f[k] = [v]
         except Exception:
             skipped.append(k)
-    f.save()
+    _save(f)
     return skipped
 
 
@@ -302,14 +310,14 @@ def write_extra(path, lyrics=None, cover=None):
             t.delall("USLT")
             t.delall("SYLT")
             if lyrics.strip():
-                t.add(USLT(encoding=3, lang="eng", desc="", text=lyrics))
+                t.add(USLT(encoding=1, lang="eng", desc="", text=lyrics))
                 sy = parse_lrc(lyrics)
                 if len(sy) >= 2:  # letra con tiempos: también como SYLT (letra sincronizada de ID3)
-                    t.add(SYLT(encoding=3, lang="eng", format=2, type=1, desc="", text=sy))
+                    t.add(SYLT(encoding=1, lang="eng", format=2, type=1, desc="", text=sy))
         if cover is not None:
             t.delall("APIC")
             if cover:
-                t.add(APIC(encoding=3, mime=mime_of(cover), type=3, desc="Cover", data=cover))
+                t.add(APIC(encoding=1, mime=mime_of(cover), type=3, desc="Cover", data=cover))
     elif isinstance(f, MP4):
         if lyrics is not None:
             _pop(t, "\xa9lyr")
@@ -339,7 +347,7 @@ def write_extra(path, lyrics=None, cover=None):
                 if cover:
                     pic.mime, pic.data = mime_of(cover), cover
                     t["metadata_block_picture"] = [base64.b64encode(pic.write()).decode("ascii")]
-    f.save()
+    _save(f)
 
 
 # ---------------------------------------------------------------------- Tema
@@ -726,6 +734,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.28', [
+        'Arreglo importante: los MP3 ahora se guardan en ID3v2.3 con texto UTF-16 (el formato que entiende el Explorador de Windows). Antes la portada se guardaba bien, pero Windows no la mostraba como miniatura.',
+        'Nuevo: Herramientas → «Reparar portadas para el Explorador de Windows» reescribe las etiquetas de los MP3 ya existentes (selección o carpeta) sin tocar el audio.',
+    ]),
     ('1.27', [
         'Nuevo botón ⟳ «Actualizar» junto a atrás/adelante/subir, y clic derecho en el espacio en blanco → «Actualizar» (también F5), para que aparezcan las canciones que añades desde fuera.',
         'Herramientas → «Descargar de YouTube a MP3»: pega el enlace, descarga el audio y se selecciona en la lista para ponerle metadatos y portada.',
@@ -983,7 +995,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.27 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.28 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4851,6 +4863,8 @@ class Main(QMainWindow):
                              "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
         t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
+        t.addAction(self.act("🖼 Reparar portadas para el Explorador de Windows", self.fix_windows_covers,
+                             "Reescribe las etiquetas de los MP3 (selección o carpeta) en el formato que Windows entiende, sin tocar el audio"))
         t.addAction(self.act("⬇ Descargar de YouTube a MP3…", self.open_ytdl,
                              "Descarga el audio de un enlace de YouTube como MP3 para luego editarlo"))
 
@@ -4904,6 +4918,39 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         dlg.show()
         self._conv = dlg
+
+    def fix_windows_covers(self):
+        paths = self.selected_paths()
+        if not paths:
+            paths = [self.list.item(r).data(PATH_ROLE) for r in range(self.list.count())
+                     if self.list.item(r).data(KIND_ROLE) != "dir"]
+        paths = [p for p in paths if p.lower().endswith(".mp3")]
+        if not paths:
+            QMessageBox.information(self, "Reparar portadas", "No hay MP3 en la selección ni en esta carpeta.")
+            return
+        self.apply_form()
+        self.release_if(paths)
+        ok, errs = 0, []
+        for p in paths:
+            try:
+                f = MP3(p)
+                if f.tags is None:
+                    f.add_tags()
+                for fr in f.tags.values():
+                    if hasattr(fr, "encoding"):
+                        fr.encoding = 1
+                f.save(v2_version=3)
+                ok += 1
+            except Exception as e:
+                errs.append(f"{os.path.basename(p)}: {e}")
+            self.tags_cache.pop(p, None)
+            self.meta.pop(p, None)
+        self.refresh_shell(paths)
+        self.load_folder(self.current_dir, select=self.selected_paths() or None)
+        msg = f"{ok} MP3 reescritos para el Explorador. Pulsa F5 en la carpeta de Windows."
+        self.statusBar().showMessage(msg)
+        if errs:
+            QMessageBox.warning(self, "Reparar portadas", "\n".join(errs))
 
     def open_ytdl(self):
         import ytdl
