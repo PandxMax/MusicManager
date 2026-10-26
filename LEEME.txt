@@ -306,3 +306,8 @@ VERSIÓN 1.39
 VERSIÓN 1.40
 ------------
  - El programa pesa menos: se quitaron archivos internos que no se usaban.
+
+VERSIÓN 1.41
+------------
+ - Nuevo logo: panda con auriculares escuchando música.
+ - Pantalla de carga animada: el panda saca canciones de una carpeta.
