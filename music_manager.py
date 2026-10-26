@@ -75,6 +75,7 @@ def _splash_pump():
 import mutagen
 import i18n
 import icons
+import thumbs
 from i18n import tr as T
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover
@@ -120,7 +121,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.42"
+APP_VERSION = "1.43"
 
 
 class TMenu(QMenu):
@@ -820,6 +821,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.43', [
+        'Más fluido: las portadas de la lista se cargan en segundo plano, así la ventana ya no se traba mientras aparecen.',
+        'Las miniaturas se guardan en caché: volver a una carpeta que ya abriste es casi instantáneo.',
+        'Para no ocupar espacio, cada hora se borran solas las miniaturas que no se usaron en la última hora.',
+    ]),
     ('1.42', [
         'Logo rediseñado con un estilo más profesional: panda con auriculares y ondas de sonido sobre fondo oscuro, en los colores del programa.',
         'La pantalla de carga usa el mismo estilo nuevo.',
@@ -1135,7 +1141,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.42 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.43 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2411,6 +2417,15 @@ class Main(QMainWindow):
         self.cur_paths, self.current_dir = [], ""
         self.gen, self.thumb_queue = 0, []
         self.meta, self.tags_cache = {}, {}
+        # miniaturas en segundo plano + caché en disco (se limpia cada hora)
+        self.thumbs = thumbs.ThumbWorker(THUMB_GEN, inspect_file, read_tags, find_folder_image)
+        self.thumbs.ready.connect(self.on_thumb)
+        self.thumbs.start()
+        self.thumb_clean = QTimer(self)
+        self.thumb_clean.setInterval(3600 * 1000)
+        self.thumb_clean.timeout.connect(self.clean_thumbs)
+        self.thumb_clean.start()
+        QTimer.singleShot(15000, self.clean_thumbs)
         self.suggestions, self.chosen, self.ai_rows = {}, set(), []
         self.protected, self.worker, self.icons_mode = set(), None, True
         self.icon_px = max(40, min(160, int(self.cfg.value("icon_px", THUMB) or THUMB)))
@@ -3236,40 +3251,27 @@ class Main(QMainWindow):
         self.list.overlay.setText("Aquí no hay música todavía.\n\nElige otra carpeta a la izquierda o pega archivos con Ctrl+V.")
         self.list.overlay.setGeometry(self.list.viewport().rect())
         self.list.overlay.setVisible(self.list.count() == 0)
-        gen = self.gen
-        QTimer.singleShot(0, lambda: self.thumb_tick(gen))
+        self.thumbs.request(self.gen, self.thumb_queue)
         self.statusBar().showMessage(f"{path} — {len(files)} canciones")
 
-    def thumb_tick(self, gen):
-        """Carga las portadas poco a poco para no congelar la ventana."""
+    def on_thumb(self, gen, f, img, lyrics, tags):
+        """Llega una miniatura generada (o leída de la caché) en segundo plano."""
+        icon = QIcon(QPixmap.fromImage(img)) if img is not None and not img.isNull() else None
+        self.meta[f] = {"icon": icon, "has_lyrics": bool(lyrics)}
+        if tags and f not in self.tags_cache:
+            self.tags_cache[f] = tags
         if gen != self.gen:
             return
-        if QApplication.mouseButtons() & Qt.MouseButton.LeftButton:  # no estorbes mientras seleccionas o arrastras
-            QTimer.singleShot(200, lambda: self.thumb_tick(gen))
-            return
-        t0 = time.time()
-        index = self.row_index
-        while self.thumb_queue and time.time() - t0 < 0.03:
-            f = self.thumb_queue.pop(0)
-            d = inspect_file(f)
-            if f not in self.tags_cache:
-                self.tags_cache[f] = read_tags(f)
-            data = d["cover"]
-            if data is None:
-                fi = find_folder_image(os.path.dirname(f))
-                if fi:
-                    try:
-                        with open(fi, "rb") as fh:
-                            data = fh.read()
-                    except OSError:
-                        data = None
-            icon = make_icon(data)
-            self.meta[f] = {"icon": icon, "has_lyrics": bool(d["lyrics"].strip())}
-            r = index.get(f)
-            if icon is not None and r is not None:
-                self.list.item(r).setIcon(icon)
-        if self.thumb_queue:
-            QTimer.singleShot(25, lambda: self.thumb_tick(gen))
+        r = self.row_index.get(f)
+        if icon is not None and r is not None and r < self.list.count():
+            it = self.list.item(r)
+            if it is not None and it.data(PATH_ROLE) == f:
+                it.setIcon(icon)
+
+    def clean_thumbs(self):
+        """Borra (en segundo plano) las miniaturas guardadas que no se usaron en la última hora."""
+        import threading
+        threading.Thread(target=thumbs.cleanup, daemon=True).start()
 
     def selected_paths(self):
         return [i.data(PATH_ROLE) for i in self.list.selectedItems() if i.data(KIND_ROLE) != "dir"]
@@ -4917,6 +4919,10 @@ class Main(QMainWindow):
         self.cfg.setValue("split_cols2", self.top_split.saveState())
         if self.player is not None:
             self.player.stop()
+        try:
+            self.thumbs.stop()
+        except Exception:
+            pass
         super().closeEvent(e)
 
     # ------------------------------------------------ Portada: menú de clic derecho

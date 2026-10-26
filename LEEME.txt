@@ -315,3 +315,8 @@ VERSIÓN 1.41
 VERSIÓN 1.42
 ------------
  - Logo y pantalla de carga rediseñados con un estilo más profesional.
+
+VERSIÓN 1.43
+------------
+ - Portadas de la lista en segundo plano: la ventana ya no se traba.
+ - Caché de miniaturas: volver a una carpeta es casi instantáneo; cada hora se borran las que no se usaron.
