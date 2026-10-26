@@ -217,3 +217,8 @@ VERSIÓN 1.22
 ------------
  - Al arrastrar archivos o carpetas ya no sale el signo de "prohibido".
  - La carpeta que queda debajo del cursor se resalta con un recuadro de color mientras arrastras, para soltar encima.
+
+VERSIÓN 1.23
+------------
+ - Comparación: se pueden arrastrar canciones o carpetas de cualquier lugar (explorador de Windows o listas del programa) para añadirlas y compararlas.
+ - Bajo la portada hay botones para buscar la canción en YouTube, Spotify, Tidal, Qobuz y Wikipedia.

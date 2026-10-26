@@ -415,12 +415,52 @@ class SpectrumDialog(QWidget):
         # pestaña 3: análisis
         self.txt = QTextBrowser(); self.tabs.addTab(self.txt, "Análisis")
 
-        self.worker = Worker(paths)
-        self.worker.done.connect(self.on_done)
-        self.worker.fail.connect(self.on_fail)
-        self.worker.finished.connect(lambda: None)
-        self.worker.start()
+        self.setAcceptDrops(True)
+        self.cmp_hint.setText(self.cmp_hint.text() + "\nPuedes arrastrar aquí canciones o carpetas de cualquier lugar para añadirlas.")
+        self._workers, self._offset, self._total = [], 0, len(paths)
         self._finished = 0
+        self._start_worker(paths, 0)
+
+    def _start_worker(self, paths, offset):
+        w = Worker(paths)
+        w.done.connect(lambda i, r, o=offset: self.on_done(i + o, r))
+        w.fail.connect(lambda i, m, o=offset: self.on_fail(i + o, m))
+        self._workers.append(w)
+        w.start()
+
+    # ---- arrastrar canciones de otros lugares para compararlas
+    def dragEnterEvent(self, e):
+        if e.mimeData().hasUrls():
+            e.acceptProposedAction()
+
+    def dragMoveEvent(self, e):
+        if e.mimeData().hasUrls():
+            e.acceptProposedAction()
+
+    def dropEvent(self, e):
+        found = []
+        for u in e.mimeData().urls():
+            p = u.toLocalFile()
+            if os.path.isdir(p):
+                for root, _d, files in os.walk(p):
+                    found += [os.path.join(root, f) for f in sorted(files)]
+            elif p:
+                found.append(p)
+        exts = (".mp3", ".flac", ".m4a", ".mp4", ".aac", ".ogg", ".opus", ".wav", ".wma", ".aiff", ".aif", ".ape", ".alac")
+        new = [p for p in found if p.lower().endswith(exts) and p not in self.paths][:12]
+        e.acceptProposedAction()
+        if not new:
+            return
+        self.add_paths(new)
+
+    def add_paths(self, new):
+        offset = len(self.paths)
+        self.paths = self.paths + new
+        self._total = len(self.paths)
+        self.bar.setRange(0, self._total); self.bar.setValue(self._finished)
+        self.bar.setFormat("Analizando… %v / %m"); self.bar.show()
+        self.tabs.setCurrentIndex(1)
+        self._start_worker(new, offset)
 
     # ---- resultados
     def on_done(self, i, r):
@@ -470,6 +510,11 @@ class SpectrumDialog(QWidget):
 
     def build_compare(self):
         rs = self.ordered()
+        while self.cmp_lay.count() > 1:
+            it = self.cmp_lay.takeAt(1)
+            if it.widget():
+                it.widget().deleteLater()
+        self.curve = None
         self.cmp_hint.setVisible(False)
         if len(rs) < 2:
             self.cmp_hint.setText("Selecciona 2 o más canciones para compararlas."); self.cmp_hint.setVisible(True)
@@ -528,8 +573,10 @@ class SpectrumDialog(QWidget):
             w.grab().save(fn, "PNG")
 
     def shutdown(self):
-        self.worker._stop = True
-        self.worker.wait(3000)
+        for w in self._workers:
+            w._stop = True
+        for w in self._workers:
+            w.wait(3000)
 
     def closeEvent(self, e):
         self.shutdown()

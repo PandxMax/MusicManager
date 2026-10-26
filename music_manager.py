@@ -50,7 +50,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.22"
+APP_VERSION = "1.23"
 
 
 class TMenu(QMenu):
@@ -709,6 +709,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.23', [
+        'Comparación: ahora puedes arrastrar canciones o carpetas de cualquier lugar (del explorador de Windows o de las listas del programa) para añadirlas y compararlas.',
+        'Debajo de la portada hay botones para buscar la canción en YouTube, Spotify, Tidal, Qobuz y Wikipedia.',
+    ]),
     ('1.22', [
         'Al arrastrar archivos o carpetas ya no aparece el signo de «prohibido», y la carpeta que tienes debajo se resalta para soltar encima.',
     ]),
@@ -945,7 +949,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.22 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.23 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2429,6 +2433,21 @@ class Main(QMainWindow):
         cvw.setContentsMargins(4, 0, 0, 0)
         cvw.setSpacing(0)
         cvw.addWidget(cover_box)
+        web_w = QWidget()
+        web_l = FlowLayout(web_w, 6, 6)
+        web_l.setContentsMargins(6, 8, 6, 0)
+        for kind, label, tip in (("youtube", "▶ YouTube", "Buscar esta canción en YouTube"),
+                                 ("spotify", "🟢 Spotify", "Buscar esta canción en Spotify"),
+                                 ("tidal", "🌊 Tidal", "Buscar esta canción en Tidal"),
+                                 ("qobuz", "🎧 Qobuz", "Buscar esta canción en Qobuz"),
+                                 ("wiki", "📖 Wikipedia", "Buscar esta canción o artista en Wikipedia")):
+            wb = QPushButton(label)
+            wb.setObjectName("tabbtn")
+            wb.setCursor(Qt.CursorShape.PointingHandCursor)
+            wb.setToolTip(tip)
+            wb.clicked.connect(lambda _=False, k=kind: self.web_song(k))
+            web_l.addWidget(wb)
+        cvw.addWidget(web_w)
         cvw.addStretch(1)
         coverw.setMinimumWidth(330)
         self.cover_col = coverw
@@ -4752,6 +4771,18 @@ class Main(QMainWindow):
             url = "https://open.spotify.com/search/" + quote(name)
         QDesktopServices.openUrl(QUrl(url))
         self.statusBar().showMessage(f"Abriendo «{name}» en el navegador…")
+
+    def web_song(self, kind):
+        p = self.current_path()
+        if not p:
+            self.statusBar().showMessage("Selecciona una canción primero.")
+            return
+        artist, title = self.val(p, "artist"), self.val(p, "title")
+        title = title or os.path.splitext(os.path.basename(p))[0]
+        if kind == "wiki":
+            self.web_artist("wiki", artist or title)
+        else:
+            self.web_artist(kind, f"{artist} {title}".strip())
 
     def add_person_actions(self, m, name):
         name = (name or "").strip()
