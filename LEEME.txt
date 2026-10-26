@@ -324,3 +324,8 @@ VERSIÓN 1.43
 VERSIÓN 1.44
 ------------
  - Se quitó la pantalla de carga del panda: el programa se abre directamente.
+
+VERSIÓN 1.45
+------------
+ - Rellenar con IA ahora completa todos los campos (incluidos compositor, pista, disco y comentario).
+ - Álbum, año, pista y disco se toman del catálogo de iTunes/Deezer; la IA completa el resto.

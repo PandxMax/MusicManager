@@ -69,7 +69,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.44"
+APP_VERSION = "1.45"
 
 
 class TMenu(QMenu):
@@ -769,6 +769,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.45', [
+        '«Rellenar con IA» ahora rellena todos los campos: título, intérprete, álbum, intérprete del álbum, compositor, género, año, pista, número de disco y comentario (sello, productor…).',
+        'Antes de preguntar a la IA busca la canción en iTunes y Deezer, así el álbum, el año, la pista y el disco salen del catálogo real y no adivinados.',
+        'Corregido: la pista y el número de disco a veces no se rellenaban.',
+    ]),
     ('1.44', [
         'Se quitó la pantalla de carga del panda: el programa se abre directamente.',
     ]),
@@ -1092,7 +1097,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.44 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.45 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1952,23 +1957,116 @@ class MetaAIWorker(AIBase):
         super().__init__(provider, model, key)
         self.title, self.artist = title, artist
 
+    @staticmethod
+    def _norm(t):
+        t = re.sub(r"\(.*?\)|\[.*?\]|feat\..*|ft\..*", " ", (t or "").lower())
+        return re.sub(r"[^0-9a-záéíóúñü]+", " ", t).strip()
+
+    def _get(self, url):
+        req = urllib.request.Request(url, headers={"User-Agent": "MusicManager (https://github.com/PandxMax/MusicManager)"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read().decode("utf-8"))
+
+    def catalog(self):
+        """Datos reales del catálogo de iTunes (y Deezer de respaldo): álbum, año, pista, disco, género."""
+        t, a = self._norm(self.title), self._norm(self.artist)
+        out = {}
+        try:
+            d = self._get("https://itunes.apple.com/search?entity=song&limit=25&term="
+                          + quote_plus(f"{self.artist} {self.title}".strip()))
+            best, best_sc, years = None, 0, []
+            for r in d.get("results", []):
+                rt, ra = self._norm(r.get("trackName")), self._norm(r.get("artistName"))
+                sc = (3 if rt == t else 2 if t and (t in rt or rt in t) else 0)
+                sc += (3 if a and (a in ra or ra in a) else 0 if a else 1)
+                coll = r.get("collectionName") or ""
+                if sc >= 3 and not coll.endswith((" - Single", " - EP")):
+                    sc += 1   # mejor el álbum original que el sencillo
+                if sc >= 4 and (r.get("releaseDate") or "")[:4].isdigit():
+                    years.append(r["releaseDate"][:4])   # año del primer lanzamiento (sencillo o álbum)
+                if sc > best_sc:
+                    best, best_sc = r, sc
+            if best and best_sc >= 4:
+                coll = re.sub(r" - (Single|EP)$", "", best.get("collectionName") or "")
+                out = {"title": best.get("trackName", ""), "artist": best.get("artistName", ""),
+                       "album": coll, "albumartist": best.get("collectionArtistName") or best.get("artistName", ""),
+                       "genre": best.get("primaryGenreName", ""), "date": min(years) if years else (best.get("releaseDate") or "")[:4],
+                       "tracknumber": str(best.get("trackNumber") or ""), "discnumber": str(best.get("discNumber") or "")}
+        except Exception:
+            pass
+        if not out.get("album"):
+            try:
+                q = quote_plus(f'artist:"{self.artist}" track:"{self.title}"' if self.artist else self.title)
+                d = self._get(f"https://api.deezer.com/search?q={q}&limit=5")
+                hit = (d.get("data") or [None])[0]
+                if hit:
+                    tr = self._get(f"https://api.deezer.com/track/{hit['id']}")
+                    out.update({k: v for k, v in {
+                        "title": tr.get("title", ""), "artist": (tr.get("artist") or {}).get("name", ""),
+                        "album": (tr.get("album") or {}).get("title", ""),
+                        "albumartist": (tr.get("artist") or {}).get("name", ""),
+                        "date": (tr.get("release_date") or "")[:4],
+                        "tracknumber": str(tr.get("track_position") or ""),
+                        "discnumber": str(tr.get("disk_number") or "")}.items() if v and not out.get(k)})
+            except Exception:
+                pass
+        return {k: v for k, v in out.items() if v}
+
     def run(self):
+        found = self.catalog()
         system = ("Eres un asistente experto en metadatos musicales. Respondes SOLO con un objeto JSON válido, sin texto "
-                  "extra ni bloques de código. Si no estás seguro de un dato, déjalo como cadena vacía: nunca inventes.")
+                  "extra ni bloques de código. Tu trabajo es RELLENAR TODOS LOS CAMPOS con los datos oficiales de la "
+                  "canción. Solo deja un campo vacío si ese dato de verdad no existe o no lo conoces en absoluto.")
+        known = json.dumps(found, ensure_ascii=False) if found else "ninguno"
         prompt = (f"Canción: «{self.title}». Artista: «{self.artist}».\n"
-                  "Devuelve el JSON con estas claves exactas: title (título oficial), artist, album (álbum del lanzamiento "
-                  "original), albumartist, composer, genre (género y subgénero principal, ej. «Rock alternativo»), "
-                  "date (año de lanzamiento, 4 dígitos), tracknumber (número de pista en el álbum), discnumber. "
-                  "Todos los valores son texto.")
+                  f"Datos ya comprobados en el catálogo de iTunes/Deezer (respétalos): {known}\n\n"
+                  "Devuelve el JSON con TODAS estas claves (todos los valores como texto):\n"
+                  "- title: título oficial\n- artist: intérprete principal (con «feat.» si corresponde)\n"
+                  "- album: álbum original donde salió (si solo fue sencillo, el nombre del sencillo)\n"
+                  "- albumartist: intérprete del álbum (normalmente el mismo artista; «Varios artistas» si es recopilatorio)\n"
+                  "- composer: compositores/autores de la canción, separados por «; »\n"
+                  "- genre: género principal y, si aplica, subgénero (ej. «Reguetón», «Rock alternativo», «Pop latino»)\n"
+                  "- date: año de lanzamiento (4 dígitos)\n- tracknumber: número de pista en ese álbum (1 si es sencillo)\n"
+                  "- discnumber: número de disco (1 si el álbum tiene un solo disco)\n"
+                  "- comment: una nota breve y útil, por ejemplo «Sello: Sony Music · Productor: Tainy» (sin opiniones)")
+        ai, err = {}, None
         try:
             txt = self.chat([{"role": "user", "content": prompt}], system)
             m = re.search(r"\{.*\}", txt, re.S)
-            data = json.loads(m.group(0)) if m else {}
-            self.result.emit({k: str(v).strip() for k, v in data.items() if k in EASY_KEYS and v not in (None, "")})
+            raw = json.loads(m.group(0)) if m else {}
+            alias = {"track": "tracknumber", "disc": "discnumber", "year": "date", "album_artist": "albumartist",
+                     "comments": "comment"}
+            for k, v in raw.items():
+                k = alias.get(k, k)
+                if k in EASY_KEYS and v not in (None, "") and str(v).strip().lower() not in ("desconocido", "unknown", "n/a"):
+                    ai[k] = str(v).strip()
         except urllib.error.HTTPError as e:
-            self.failed.emit(self.error_text(e))
+            err = self.error_text(e)
         except Exception as e:
-            self.failed.emit(f"No pude leer la respuesta de la IA: {e}")
+            err = f"No pude leer la respuesta de la IA: {e}"
+        # lo comprobado en el catálogo manda en los datos objetivos; la IA completa el resto
+        data = dict(ai)
+        for k in ("title", "artist", "album", "albumartist", "date", "tracknumber", "discnumber"):
+            if found.get(k):
+                data[k] = found[k]
+        if not data.get("genre") and found.get("genre"):
+            data["genre"] = found["genre"]
+        if data.get("artist") and not data.get("albumartist"):
+            data["albumartist"] = data["artist"]
+        if data.get("album") and not data.get("discnumber"):
+            data["discnumber"] = "1"
+        m = re.match(r"\d{4}", data.get("date", ""))
+        if data.get("date") and m:
+            data["date"] = m.group(0)
+        for k in ("tracknumber", "discnumber"):
+            m = re.match(r"\d+", data.get(k, ""))
+            if data.get(k):
+                data[k] = m.group(0) if m else ""
+        data = {k: v for k, v in data.items() if v}
+        if not data and err:
+            self.failed.emit(err)
+        else:
+            self.result.emit(data)
 
 
 class MetaAIDialog(QDialog):
@@ -2026,7 +2124,7 @@ class MetaAIDialog(QDialog):
             self.status.setText("Escribe el nombre de la canción.")
             return
         self.go.setEnabled(False)
-        self.status.setText("Buscando con la IA…")
+        self.status.setText("Buscando en iTunes/Deezer y con la IA…")
         prov, model, key = self.settings
         self.worker = MetaAIWorker(prov, model, key, t, a)
         self.worker.result.connect(self.on_result)
