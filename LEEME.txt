@@ -252,3 +252,8 @@ VERSIÓN 1.29
 ------------
  - Se quitó "Reparar portadas": basta con guardar; los MP3 siempre se escriben en el formato que entiende el Explorador de Windows.
  - Portadas FLAC con sus medidas para que Windows las muestre como miniatura.
+
+VERSIÓN 1.30
+------------
+ - Metadatos: campos pegados a las etiquetas técnicas; el espacio sobrante queda abajo.
+ - El botón Guardar está al costado derecho de la portada (solo aparece si hay cambios).

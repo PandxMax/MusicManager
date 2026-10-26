@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.29"
+APP_VERSION = "1.30"
 
 
 class TMenu(QMenu):
@@ -740,6 +740,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.30', [
+        'Metadatos: los campos quedan pegados a las etiquetas técnicas (sin hueco en medio); el espacio sobrante queda abajo.',
+        'El botón «Guardar» ahora está al costado derecho de la portada (aparece solo cuando hay cambios).',
+    ]),
     ('1.29', [
         'Se quitó «Reparar portadas»: ahora basta con guardar. Cada vez que guardas un MP3 queda en el formato que el Explorador de Windows entiende.',
         'Las portadas en FLAC se guardan con sus medidas (ancho, alto y profundidad) para que Windows las muestre como miniatura.',
@@ -1004,7 +1008,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.29 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.30 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2301,6 +2305,7 @@ class Main(QMainWindow):
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
+        grid.setRowStretch(8, 1)          # el espacio que sobra va abajo, no entre las etiquetas y los campos
 
         # ---------- letra (oculta; se muestra con el botón «📝 Letra»)
         self.lyr_box = QGroupBox("Letra")
@@ -2380,12 +2385,19 @@ class Main(QMainWindow):
         self.cover_lbl.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cover_lbl.customContextMenuRequested.connect(self.cover_menu)
         self.cover_lbl.setToolTip("Clic derecho: cambiar, quitar, copiar, pegar, guardar o redimensionar")
-        self.save_btn = QPushButton("💾 Guardar")
+        self.save_btn = QPushButton("💾")
         self.save_btn.setObjectName("accent")
-        self.save_btn.setToolTip("Hay cambios sin guardar en este archivo: escribe los cambios (Ctrl+S)")
+        self.save_btn.setFixedSize(32, 32)
+        self.save_btn.setToolTip("Hay cambios sin guardar: guardar (Ctrl+S)")
         self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.save_btn.clicked.connect(self.save_all)
+        sp = self.save_btn.sizePolicy()
+        sp.setRetainSizeWhenHidden(True)   # que no se mueva nada al aparecer
+        self.save_btn.setSizePolicy(sp)
         self.save_btn.hide()
+        right = QVBoxLayout()
+        right.addWidget(self.save_btn)
+        right.addStretch(1)
         ch = QHBoxLayout()
         ch.setSpacing(8)
         left = QVBoxLayout()
@@ -2412,10 +2424,10 @@ class Main(QMainWindow):
         ch.addStretch(1)
         ch.addLayout(left)
         ch.addWidget(self.cover_lbl)
+        ch.addLayout(right)
         ch.addStretch(1)
         cv.setContentsMargins(6, 4, 6, 4)
         cv.setSpacing(3)
-        cv.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         cv.addLayout(ch)
         cv.addWidget(self.info_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
         self.status_lbl.hide()
