@@ -166,3 +166,9 @@ VERSIÓN 1.14
    de ancho aunque la pantalla fuera menor y se cortaban los lados). Se ajusta y se mete en pantalla al abrir.
  - La fila de datos técnicos + botones (Espectro, MusicBrainz, Discogs) salta de línea si no cabe.
  - Si la ventana es muy pequeña, aparecen barras de desplazamiento en vez de cortar el contenido.
+
+VERSIÓN 1.15
+------------
+ - Datos técnicos más ordenados: chips a la izquierda (saltan de línea solos) y los botones Espectro /
+   MusicBrainz / Discogs siempre agrupados a la derecha, sin partirse.
+ - Panel de la portada más compacto: botones de 32 px, menos espacio vacío y columna derecha más angosta.

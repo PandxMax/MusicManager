@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.14"
+APP_VERSION = "1.15"
 
 
 class TMenu(QMenu):
@@ -343,7 +343,7 @@ QToolBar QToolButton:checked { background: @accent; color: white; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
-QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 8px; font-size: 11px; }
+QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 7px; font-size: 11px; }
 QPushButton#tabbtn { border-radius: 10px; padding: 7px 10px; }
 QFrame#plpanel { background: @window; border: 1px solid @border; border-radius: 14px; }
 QFrame#npcard { background: @surface2; border: 1px solid @border; border-radius: 12px; }
@@ -357,7 +357,7 @@ QListWidget#pl { background: transparent; border: none; outline: none; }
 QListWidget#pl::item { background: @surface; border: 1px solid @border; border-radius: 8px; padding: 4px 8px; margin: 1px 2px; }
 QListWidget#pl::item:selected { background: @accent_soft; border-color: @accent; color: @text; }
 QPushButton#tabbtn:checked { background: @accent; color: white; border-color: @accent; font-weight: 600; }
-QPushButton#chipbtn { background: @accent_soft; border: 1px solid @accent; border-radius: 10px; padding: 2px 10px; font-size: 11px; }
+QPushButton#chipbtn { background: @accent_soft; border: 1px solid @accent; border-radius: 10px; padding: 2px 8px; font-size: 11px; }
 QPushButton#chipbtn:hover { background: @accent; color: white; }
 QPushButton#iconbtn { background: @surface2; border: 1px solid @border; border-radius: 10px; font-size: 16px; padding: 0; }
 QPushButton#iconbtn:hover { border-color: @accent; background: @accent_soft; }
@@ -707,6 +707,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.15', [
+        'Datos técnicos más ordenados: las etiquetas a la izquierda y los botones Espectro / MusicBrainz / Discogs siempre juntos a la derecha.',
+        'Panel de portada más compacto: botones más pequeños, menos espacio vacío y la columna derecha un poco más angosta.',
+    ]),
     ('1.14', [
         'Corregido: la ventana ya no se sale de la pantalla ni se corta por los lados (se ajusta al tamaño de tu pantalla al abrir).',
         'La fila de datos técnicos y los botones (Espectro, MusicBrainz, Discogs) pasa a otra línea cuando no cabe, en vez de ensanchar la ventana.',
@@ -911,7 +915,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.14 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.15 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2091,28 +2095,38 @@ class Main(QMainWindow):
         # información técnica: etiquetas de solo lectura (chips) en la cabecera del cuadro
         self.tech = {}
         self.tech_bar = QWidget()
-        tbl = FlowLayout(self.tech_bar, 4, 4)
-        tbl.setContentsMargins(0, 0, 0, 4)
+        tb_l = QHBoxLayout(self.tech_bar)
+        tb_l.setContentsMargins(0, 0, 0, 4)
+        tb_l.setSpacing(8)
+        chips_w = QWidget()
+        tbl = FlowLayout(chips_w, 4, 4)
+        tbl.setContentsMargins(0, 0, 0, 0)
         for k in ("codec", "bitrate", "freq", "dur", "mode", "size"):
             chip = QLabel("")
             chip.setObjectName("chip")
             chip.hide()
             self.tech[k] = chip
             tbl.addWidget(chip)
+        tb_l.addWidget(chips_w, 1, Qt.AlignmentFlag.AlignTop)
+        btns_w = QWidget()
+        btl = QHBoxLayout(btns_w)
+        btl.setContentsMargins(0, 0, 0, 0)
+        btl.setSpacing(4)
         self.btn_spec = QPushButton("📊 Espectro")
-        self.btn_spec.setObjectName("chipbtn")
-        self.btn_spec.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_spec.setToolTip("Espectrograma y análisis de calidad de las canciones seleccionadas")
         self.btn_spec.clicked.connect(self.open_spectrum)
-        tbl.addWidget(self.btn_spec)
+        btl.addWidget(self.btn_spec)
         for src, text, tip in (("musicbrainz", "🎼 MusicBrainz", "Buscar las etiquetas de esta canción en MusicBrainz (gratis)"),
                                ("discogs", "💿 Discogs", "Buscar las etiquetas de esta canción en Discogs (necesita tu token)")):
-            b = QPushButton(text)
-            b.setObjectName("chipbtn")
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setToolTip(tip)
-            b.clicked.connect(lambda _=False, s_=src: self.open_tag_source(s_))
-            tbl.addWidget(b)
+            b_ = QPushButton(text)
+            b_.setToolTip(tip)
+            b_.clicked.connect(lambda _=False, s_=src: self.open_tag_source(s_))
+            btl.addWidget(b_)
+        for i in range(btl.count()):
+            w_ = btl.itemAt(i).widget()
+            w_.setObjectName("chipbtn")
+            w_.setCursor(Qt.CursorShape.PointingHandCursor)
+        tb_l.addWidget(btns_w, 0, Qt.AlignmentFlag.AlignTop)
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
@@ -2178,7 +2192,7 @@ class Main(QMainWindow):
 
         # ---------- columna derecha: portada + IA
         cover_box = QGroupBox()
-        cover_box.setStyleSheet("QGroupBox { margin-top: 0px; padding-top: 10px; }")
+        cover_box.setStyleSheet("QGroupBox { margin-top: 0px; padding: 6px 4px 4px 4px; }")
         cv = QVBoxLayout(cover_box)
         self.cover_lbl = QLabel("Selecciona una canción")
         self.cover_lbl.setObjectName("cover")
@@ -2192,14 +2206,14 @@ class Main(QMainWindow):
         self.cover_lbl.customContextMenuRequested.connect(self.cover_menu)
         self.cover_lbl.setToolTip("Clic derecho: cambiar, quitar, copiar, pegar, guardar o redimensionar")
         ch = QHBoxLayout()
-        ch.setSpacing(10)
+        ch.setSpacing(8)
         left = QVBoxLayout()
-        left.setSpacing(6)
+        left.setSpacing(4)
         for text, tip, fn in (("🖼", "Cambiar portada…", self.set_cover), ("✨", "Buscar portada automáticamente (alta calidad)", self.auto_cover), ("💾", "Guardar portada como imagen…", self.save_cover_as),
                               ("🗑", "Quitar portada", self.remove_cover), ("🔍", "Ver la portada en grande", self.view_cover)):
             b = QPushButton(text)
             b.setObjectName("iconbtn")
-            b.setFixedSize(38, 38)
+            b.setFixedSize(32, 32)
             b.setToolTip(tip)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.clicked.connect(lambda _=False, f=fn: f())
@@ -2218,6 +2232,8 @@ class Main(QMainWindow):
         ch.addLayout(left)
         ch.addWidget(self.cover_lbl)
         ch.addStretch(1)
+        cv.setContentsMargins(6, 4, 6, 4)
+        cv.setSpacing(3)
         cv.addLayout(ch)
         cv.addWidget(self.info_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
         self.status_lbl.hide()
@@ -2263,6 +2279,7 @@ class Main(QMainWindow):
         self.rightw_w = rightw
         rv = QVBoxLayout(rightw)
         rv.setContentsMargins(4, 0, 0, 0)
+        rv.setSpacing(4)
         rv.addWidget(cover_box)        # fija: no se mueve
         tabs_row = QHBoxLayout()
         tabs_row.setSpacing(6)
@@ -2281,7 +2298,7 @@ class Main(QMainWindow):
         self.right_stack.addWidget(self.lyr_box)  # 1: letra
         rv.addLayout(tabs_row)
         rv.addWidget(self.right_stack, 1)
-        rightw.setMinimumWidth(360)
+        rightw.setMinimumWidth(330)
 
         main = QSplitter()
         main.addWidget(self.left_split)
@@ -2291,7 +2308,7 @@ class Main(QMainWindow):
         self.left_split.setMinimumWidth(210)
         for i in range(3):
             main.setCollapsible(i, False)
-        main.setSizes([290, 860, 370])
+        main.setSizes([280, 900, 330])
         self.main_split, self.mid_split = main, middle
         for sp in (main, middle, self.left_split):
             self.style_splitter(sp)
