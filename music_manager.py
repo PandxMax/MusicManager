@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.16"
+APP_VERSION = "1.17"
 
 
 class TMenu(QMenu):
@@ -707,6 +707,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.17', [
+        'Los botones Espectro, MusicBrainz y Discogs pasaron a la derecha de la barra de la lista.',
+        'Los botones del reproductor (lista, anterior, siguiente y detener) ahora están dibujados con el color del programa y cambian junto con el botón de reproducir.',
+    ]),
     ('1.16', [
         'Los botones Espectro, MusicBrainz y Discogs ahora están arriba, a la izquierda, junto a las flechas de navegación; ya no ocupan lugar en los metadatos.',
     ]),
@@ -918,7 +922,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.16 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.17 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1504,6 +1508,48 @@ class PlayButton(QPushButton):
         else:
             p.drawPolygon(QPolygonF([QPointF(c.x() - 4, c.y() - 7), QPointF(c.x() - 4, c.y() + 7),
                                      QPointF(c.x() + 7, c.y())]))
+
+
+class GlyphButton(QPushButton):
+    """Botones del reproductor dibujados a mano (anterior, siguiente, detener, lista) con el color del programa,
+    para que cambien junto con el botón de reproducir."""
+    def __init__(self, kind, size=30):
+        super().__init__()
+        self.kind = kind
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setFlat(True)
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        base = self.palette().color(QPalette.ColorRole.Highlight)
+        full = QRectF(self.rect())
+        on = self.isEnabled()
+        if self.underMouse() and on:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(base.red(), base.green(), base.blue(), 70))
+            p.drawEllipse(full)
+        col = base.lighter(125) if on else QColor(120, 120, 130)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(col)
+        c = full.center()
+        if self.isDown():
+            c = QPointF(c.x() + 0.8, c.y() + 0.8)
+        x, y = c.x(), c.y()
+        k = self.kind
+        if k == "prev":
+            p.drawRoundedRect(QRectF(x - 7, y - 6, 2.6, 12), 1, 1)
+            p.drawPolygon(QPolygonF([QPointF(x + 7, y - 6.5), QPointF(x + 7, y + 6.5), QPointF(x - 3.5, y)]))
+        elif k == "next":
+            p.drawRoundedRect(QRectF(x + 4.4, y - 6, 2.6, 12), 1, 1)
+            p.drawPolygon(QPolygonF([QPointF(x - 7, y - 6.5), QPointF(x - 7, y + 6.5), QPointF(x + 3.5, y)]))
+        elif k == "stop":
+            p.drawRoundedRect(QRectF(x - 5.5, y - 5.5, 11, 11), 2, 2)
+        else:   # lista
+            for dy in (-5, 0, 5):
+                p.drawRoundedRect(QRectF(x - 7, y + dy - 1.3, 14, 2.6), 1.3, 1.3)
 
 
 class FolderTree(QTreeWidget):
@@ -2160,6 +2206,10 @@ class Main(QMainWindow):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.clicked.connect(fn)
             navbar.addWidget(b)
+        self.path_lbl = QLabel("")
+        self.path_lbl.setObjectName("hint")
+        self.path_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        navbar.addWidget(self.path_lbl, 1)
         navbar.addSpacing(8)
         self.btn_spec = None
         for src, text, tip in (("spec", "📊 Espectro", "Espectrograma y análisis de calidad de las canciones seleccionadas"),
@@ -2176,10 +2226,6 @@ class Main(QMainWindow):
                 b_.clicked.connect(lambda _=False, s_=src: self.open_tag_source(s_))
             navbar.addWidget(b_)
         navbar.addSpacing(8)
-        self.path_lbl = QLabel("")
-        self.path_lbl.setObjectName("hint")
-        self.path_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        navbar.addWidget(self.path_lbl, 1)
         lpv.addLayout(navbar)
         lpv.addWidget(self.list, 1)
         middle.addWidget(self.list_pane)
@@ -2757,12 +2803,10 @@ class Main(QMainWindow):
         infow = QWidget()
         infow.setLayout(info)
         infow.setFixedWidth(245)
-        self.btn_prev, self.btn_play = QPushButton("⏮"), PlayButton()
-        self.btn_stop, self.btn_next = QPushButton("⏹"), QPushButton("⏭")
+        self.btn_prev, self.btn_play = GlyphButton("prev"), PlayButton()
+        self.btn_stop, self.btn_next = GlyphButton("stop"), GlyphButton("next")
         for b, tip in ((self.btn_prev, "Anterior"), (self.btn_play, "Reproducir / pausa (Espacio)"),
                        (self.btn_stop, "Detener"), (self.btn_next, "Siguiente")):
-            if b is not self.btn_play:
-                b.setObjectName("tbtn")
             b.setToolTip(tip)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
         self.seek = ClickSlider(Qt.Orientation.Horizontal)
@@ -2782,8 +2826,7 @@ class Main(QMainWindow):
         for w in (self.now_cover, infow):
             w.setParent(bar)   # siguen existiendo para el resto del código, pero ocultos
             w.hide()
-        self.btn_list = QPushButton("☰")
-        self.btn_list.setObjectName("tbtn")
+        self.btn_list = GlyphButton("list")
         self.btn_list.setToolTip("Lista de reproducción")
         self.btn_list.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_list.clicked.connect(self.show_playlist)
