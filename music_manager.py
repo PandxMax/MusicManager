@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.32"
+APP_VERSION = "1.33"
 
 
 class TMenu(QMenu):
@@ -740,6 +740,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.33', [
+        'Portada: la etiqueta con formato y tamaño (JPEG · 600×600 px · 93 KB) ya no se pega ni tapa la imagen; tiene su propio espacio debajo.',
+        'Vuelve «Herramientas → Descargar de YouTube a MP3» (se había quitado por error en la 1.29).',
+        'Árboles de carpetas: al mover archivos o carpetas ya no se abre solo el 2.º árbol ni aparece la fila «…»; cada árbol conserva exactamente lo que tenías abierto.',
+    ]),
     ('1.32', [
         'En «Acerca de» ahora aparece el creador: PandxMax.',
     ]),
@@ -1015,7 +1020,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.32 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.33 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1737,7 +1742,9 @@ class FolderTree(QTreeWidget):
 
     def add_placeholder(self, item):
         if has_subdirs(item.data(0, PATH_ROLE)):
-            item.addChild(QTreeWidgetItem(["…"]))
+            ph = QTreeWidgetItem(["…"])
+            ph.setFlags(Qt.ItemFlag.ItemIsEnabled)   # no se puede seleccionar ni marcar
+            item.addChild(ph)
 
     def build(self, entries):
         self.clear()
@@ -1785,6 +1792,10 @@ class FolderTree(QTreeWidget):
             if it.data(0, PATH_ROLE) == curp:
                 self.setCurrentItem(it)
                 break
+        for it in self.all_items():          # al seleccionar, Qt abre las carpetas padre: deja cada una como estaba
+            p = it.data(0, PATH_ROLE)
+            if p is not None and it.isExpanded() != (p in exp) and it.childCount():
+                it.setExpanded(p in exp)
         self.blockSignals(False)
 
     def reveal(self, path):
@@ -2430,6 +2441,11 @@ class Main(QMainWindow):
         cv.setContentsMargins(6, 4, 6, 4)
         cv.setSpacing(3)
         cv.addLayout(ch)
+        cv.addSpacing(8)
+        self.info_lbl.setFixedHeight(24)
+        sp_i = self.info_lbl.sizePolicy()
+        sp_i.setRetainSizeWhenHidden(True)      # su sitio queda reservado: la portada no se mueve ni se tapa
+        self.info_lbl.setSizePolicy(sp_i)
         cv.addWidget(self.info_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
         self.status_lbl.hide()
         cover_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
@@ -4886,6 +4902,8 @@ class Main(QMainWindow):
                              "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
         t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
+        t.addAction(self.act("⬇ Descargar de YouTube a MP3…", self.open_ytdl,
+                             "Descarga el audio de un enlace de YouTube como MP3 para luego editarlo"))
 
         fs = mb.addMenu("&Fuente de etiquetas")
         fs.addAction(self.act("🎼 Buscar en MusicBrainz…", lambda: self.open_tag_source("musicbrainz")))

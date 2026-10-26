@@ -266,3 +266,9 @@ VERSIÓN 1.31
 VERSIÓN 1.32
 ------------
  - En "Acerca de" aparece el creador: PandxMax.
+
+VERSIÓN 1.33
+------------
+ - La etiqueta con formato y tamaño de la portada tiene su propio espacio y no tapa la imagen.
+ - Vuelve Herramientas -> Descargar de YouTube a MP3.
+ - Los árboles de carpetas ya no se abren solos ni muestran la fila "..." al mover archivos.
