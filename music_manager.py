@@ -44,7 +44,24 @@ from i18n import tr as T
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import USLT, APIC, SYLT
+from mutagen.id3 import USLT, APIC, SYLT, COMM
+from mutagen.easyid3 import EasyID3
+
+
+def _comm_get(id3, key):
+    return [t for fr in id3.getall("COMM") for t in fr.text]
+
+
+def _comm_set(id3, key, value):
+    id3.delall("COMM")
+    id3.add(COMM(encoding=1, lang="eng", desc="", text=list(value)))
+
+
+def _comm_del(id3, key):
+    id3.delall("COMM")
+
+
+EasyID3.RegisterKey("comment", _comm_get, _comm_set, _comm_del)   # el comentario de los MP3 (COMM)
 
 try:
     from send2trash import send2trash
@@ -58,16 +75,16 @@ except ImportError:
     HAS_AUDIO = False
 
 AUDIO_EXT = {".mp3", ".flac", ".ogg", ".oga", ".opus", ".m4a", ".mp4"}
-FIELDS = [("title", "Título"), ("artist", "Artista"), ("album", "Álbum"),
-          ("albumartist", "Artista del álbum"), ("composer", "Compositor"),
+FIELDS = [("title", "Título"), ("artist", "Intérprete"), ("album", "Álbum"),
+          ("albumartist", "Intérprete del álbum"), ("composer", "Compositor"),
           ("genre", "Género"), ("date", "Año"), ("tracknumber", "Pista"),
-          ("discnumber", "Disco"), ("bpm", "BPM")]
+          ("discnumber", "Número de disco"), ("comment", "Comentario")]
 EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.35"
+APP_VERSION = "1.36"
 
 
 class TMenu(QMenu):
@@ -759,6 +776,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.36', [
+        'Metadatos: ahora son los mismos que ves en las propiedades de Windows: Título, Intérprete, Álbum, Intérprete del álbum, Compositor, Género, Año, Pista, Número de disco y Comentario, más el Directorio (solo lectura). Se quitó BPM.',
+    ]),
     ('1.35', [
         'Datos técnicos: ahora también se ve la etiqueta que usa el archivo (ID3v2.3, ID3v2.4, Vorbis Comment, MP4…) y el codec con detalle (por ejemplo «MPEG-1 Layer III · LAME 3.100» o «AAC-LC»).',
     ]),
@@ -1045,7 +1065,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.35 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.36 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1882,7 +1902,7 @@ class MetaAIWorker(AIBase):
         prompt = (f"Canción: «{self.title}». Artista: «{self.artist}».\n"
                   "Devuelve el JSON con estas claves exactas: title (título oficial), artist, album (álbum del lanzamiento "
                   "original), albumartist, composer, genre (género y subgénero principal, ej. «Rock alternativo»), "
-                  "date (año de lanzamiento, 4 dígitos), tracknumber (número de pista en el álbum), discnumber, bpm. "
+                  "date (año de lanzamiento, 4 dígitos), tracknumber (número de pista en el álbum), discnumber. "
                   "Todos los valores son texto.")
         try:
             txt = self.chat([{"role": "user", "content": prompt}], system)
@@ -2466,6 +2486,13 @@ class Main(QMainWindow):
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
+        self.dir_le = QLineEdit()
+        self.dir_le.setReadOnly(True)
+        self.dir_le.setPlaceholderText("-")
+        dl = QLabel("Directorio")
+        self.field_widgets["dir"] = (dl, self.dir_le)
+        grid.addWidget(dl, 6, 0)
+        grid.addWidget(self.dir_le, 6, 1, 1, 3)
         self.btn_ai_meta = QPushButton("✨ Rellenar metadatos con IA…")
         self.btn_ai_meta.setToolTip("Escribe el nombre y el artista y la IA busca y rellena los datos")
         self.btn_ai_meta.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3863,6 +3890,9 @@ class Main(QMainWindow):
             le.setPlaceholderText("‹varios valores›" if multi else ("" if paths else "-"))
             le.setEnabled(bool(paths))
         self.fill_tech(paths)
+        dirs = {os.path.dirname(p) for p in paths}
+        self.dir_le.setText(next(iter(dirs)) if len(dirs) == 1 else ("‹varios›" if dirs else ""))
+        self.dir_le.setCursorPosition(0)
         self.show_current(self.current_path(), len(paths))
         self.update_suggestions()
 
