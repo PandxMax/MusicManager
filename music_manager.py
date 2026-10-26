@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.31"
+APP_VERSION = "1.32"
 
 
 class TMenu(QMenu):
@@ -740,6 +740,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.32', [
+        'En «Acerca de» ahora aparece el creador: PandxMax.',
+    ]),
     ('1.31', [
         'Metadatos: las etiquetas técnicas (formato, bitrate, frecuencia, duración, modo, tamaño) se ven siempre, también sin canción seleccionada, así nada salta de sitio.',
         'El botón «Guardar» ahora está en la cabecera de los metadatos (arriba a la derecha) y solo se activa cuando hay cambios.',
@@ -1012,7 +1015,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.31 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.32 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5483,9 +5486,11 @@ class Main(QMainWindow):
         top.addWidget(pm)
         t = QLabel(f"<h2 style='margin:0'>Music Manager</h2><p style='margin:2px 0'>Versión <b>{APP_VERSION}</b></p>"
                    "<p>Organiza tu música: mueve carpetas, edita etiquetas, portadas y letras,<br>"
-                   "analiza la calidad de tus archivos y deja que una IA te ayude con los géneros.</p>")
+                   "analiza la calidad de tus archivos y deja que una IA te ayude con los géneros.</p>"
+                   "<p>Creado por <b>PandxMax</b> · <a href='https://github.com/PandxMax/MusicManager'>github.com/PandxMax/MusicManager</a></p>")
         t.setTextFormat(Qt.TextFormat.RichText)
         t.setWordWrap(True)
+        t.setOpenExternalLinks(True)
         top.addWidget(t, 1)
         v.addLayout(top)
         log = QTextBrowser()

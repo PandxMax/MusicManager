@@ -262,3 +262,7 @@ VERSIÓN 1.31
 ------------
  - Las etiquetas técnicas de los metadatos se ven siempre (con "-" si no hay canción).
  - El botón Guardar está arriba a la derecha de los metadatos; se activa solo si hay cambios.
+
+VERSIÓN 1.32
+------------
+ - En "Acerca de" aparece el creador: PandxMax.
