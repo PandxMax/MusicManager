@@ -272,3 +272,7 @@ VERSIÓN 1.33
  - La etiqueta con formato y tamaño de la portada tiene su propio espacio y no tapa la imagen.
  - Vuelve Herramientas -> Descargar de YouTube a MP3.
  - Los árboles de carpetas ya no se abren solos ni muestran la fila "..." al mover archivos.
+
+VERSIÓN 1.34
+------------
+ - Botón "Rellenar metadatos con IA" debajo de los metadatos: pide canción y artista, la IA busca los datos y los rellena (los revisas antes de aplicar).

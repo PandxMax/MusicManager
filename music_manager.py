@@ -67,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.33"
+APP_VERSION = "1.34"
 
 
 class TMenu(QMenu):
@@ -740,6 +740,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.34', [
+        'Nuevo botón «✨ Rellenar metadatos con IA…» debajo de los metadatos: pide el nombre de la canción y el artista, la IA busca los datos (álbum, género, año, pista…) y los rellena. Antes de aplicar puedes revisarlos y corregirlos.',
+    ]),
     ('1.33', [
         'Portada: la etiqueta con formato y tamaño (JPEG · 600×600 px · 93 KB) ya no se pega ni tapa la imagen; tiene su propio espacio debajo.',
         'Vuelve «Herramientas → Descargar de YouTube a MP3» (se había quitado por error en la 1.29).',
@@ -1020,7 +1023,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.33 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.34 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1843,6 +1846,116 @@ class ChatWorker(AIBase):
             self.failed.emit(str(e))
 
 
+class MetaAIWorker(AIBase):
+    """Pide a la IA los metadatos de una canción a partir del título y el artista."""
+    result = pyqtSignal(dict)
+
+    def __init__(self, provider, model, key, title, artist):
+        super().__init__(provider, model, key)
+        self.title, self.artist = title, artist
+
+    def run(self):
+        system = ("Eres un asistente experto en metadatos musicales. Respondes SOLO con un objeto JSON válido, sin texto "
+                  "extra ni bloques de código. Si no estás seguro de un dato, déjalo como cadena vacía: nunca inventes.")
+        prompt = (f"Canción: «{self.title}». Artista: «{self.artist}».\n"
+                  "Devuelve el JSON con estas claves exactas: title (título oficial), artist, album (álbum del lanzamiento "
+                  "original), albumartist, composer, genre (género y subgénero principal, ej. «Rock alternativo»), "
+                  "date (año de lanzamiento, 4 dígitos), tracknumber (número de pista en el álbum), discnumber, bpm. "
+                  "Todos los valores son texto.")
+        try:
+            txt = self.chat([{"role": "user", "content": prompt}], system)
+            m = re.search(r"\{.*\}", txt, re.S)
+            data = json.loads(m.group(0)) if m else {}
+            self.result.emit({k: str(v).strip() for k, v in data.items() if k in EASY_KEYS and v not in (None, "")})
+        except urllib.error.HTTPError as e:
+            self.failed.emit(self.error_text(e))
+        except Exception as e:
+            self.failed.emit(f"No pude leer la respuesta de la IA: {e}")
+
+
+class MetaAIDialog(QDialog):
+    def __init__(self, main, path, settings):
+        super().__init__(main)
+        self.main, self.path, self.settings, self.worker = main, path, settings, None
+        self.setWindowTitle("✨ Rellenar metadatos con IA")
+        self.resize(520, 520)
+        v = QVBoxLayout(self)
+        v.addWidget(QLabel("Escribe el nombre de la canción y el artista. La IA buscará los datos y podrás revisarlos "
+                           "antes de aplicarlos. Puede equivocarse: comprueba lo importante."))
+        v.itemAt(0).widget().setWordWrap(True)
+        base = os.path.splitext(os.path.basename(path))[0]
+        title, artist = main.val(path, "title"), main.val(path, "artist")
+        if not title and " - " in base:
+            artist, title = [x.strip() for x in base.split(" - ", 1)]
+        if not title:
+            title = base
+        f = QFormLayout()
+        self.t_le, self.a_le = QLineEdit(title), QLineEdit(artist)
+        f.addRow("Canción", self.t_le)
+        f.addRow("Artista", self.a_le)
+        v.addLayout(f)
+        self.go = QPushButton("🔎 Buscar con IA")
+        self.go.setObjectName("accent")
+        self.go.clicked.connect(self.search)
+        v.addWidget(self.go)
+        self.status = QLabel("")
+        self.status.setWordWrap(True)
+        v.addWidget(self.status)
+        self.res_box = QGroupBox("Resultado (puedes corregirlo)")
+        rf = QFormLayout(self.res_box)
+        self.res = {}
+        for k, n in FIELDS:
+            le = QLineEdit()
+            self.res[k] = le
+            rf.addRow(n, le)
+        self.res_box.setEnabled(False)
+        v.addWidget(self.res_box, 1)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        self.apply_btn = QPushButton("✔ Aplicar a la canción")
+        self.apply_btn.setObjectName("accent")
+        self.apply_btn.setEnabled(False)
+        self.apply_btn.clicked.connect(self.apply)
+        cl = QPushButton("Cerrar")
+        cl.clicked.connect(self.reject)
+        row.addWidget(self.apply_btn)
+        row.addWidget(cl)
+        v.addLayout(row)
+
+    def search(self):
+        t, a = self.t_le.text().strip(), self.a_le.text().strip()
+        if not t:
+            self.status.setText("Escribe el nombre de la canción.")
+            return
+        self.go.setEnabled(False)
+        self.status.setText("Buscando con la IA…")
+        prov, model, key = self.settings
+        self.worker = MetaAIWorker(prov, model, key, t, a)
+        self.worker.result.connect(self.on_result)
+        self.worker.failed.connect(self.on_fail)
+        self.worker.start()
+
+    def on_fail(self, msg):
+        self.go.setEnabled(True)
+        self.status.setText("No se pudo: " + msg)
+
+    def on_result(self, data):
+        self.go.setEnabled(True)
+        if not data:
+            self.status.setText("La IA no encontró datos fiables de esa canción. Prueba a escribir mejor el título o el artista.")
+            return
+        for k, le in self.res.items():
+            le.setText(data.get(k, ""))
+        self.res_box.setEnabled(True)
+        self.apply_btn.setEnabled(True)
+        self.status.setText("Revisa los datos. Solo se aplican los campos que no estén vacíos.")
+
+    def apply(self):
+        vals = {k: le.text().strip() for k, le in self.res.items() if le.text().strip()}
+        self.main.apply_ai_meta(self.path, vals)
+        self.accept()
+
+
 class GenreChat(QDialog):
     """Ventana para conversar con la IA y cuestionar/repensar el género de una canción."""
     QUICK = ["¿Estás seguro de esa decisión?",
@@ -2331,6 +2444,11 @@ class Main(QMainWindow):
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
+        self.btn_ai_meta = QPushButton("✨ Rellenar metadatos con IA…")
+        self.btn_ai_meta.setToolTip("Escribe el nombre y el artista y la IA busca y rellena los datos")
+        self.btn_ai_meta.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ai_meta.clicked.connect(self.open_meta_ai)
+        grid.addWidget(self.btn_ai_meta, 7, 0, 1, 4)
         grid.setRowStretch(8, 1)          # el espacio que sobra va abajo, no entre las etiquetas y los campos
 
         # ---------- letra (oculta; se muestra con el botón «📝 Letra»)
@@ -4234,6 +4352,27 @@ class Main(QMainWindow):
         self.btn_lyr.setEnabled(True)
         self.statusBar().showMessage("Falló la consulta de letras.")
         QMessageBox.warning(self, "Error de LRCLIB", msg)
+
+    def open_meta_ai(self):
+        path = self.current_path()
+        if not path:
+            QMessageBox.information(self, "Rellenar con IA", "Selecciona una canción primero.")
+            return
+        settings = self.ai_settings()
+        if not settings:
+            return
+        self.meta_ai_dlg = MetaAIDialog(self, path, settings)
+        self.meta_ai_dlg.show()
+
+    def apply_ai_meta(self, path, vals):
+        self.apply_form()
+        for k, v in vals.items():
+            if k in EASY_KEYS:
+                self.pending.setdefault(path, {})[k] = v
+        self.mark_items()
+        if path in self.cur_paths:
+            self.on_select()
+        self.statusBar().showMessage(f"{len(vals)} dato(s) rellenados con IA (pendientes de guardar).")
 
     def open_chat(self):
         path = self.current_path()
