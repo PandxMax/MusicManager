@@ -19,8 +19,25 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen,
 )
+if __name__ == "__main__":   # pantalla de carga inmediata: el resto de importaciones (pesadas) ocurre detrás
+    from PyQt6.QtGui import QPainter as _P, QPixmap as _Pm, QColor as _C, QFont as _F
+    _app = QApplication(sys.argv)
+    _pm = _Pm(420, 180)
+    _pm.fill(_C("#14141c"))
+    _p = _P(_pm)
+    _p.setPen(_C("#7C5CFF")); _p.setBrush(_C("#7C5CFF")); _p.drawRect(0, 0, 420, 6)
+    _p.setPen(_C("#ffffff")); _f = _F(); _f.setPointSize(20); _f.setBold(True); _p.setFont(_f)
+    _p.drawText(0, 40, 420, 60, Qt.AlignmentFlag.AlignCenter, "♪ Music Manager")
+    _f.setPointSize(10); _f.setBold(False); _p.setFont(_f); _p.setPen(_C("#b8b8c8"))
+    _p.drawText(0, 100, 420, 40, Qt.AlignmentFlag.AlignCenter, "Cargando…")
+    _p.end()
+    _SPLASH = QSplashScreen(_pm)
+    _SPLASH.show()
+    _app.processEvents()
+else:
+    _SPLASH = None
 import mutagen
 import i18n
 from i18n import tr as T
@@ -50,7 +67,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.23"
+APP_VERSION = "1.24"
 
 
 class TMenu(QMenu):
@@ -709,6 +726,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.24', [
+        'El programa abre más rápido: aparece una pantalla de carga al instante y lo pesado (reproductor, comprobar actualizaciones, guía) se carga después de mostrar la ventana.',
+        'El ejecutable es más ligero (se quitaron módulos que no se usan), así que arranca antes.',
+    ]),
     ('1.23', [
         'Comparación: ahora puedes arrastrar canciones o carpetas de cualquier lugar (del explorador de Windows o de las listas del programa) para añadirlas y compararlas.',
         'Debajo de la portada hay botones para buscar la canción en YouTube, Spotify, Tidal, Qobuz y Wikipedia.',
@@ -949,7 +970,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.23 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.24 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5349,8 +5370,10 @@ if __name__ == "__main__":
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MusicManager.App")
         except Exception:
             pass
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Music Manager")
     w = Main()
     w.show()
+    if _SPLASH is not None:
+        _SPLASH.finish(w)
     sys.exit(app.exec())

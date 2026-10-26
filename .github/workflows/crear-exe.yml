@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - run: pip install -r requirements.txt pyinstaller
-      - run: pyinstaller --noconfirm --clean --windowed --name MusicManager --icon MusicManager.ico --hidden-import logo_data --hidden-import spectro --hidden-import i18n --hidden-import convert --collect-all imageio_ffmpeg music_manager.py
+      - run: pyinstaller --noconfirm --clean --windowed --name MusicManager --icon MusicManager.ico --hidden-import logo_data --hidden-import spectro --hidden-import i18n --hidden-import convert --collect-all imageio_ffmpeg --exclude-module tkinter --exclude-module matplotlib --exclude-module scipy --exclude-module pandas --exclude-module PIL --exclude-module unittest --exclude-module pydoc --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.QtQml --exclude-module PyQt6.QtQuick --exclude-module PyQt6.QtSql --exclude-module PyQt6.QtTest music_manager.py
       - uses: actions/upload-artifact@v4
         with: { name: MusicManager-Windows, path: dist/MusicManager }
       # Publica una "Release" con el zip: de ahí se actualiza el programa solo (Ayuda > Buscar actualizaciones)

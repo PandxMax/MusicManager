@@ -222,3 +222,8 @@ VERSIÓN 1.23
 ------------
  - Comparación: se pueden arrastrar canciones o carpetas de cualquier lugar (explorador de Windows o listas del programa) para añadirlas y compararlas.
  - Bajo la portada hay botones para buscar la canción en YouTube, Spotify, Tidal, Qobuz y Wikipedia.
+
+VERSIÓN 1.24
+------------
+ - Arranque más rápido: pantalla de carga al instante y las tareas pesadas se hacen después de mostrar la ventana.
+ - Ejecutable más ligero (módulos sin usar excluidos).
