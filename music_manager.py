@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.15"
+APP_VERSION = "1.16"
 
 
 class TMenu(QMenu):
@@ -707,6 +707,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.16', [
+        'Los botones Espectro, MusicBrainz y Discogs ahora están arriba, a la izquierda, junto a las flechas de navegación; ya no ocupan lugar en los metadatos.',
+    ]),
     ('1.15', [
         'Datos técnicos más ordenados: las etiquetas a la izquierda y los botones Espectro / MusicBrainz / Discogs siempre juntos a la derecha.',
         'Panel de portada más compacto: botones más pequeños, menos espacio vacío y la columna derecha un poco más angosta.',
@@ -915,7 +918,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.15 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.16 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2108,25 +2111,6 @@ class Main(QMainWindow):
             self.tech[k] = chip
             tbl.addWidget(chip)
         tb_l.addWidget(chips_w, 1, Qt.AlignmentFlag.AlignTop)
-        btns_w = QWidget()
-        btl = QHBoxLayout(btns_w)
-        btl.setContentsMargins(0, 0, 0, 0)
-        btl.setSpacing(4)
-        self.btn_spec = QPushButton("📊 Espectro")
-        self.btn_spec.setToolTip("Espectrograma y análisis de calidad de las canciones seleccionadas")
-        self.btn_spec.clicked.connect(self.open_spectrum)
-        btl.addWidget(self.btn_spec)
-        for src, text, tip in (("musicbrainz", "🎼 MusicBrainz", "Buscar las etiquetas de esta canción en MusicBrainz (gratis)"),
-                               ("discogs", "💿 Discogs", "Buscar las etiquetas de esta canción en Discogs (necesita tu token)")):
-            b_ = QPushButton(text)
-            b_.setToolTip(tip)
-            b_.clicked.connect(lambda _=False, s_=src: self.open_tag_source(s_))
-            btl.addWidget(b_)
-        for i in range(btl.count()):
-            w_ = btl.itemAt(i).widget()
-            w_.setObjectName("chipbtn")
-            w_.setCursor(Qt.CursorShape.PointingHandCursor)
-        tb_l.addWidget(btns_w, 0, Qt.AlignmentFlag.AlignTop)
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
@@ -2176,6 +2160,22 @@ class Main(QMainWindow):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.clicked.connect(fn)
             navbar.addWidget(b)
+        navbar.addSpacing(8)
+        self.btn_spec = None
+        for src, text, tip in (("spec", "📊 Espectro", "Espectrograma y análisis de calidad de las canciones seleccionadas"),
+                               ("musicbrainz", "🎼 MusicBrainz", "Buscar las etiquetas de esta canción en MusicBrainz (gratis)"),
+                               ("discogs", "💿 Discogs", "Buscar las etiquetas de esta canción en Discogs (necesita tu token)")):
+            b_ = QPushButton(text)
+            b_.setObjectName("chipbtn")
+            b_.setCursor(Qt.CursorShape.PointingHandCursor)
+            b_.setToolTip(tip)
+            if src == "spec":
+                self.btn_spec = b_
+                b_.clicked.connect(self.open_spectrum)
+            else:
+                b_.clicked.connect(lambda _=False, s_=src: self.open_tag_source(s_))
+            navbar.addWidget(b_)
+        navbar.addSpacing(8)
         self.path_lbl = QLabel("")
         self.path_lbl.setObjectName("hint")
         self.path_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)

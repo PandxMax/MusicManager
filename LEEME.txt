@@ -172,3 +172,8 @@ VERSIÓN 1.15
  - Datos técnicos más ordenados: chips a la izquierda (saltan de línea solos) y los botones Espectro /
    MusicBrainz / Discogs siempre agrupados a la derecha, sin partirse.
  - Panel de la portada más compacto: botones de 32 px, menos espacio vacío y columna derecha más angosta.
+
+VERSIÓN 1.16
+------------
+ - Los botones "📊 Espectro", "🎼 MusicBrainz" y "💿 Discogs" pasaron a la barra de arriba de la lista,
+   a la izquierda junto a ◀ ▶ ▲. Los metadatos solo muestran los datos técnicos.
