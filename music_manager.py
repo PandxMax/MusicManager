@@ -50,7 +50,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.20"
+APP_VERSION = "1.21"
 
 
 class TMenu(QMenu):
@@ -709,6 +709,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.21', [
+        'La división entre la lista y la portada (y entre metadatos y géneros) ya no se puede mover: se queda quieta.',
+        'Con los metadatos a la vista, la fila de abajo tiene siempre el mismo tamaño y posición; al cerrar el espectrograma vuelve exactamente al mismo sitio.',
+        'Sin canción seleccionada, los campos de metadatos aparecen vacíos con una sola línea «-» y se rellenan al elegir una canción.',
+    ]),
     ('1.20', [
         'Con los metadatos a la vista, la barra roja para estirar la fila de abajo ya no aparece (solo se puede estirar con el espectrograma abierto).',
         'Corregido: ahora sí se puede arrastrar un archivo o carpeta sobre otra carpeta de la misma lista; la carpeta de destino se resalta al pasar por encima.',
@@ -937,7 +942,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.20 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.21 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2189,6 +2194,8 @@ class Main(QMainWindow):
             le = QLineEdit()
             le.textEdited.connect(lambda _, key=k: self.edited.add(key))
             self.inputs[k] = le
+            le.setPlaceholderText("-")     # sin canción seleccionada: solo una línea, se rellena al elegir una
+            le.setEnabled(False)
             lb = QLabel(n)
             self.field_widgets[k] = (lb, le)
             grid.addWidget(lb, r + 1, c * 2)
@@ -3524,7 +3531,7 @@ class Main(QMainWindow):
             vs = {self.val(p, k) for p in paths}
             multi = len(vs) > 1
             le.setText("" if multi or not vs else next(iter(vs)))
-            le.setPlaceholderText("‹varios valores›" if multi else "")
+            le.setPlaceholderText("‹varios valores›" if multi else ("" if paths else "-"))
             le.setEnabled(bool(paths))
         self.fill_tech(paths)
         self.show_current(self.current_path(), len(paths))
@@ -4305,10 +4312,21 @@ class Main(QMainWindow):
     def set_rows_locked(self, locked):
         """Con los metadatos a la vista, la división entre la fila de arriba y la de abajo no se estira (se ve mejor);
         solo se puede mover cuando está el espectrograma."""
+        for sp in (self.top_split, self.bottom_split):   # la división de las columnas nunca se mueve
+            hh = sp.handle(1)
+            if hh is not None:
+                hh.setEnabled(False)
+                hh.setCursor(Qt.CursorShape.ArrowCursor)
         h = self.mid_split.handle(1)
         if h is not None:
             h.setEnabled(not locked)
             h.setCursor(Qt.CursorShape.ArrowCursor if locked else Qt.CursorShape.SplitVCursor)
+        if locked:   # la fila de abajo mide siempre lo mismo: al volver de espectrograma queda exactamente en el mismo sitio
+            hgt = max(self.bottom_w.sizeHint().height() + 6, 290)
+            self.bottom_stack.setFixedHeight(hgt)
+        else:
+            self.bottom_stack.setMinimumHeight(0)
+            self.bottom_stack.setMaximumHeight(16777215)
 
     def style_splitter(self, sp):
         sp.setHandleWidth(9)
@@ -4562,6 +4580,7 @@ class Main(QMainWindow):
         self.bottom_stack.setCurrentIndex(0)
         self.bottom_stack.removeWidget(pane)
         self.set_rows_locked(True)
+        restore = False   # el tamaño de la fila de abajo ya queda fijo; no se restauran proporciones
         pane.hide()
         pane.setParent(None)
         pane.deleteLater()

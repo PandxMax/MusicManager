@@ -205,3 +205,10 @@ VERSIÓN 1.20
    solo se puede estirar cuando el espectrograma está abierto.
  - Arrastrar archivos/carpetas sobre otra carpeta de la misma lista: ahora el programa resuelve el soltar
    por sí mismo (y resalta la carpeta de destino), sin depender de los eventos de arrastre de Qt.
+
+VERSIÓN 1.21
+------------
+ - Las divisiones entre columnas (lista | portada, metadatos | géneros) quedan quietas y no se pueden mover.
+ - La fila de abajo con los metadatos tiene siempre el mismo tamaño y posición. Solo cambia mientras está el
+   espectrograma (ahí sí se puede estirar) y al cerrarlo vuelve exactamente a la misma posición.
+ - Sin canción seleccionada, los campos de metadatos están vacíos con una sola línea "-".
