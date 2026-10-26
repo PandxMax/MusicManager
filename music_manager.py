@@ -85,7 +85,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.39"
+APP_VERSION = "1.40"
 
 
 class TMenu(QMenu):
@@ -785,6 +785,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.40', [
+        'El programa pesa menos: se quitaron archivos que no se usaban (OpenGL por software, visor de PDF de Qt, OpenSSL duplicado, traducciones de Qt y formatos de imagen raros) y el componente de descargas ya no incluye su código fuente suelto.',
+    ]),
     ('1.39', [
         'Nuevo botón «Ajustes de la canción» junto al reproductor (también en Herramientas): graves, medios, agudos, volumen, normalizar, tempo, tono, velocidad (tasa), recorte, bucle (repetir), al revés, eco, reverberación, ancho estéreo, mono, quitar la voz y entrada/salida gradual.',
         'Puedes escuchar una muestra de 30 s con los ajustes antes de guardar, y guardarla como canción nueva «(editada)» o reemplazar la original. Se conservan las etiquetas y la portada (MP3, M4A, MP4 y FLAC).',
@@ -1089,7 +1092,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.39 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.40 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()

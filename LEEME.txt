@@ -302,3 +302,7 @@ VERSIÓN 1.39
  - Nuevo botón «Ajustes de la canción» junto al reproductor: graves, medios, agudos, volumen, tempo, tono, velocidad, bucle, recorte, eco, reverberación, estéreo, quitar voz y más.
  - Escucha una muestra antes de guardar; guarda como canción nueva o reemplaza la original (conserva etiquetas y portada).
  - Los botones con emojis ahora tienen iconos dibujados que siguen el tema.
+
+VERSIÓN 1.40
+------------
+ - El programa pesa menos: se quitaron archivos internos que no se usaban.
