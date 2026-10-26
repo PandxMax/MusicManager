@@ -153,3 +153,9 @@ VERSIÓN 1.12
 ------------
  - Al abrir el programa por primera vez después de actualizarlo, aparece una pantallita con lo que cambió
    (todas las versiones que te saltaste). Se puede volver a ver en Ayuda > "Novedades de esta versión".
+
+VERSIÓN 1.13
+------------
+ - Junto al botón "📊 Espectro" (encima de los campos) hay dos botones nuevos: "🎼 MusicBrainz" y
+   "💿 Discogs". Buscan la canción seleccionada, muestran los resultados y aplican las etiquetas.
+   (Discogs necesita el token gratuito: Ajustes > Fuentes de etiquetas.)

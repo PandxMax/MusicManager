@@ -49,7 +49,7 @@ EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
-APP_VERSION = "1.12"
+APP_VERSION = "1.13"
 
 
 class TMenu(QMenu):
@@ -707,6 +707,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.13', [
+        'Junto a «📊 Espectro» hay ahora dos botones, «🎼 MusicBrainz» y «💿 Discogs», para buscar y poner las etiquetas de la canción.',
+    ]),
     ('1.12', [
         'Al actualizar, aparece una pantallita con las novedades de la versión (Ayuda ▸ «Novedades de esta versión» para verla cuando quieras).',
     ]),
@@ -844,7 +847,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes y Deezer (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.12 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.13 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2038,6 +2041,14 @@ class Main(QMainWindow):
         self.btn_spec.setToolTip("Espectrograma y análisis de calidad de las canciones seleccionadas")
         self.btn_spec.clicked.connect(self.open_spectrum)
         tbl.addWidget(self.btn_spec)
+        for src, text, tip in (("musicbrainz", "🎼 MusicBrainz", "Buscar las etiquetas de esta canción en MusicBrainz (gratis)"),
+                               ("discogs", "💿 Discogs", "Buscar las etiquetas de esta canción en Discogs (necesita tu token)")):
+            b = QPushButton(text)
+            b.setObjectName("chipbtn")
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setToolTip(tip)
+            b.clicked.connect(lambda _=False, s_=src: self.open_tag_source(s_))
+            tbl.addWidget(b)
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
