@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.61"
+APP_VERSION = "1.62"
 
 
 class TMenu(QMenu):
@@ -406,6 +406,7 @@ QToolButton#webbtn { background: @accent_soft; border: 1px solid @accent; border
 QToolButton#webbtn:hover { background: @accent; color: white; }
 QToolButton#webbtn::menu-indicator { image: none; width: 0px; }
 QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 10px; }
+QFrame#drawer { background: @surface; border: 1px solid @border; border-left: none; border-top-right-radius: 16px; border-bottom-right-radius: 16px; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
@@ -787,6 +788,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.62', [
+        'Árboles de carpetas plegables: en Ajustes → General → «Árboles de carpetas» elige «Siempre visibles (normal)» o «Escondidas». Escondidas, la lista de canciones gana todo el ancho y las carpetas salen deslizándose con la flechita del borde izquierdo; la misma flechita, pegada al lado del panel, las vuelve a esconder.',
+    ]),
     ('1.61', [
         'Pasar entre árboles sin arrastrar (como el explorador de Kodi): con el 2.º árbol visible aparece abajo una barra que dice qué vas a pasar y a dónde («3 canciones ➜ Rock»), con los botones «Copiar al otro árbol» (F7) y «Mover al otro árbol» (F6). Sirve para canciones elegidas en la lista o carpetas elegidas en un árbol; el destino es la carpeta abierta en el otro árbol. Arrastrar sigue funcionando igual.',
         'Clic derecho en canciones: «Mover / Copiar al otro árbol».',
@@ -1219,7 +1223,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.61 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.62 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3187,6 +3191,7 @@ class Main(QMainWindow):
         lb_l.addWidget(self.left_split, 1)
         lb_l.addWidget(self.build_xfer_bar())
         main.addWidget(left_box)
+        self.left_box = left_box
         main.addWidget(middle)
         main.setStretchFactor(1, 1)
         self.left_split.setMinimumWidth(210)
@@ -3203,6 +3208,9 @@ class Main(QMainWindow):
         cl.setSpacing(0)
         cl.addWidget(main, 1)   # sin barra general: el programa entero no se desplaza
         self._central_lay = cl
+        import drawer
+        self.tree_drawer = drawer.TreeDrawer(self, central, self.left_box, main)
+        QTimer.singleShot(0, lambda: self.set_trees_mode(str(self.cfg.value("trees_mode", "normal"))))
         self.setCentralWidget(central)
         self.build_pl_panel(central)
         self.shuffle = bool(int(self.cfg.value("shuffle", 0) or 0))
@@ -3357,6 +3365,8 @@ class Main(QMainWindow):
 
     def toggle_tree2(self, on):
         self.tree2_box.setVisible(on)
+        if getattr(self, "tree_drawer", None):
+            QTimer.singleShot(0, self.tree_drawer.place)
         QTimer.singleShot(0, self.update_xfer)
         self.cfg.setValue("tree2", 1 if on else 0)
         if on:
@@ -4245,6 +4255,13 @@ class Main(QMainWindow):
         return [self.list.item(r).data(PATH_ROLE) for r in range(self.list.count())
                 if self.list.item(r).data(KIND_ROLE) != "dir"], False
 
+    def set_trees_mode(self, mode):
+        """«normal» = árboles siempre a la izquierda · «drawer» = escondidos, salen con la flechita del borde izquierdo."""
+        self.trees_mode = mode if mode in ("normal", "drawer") else "normal"
+        self.cfg.setValue("trees_mode", self.trees_mode)
+        self.tree_drawer.set_enabled(self.trees_mode == "drawer")
+        self.layout_overlay()
+
     def set_player_style(self, style, first=False):
         """«classic» = solo la barra de abajo · «mobile» = solo el reproductor estilo celular del borde derecho."""
         if self.mobile is None:
@@ -4255,7 +4272,7 @@ class Main(QMainWindow):
             self.player_bar.hide()
             self.pl_fab.hide()            # la lista va dentro del reproductor celular
             self.pl_panel.hide()
-            self._central_lay.setContentsMargins(0, 0, 20, 0)   # canal propio para la flechita: no tapa nada
+            self._central_lay.setContentsMargins(self._central_lay.contentsMargins().left(), 0, 20, 0)   # canal propio para la flechita
             self.statusBar().setMinimumHeight(44)
             self.wide_viz.setGeometry(self.statusBar().rect())
             self.wide_viz.show()
@@ -4269,7 +4286,7 @@ class Main(QMainWindow):
         else:
             self.player_bar.show()
             self.pl_fab.show()
-            self._central_lay.setContentsMargins(0, 0, 0, 0)
+            self._central_lay.setContentsMargins(self._central_lay.contentsMargins().left(), 0, 0, 0)
             self.statusBar().setMinimumHeight(0)
             self.wide_viz.hide()
             if self.mobile is not None:
@@ -5184,6 +5201,8 @@ class Main(QMainWindow):
         self.statusBar().showMessage(msg + ".")
 
     def toggle_orient(self):
+        if getattr(self, "tree_drawer", None):
+            QTimer.singleShot(0, self.tree_drawer.place)
         horiz = self.left_split.orientation() == Qt.Orientation.Vertical
         self.left_split.setOrientation(Qt.Orientation.Horizontal if horiz else Qt.Orientation.Vertical)
         self.cfg.setValue("trees_h", 1 if horiz else 0)
@@ -6153,10 +6172,20 @@ class Main(QMainWindow):
             return c
 
         # General
+        snap_trees = getattr(self, "trees_mode", "normal")
+        r_tn = QRadioButton("Siempre visibles a la izquierda (normal)")
+        r_td = QRadioButton("Escondidas: se abren con la flechita del borde izquierdo")
+        grp_tm = QButtonGroup(dlg)
+        grp_tm.addButton(r_tn)
+        grp_tm.addButton(r_td)
+        (r_td if snap_trees == "drawer" else r_tn).setChecked(True)
+        r_tn.toggled.connect(lambda on: on and self.set_trees_mode("normal"))
+        r_td.toggled.connect(lambda on: on and self.set_trees_mode("drawer"))
         add_page("general", "General", page(
             chk("Abrir la última carpeta al iniciar", "open_last", 1),
             chk("Confirmar antes de eliminar (con papelera)", "confirm_delete", 1),
-            chk("Mostrar la guía rápida cada vez que se inicia", "guide_every", 0)))
+            chk("Mostrar la guía rápida cada vez que se inicia", "guide_every", 0),
+            QLabel(" "), QLabel("<b>Árboles de carpetas</b>"), r_tn, r_td))
         # Reproductor: barra clásica o estilo celular (solo uno a la vez)
         snap_style = getattr(self, "player_style", "classic")
         r_classic = QRadioButton("Barra de reproducción abajo (clásico)")
@@ -6307,6 +6336,8 @@ class Main(QMainWindow):
                 self.set_language(snap[2])
             if snap_style != getattr(self, "player_style", "classic"):
                 self.set_player_style(snap_style)
+            if snap_trees != getattr(self, "trees_mode", "normal"):
+                self.set_trees_mode(snap_trees)
             self.provider.setCurrentText(str(self.cfg.value("provider", "Claude")))
             self.on_provider(self.provider.currentText())
         self.ai_cfg.hide()

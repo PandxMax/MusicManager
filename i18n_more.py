@@ -743,3 +743,11 @@ ROWS += [
     ("Ya está en esa carpeta.", "It's already in that folder.", "Уже в этой папке."),
     ("➡ Mover al otro árbol  (%s)", "➡ Move to the other tree  (%s)", "➡ Переместить в другое дерево  (%s)"),
 ]
+
+ROWS += [
+    ("<b>Árboles de carpetas</b>", "<b>Folder trees</b>", "<b>Деревья папок</b>"),
+    ("Siempre visibles a la izquierda (normal)", "Always visible on the left (normal)", "Всегда видны слева (обычно)"),
+    ("Escondidas: se abren con la flechita del borde izquierdo", "Hidden: open them with the little arrow on the left edge",
+     "Скрыты: открываются стрелкой у левого края"),
+    ("Mostrar las carpetas", "Show folders", "Показать папки"), ("Ocultar las carpetas", "Hide folders", "Скрыть папки"),
+]

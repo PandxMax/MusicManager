@@ -115,17 +115,17 @@ class CoverArt(QWidget):
 
 class EdgeTab(QPushButton):
     """Asa discreta en el borde: «‹» abre el reproductor; con el reproductor abierto se pega a su lado con «›» para cerrarlo."""
-    def __init__(self, parent):
+    def __init__(self, parent, side="right", tips=("Abrir el reproductor grande", "Cerrar el reproductor grande")):
         super().__init__(parent)
         self.setFixedSize(18, 64)
-        self.opened = False
+        self.opened, self.side, self.tips = False, side, tips
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setToolTip("Abrir el reproductor grande")
+        self.setToolTip(tips[0])
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
     def set_open(self, on):
         self.opened = on
-        self.setToolTip("Cerrar el reproductor grande" if on else "Abrir el reproductor grande")
+        self.setToolTip(self.tips[1] if on else self.tips[0])
         self.update()
 
     def paintEvent(self, _):
@@ -135,12 +135,16 @@ class EdgeTab(QPushButton):
         hover = self.underMouse()
         r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         path = QPainterPath()
-        path.addRoundedRect(QRectF(r.x(), r.y(), r.width() + 12, r.height()), 9, 9)   # redondeada solo por fuera
+        if self.side == "right":
+            path.addRoundedRect(QRectF(r.x(), r.y(), r.width() + 12, r.height()), 9, 9)   # redondeada solo por fuera
+        else:
+            path.addRoundedRect(QRectF(r.x() - 12, r.y(), r.width() + 12, r.height()), 9, 9)
         p.setPen(QPen(QColor(acc.red(), acc.green(), acc.blue(), 230 if hover else 120), 1))
         p.setBrush(QColor(acc) if hover else QColor(28, 26, 38, 235))
         p.drawPath(path)
         col = QColor("white") if hover else QColor(acc).lighter(130)
-        icons.draw_glyph(p, "chevron_r" if self.opened else "chevron_l", QRectF(2, r.height() / 2 - 7, 14, 14), col)
+        point_right = self.opened if self.side == "right" else not self.opened
+        icons.draw_glyph(p, "chevron_r" if point_right else "chevron_l", QRectF(2, r.height() / 2 - 7, 14, 14), col)
 
 
 class MobilePlayer(QFrame):

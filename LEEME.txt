@@ -405,3 +405,7 @@ VERSIÓN 1.60
 VERSIÓN 1.61
 ------------
  - Pasar entre árboles sin arrastrar: barra con «Copiar al otro árbol» (F7) y «Mover al otro árbol» (F6). Arrastrar sigue funcionando.
+
+VERSIÓN 1.62
+------------
+ - Árboles de carpetas plegables (Ajustes → General): escondidos, salen con la flechita del borde izquierdo.
