@@ -340,3 +340,7 @@ VERSIÓN 1.47
 ------------
  - Inglés y ruso mucho más completos (también los textos que cambian mientras usas el programa).
  - Sin clave de IA: guía para conseguir gratis una clave de Gemini.
+
+VERSIÓN 1.48
+------------
+ - Descargas: ya no quedan archivos sueltos sin icono junto al MP3; se borran solos.

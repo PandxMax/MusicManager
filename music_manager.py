@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.47"
+APP_VERSION = "1.48"
 
 
 class TMenu(QMenu):
@@ -773,6 +773,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.48', [
+        'Descargas de YouTube / SoundCloud: ya no quedan archivos sueltos sin icono junto al MP3 (el audio original, .part o .ytdl). Se borran solos al terminar o si la descarga falla.',
+    ]),
     ('1.47', [
         'Inglés y ruso mucho más completos: ahora se traducen también los textos que cambian mientras usas el programa (letra, análisis del espectrograma, comparación, portadas, fuentes de etiquetas, avisos con nombres y cantidades…).',
         'Si usas la IA sin clave, aparece una guía paso a paso para conseguir gratis una clave de Gemini, con un botón que abre la página de Google y otro para pegarla.',
@@ -1110,7 +1113,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.47 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.48 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()

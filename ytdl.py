@@ -68,11 +68,35 @@ class DlWorker(QThread):
             with yt_dlp.YoutubeDL(opts) as y:
                 y.download([self.url])
         except Exception as e:
+            self.cleanup(before, [])
             self.fail.emit(str(e))
             return
         after = set(os.listdir(self.outdir))
-        new = sorted(os.path.join(self.outdir, f) for f in after - before if f.lower().endswith(".mp3"))
+        new = sorted(os.path.join(self.outdir, f) for f in after - before if f.lower().endswith(".mp3")
+                     and not f.lower().endswith(".temp.mp3"))
+        self.cleanup(before, new)
         self.done.emit(new)
+
+    TEMP_EXT = (".part", ".ytdl", ".temp.mp3", ".webm", ".m4a", ".opus", ".ogg", ".webp", ".jpg", ".png", ".tmp")
+
+    def cleanup(self, before, mp3s):
+        """Borra los restos que deja la descarga (audio original, .part, .ytdl…): solo archivos nuevos de esta descarga."""
+        stems = {os.path.splitext(os.path.basename(m))[0].lower() for m in mp3s}
+        try:
+            names = set(os.listdir(self.outdir)) - set(before)
+        except OSError:
+            return
+        for f in names:
+            low = f.lower()
+            if low.endswith(".mp3") and not low.endswith(".temp.mp3"):
+                continue
+            temp = low.endswith((".part", ".ytdl", ".temp.mp3")) or ".part-frag" in low
+            same = any(low.startswith(st + ".") for st in stems) and low.endswith(self.TEMP_EXT)
+            if temp or same:
+                try:
+                    os.remove(os.path.join(self.outdir, f))
+                except OSError:
+                    pass
 
 
 class YoutubeDialog(QDialog):
