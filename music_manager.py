@@ -19,12 +19,13 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton,
 )
 import mutagen
 import i18n
 import icons
 import thumbs
+import i18n_more
 from i18n import tr as T
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover
@@ -69,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.45"
+APP_VERSION = "1.46"
 
 
 class TMenu(QMenu):
@@ -394,6 +395,9 @@ QToolBar { background: @surface; border: none; border-bottom: 1px solid @border;
 QToolBar QToolButton { background: transparent; border: none; border-radius: 8px; padding: 6px 10px; }
 QToolBar QToolButton:hover { background: @accent_soft; }
 QToolBar QToolButton:checked { background: @accent; color: white; }
+QToolButton#langbtn { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 3px 8px; font-weight: 600; }
+QToolButton#langbtn:hover { border-color: @accent; background: @accent_soft; }
+QToolButton#langbtn::menu-indicator { image: none; width: 0px; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
@@ -769,6 +773,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.46', [
+        'Nuevo selector de idioma con banderitas arriba a la derecha: cambia entre Español, English y Русский al instante, sin reiniciar.',
+        'Mucho más traducido al inglés y al ruso: ventanas de IA, ajustes de la canción, descargas, espectrograma, portadas, listas de reproducción, avisos, mensajes de la barra de estado, guía rápida y «Acerca de».',
+        'Los botones «Sí / No / Aceptar / Cancelar» de los avisos ahora salen en el idioma elegido (antes salían en inglés).',
+    ]),
     ('1.45', [
         '«Rellenar con IA» ahora rellena todos los campos: título, intérprete, álbum, intérprete del álbum, compositor, género, año, pista, número de disco y comentario (sello, productor…).',
         'Antes de preguntar a la IA busca la canción en iTunes y Deezer, así el álbum, el año, la pista y el disco salen del catálogo real y no adivinados.',
@@ -1097,7 +1106,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.45 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.46 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2549,10 +2558,28 @@ class Main(QMainWindow):
         self._corner = QWidget()
         cwl = QHBoxLayout(self._corner)
         cwl.setContentsMargins(0, 0, 6, 0)
+        # selector de idioma con banderitas, siempre a la vista
+        self.lang_btn = QToolButton()
+        self.lang_btn.setObjectName("langbtn")
+        self.lang_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.lang_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.lang_btn.setIconSize(QSize(22, 15))
+        self.lang_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.lang_btn.setToolTip("Cambiar idioma")
+        lm = QMenu(self.lang_btn)
+        for code, name in i18n.LANGS:
+            a = lm.addAction(icons.flag_icon(code), name)
+            a.triggered.connect(lambda _=False, c=code: self.set_language(c))
+        self.lang_btn.setMenu(lm)
+        cwl.addWidget(self.lang_btn)
         cwl.addWidget(self.search)
         cwl.addWidget(self.chk_sub)
 
         self.pend_lbl = QLabel("")
+        # los mensajes de la barra de estado también se traducen
+        self._sb = self.statusBar()
+        _show_msg = self._sb.showMessage
+        self._sb.showMessage = lambda m, t=0: _show_msg(T(m), t)
         self.statusBar().addPermanentWidget(self.pend_lbl)
         self._pend_added = True
 
@@ -5295,6 +5322,7 @@ class Main(QMainWindow):
         mb.setCornerWidget(self._corner, Qt.Corner.TopRightCorner)
         i18n.set_lang(str(self.cfg.value("lang", "es")))
         i18n.retranslate(self)
+        self.update_lang_btn()
         QTimer.singleShot(5000, self.auto_check_updates)
 
     def auto_check_updates(self):
@@ -5472,6 +5500,24 @@ class Main(QMainWindow):
             return
         self.open_youtube(p, external)
 
+    def update_lang_btn(self):
+        code = i18n.CUR
+        self.lang_btn.setIcon(icons.flag_icon(code))
+        self.lang_btn.setText(code.upper())
+
+    def set_language(self, code):
+        """Cambia el idioma al momento, sin reiniciar."""
+        i18n.set_lang(code)
+        self.cfg.setValue("lang", code)
+        i18n.retranslate(self)
+        self.update_lang_btn()
+        try:
+            self.update_vol_icon()
+        except Exception:
+            pass
+        self.statusBar().showMessage({"es": "Idioma: Español", "en": "Language: English",
+                                      "ru": "Язык: Русский"}.get(code, ""), 3000)
+
     def open_settings(self, tab="ia"):
         tab = {0: "ia", 1: "apariencia", 2: "idioma", 3: "fuentes"}.get(tab, tab)
         snap = (self.theme, self.accent, i18n.CUR)
@@ -5554,11 +5600,12 @@ class Main(QMainWindow):
         add_page("apariencia", "Apariencia", page(f2, QLabel("Color de acento"), row, row2))
         # Idioma
         lang_cb = QComboBox()
+        lang_cb.setIconSize(QSize(22, 15))
         for code, name in i18n.LANGS:
-            lang_cb.addItem(name, code)
+            lang_cb.addItem(icons.flag_icon(code), name, code)
         lang_cb.setCurrentIndex(max(0, [c for c, _ in i18n.LANGS].index(i18n.CUR)))
         add_page("idioma", "Idioma", page(QLabel("Idioma de la interfaz"), lang_cb,
-                                          QLabel("Algunos mensajes emergentes siguen en español.")))
+                                          QLabel("También puedes cambiarlo con la banderita de arriba a la derecha.")))
         # Etiquetas (grupo)
         grp = add_page("etiquetas", "Etiquetas", None)
         hidden = {x for x in str(self.cfg.value("hidden_fields", "") or "").split(",") if x}
@@ -5617,9 +5664,7 @@ class Main(QMainWindow):
         nav.currentItemChanged.connect(on_nav)
 
         def change_lang():
-            i18n.set_lang(lang_cb.currentData())
-            self.cfg.setValue("lang", lang_cb.currentData())
-            i18n.retranslate(self)
+            self.set_language(lang_cb.currentData())
             i18n.retranslate(dlg)
             for it, t in titles:
                 it.setText(0, T(t))
@@ -5654,9 +5699,7 @@ class Main(QMainWindow):
             if snap[1] != self.accent:
                 self.set_accent(snap[1])
             if snap[2] != i18n.CUR:
-                i18n.set_lang(snap[2])
-                self.cfg.setValue("lang", snap[2])
-                i18n.retranslate(self)
+                self.set_language(snap[2])
             self.provider.setCurrentText(str(self.cfg.value("provider", "Claude")))
             self.on_provider(self.provider.currentText())
         self.ai_cfg.hide()
@@ -5684,17 +5727,7 @@ class Main(QMainWindow):
         box.setIconPixmap(self.logo_pm.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio,
                                               Qt.TransformationMode.SmoothTransformation))
         box.setTextFormat(Qt.TextFormat.RichText)
-        box.setText(
-            "<h3>🎵 Guía rápida</h3><ul>"
-            "<li><b>Mover:</b> arrastra canciones o carpetas sobre otra carpeta (también entre los dos árboles).</li>"
-            "<li><b>Copiar / cortar / pegar:</b> Ctrl+C, Ctrl+X y Ctrl+V.</li>"
-            "<li><b>Reproducir:</b> doble clic en una canción; los controles están abajo.</li>"
-            "<li><b>Editar etiquetas:</b> selecciona canciones, cambia los campos y pulsa "
-            "<b>Guardar cambios</b> (Ctrl+S).</li>"
-            "<li><b>Portada:</b> clic derecho sobre la portada grande.</li>"
-            "<li><b>Géneros con IA:</b> abre «Ajustes de IA», pega tu clave y pulsa «Sugerir género».</li>"
-            "<li><b>YouTube:</b> clic derecho en una canción → Buscar en YouTube.</li>"
-            "</ul><p>Puedes volver a ver esto en <b>Ayuda → Guía rápida</b>.</p>")
+        box.setText(T(i18n_more.GUIDE_ES))
         box.exec()
 
     # ------------------------------------------------------- Actualizaciones
@@ -5904,10 +5937,9 @@ class Main(QMainWindow):
         pm = QLabel()
         pm.setPixmap(self.logo_pm.scaled(88, 88, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         top.addWidget(pm)
-        t = QLabel(f"<h2 style='margin:0'>Music Manager</h2><p style='margin:2px 0'>Versión <b>{APP_VERSION}</b></p>"
-                   "<p>Organiza tu música: mueve carpetas, edita etiquetas, portadas y letras,<br>"
-                   "analiza la calidad de tus archivos y deja que una IA te ayude con los géneros.</p>"
-                   "<p>Creado por <b>PandxMax</b> · <a href='https://github.com/PandxMax/MusicManager'>github.com/PandxMax/MusicManager</a></p>")
+        t = QLabel(f"<h2 style='margin:0'>Music Manager</h2><p style='margin:2px 0'>{T('Versión')} <b>{APP_VERSION}</b></p>"
+                   + T(i18n_more.ABOUT_ES) +
+                   f"<p>{T('Creado por')} <b>PandxMax</b> · <a href='https://github.com/PandxMax/MusicManager'>github.com/PandxMax/MusicManager</a></p>")
         t.setTextFormat(Qt.TextFormat.RichText)
         t.setWordWrap(True)
         t.setOpenExternalLinks(True)

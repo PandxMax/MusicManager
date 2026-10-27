@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt, QThread, QUrl, pyqtSignal
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton, QSlider, QComboBox,
                              QTabWidget, QWidget, QCheckBox, QDoubleSpinBox, QSpinBox, QProgressBar, QMessageBox,
                              QScrollArea, QFrame)
+from i18n import tr as T
 from spectro import ffmpeg_exe, file_info
 
 try:
@@ -412,14 +413,14 @@ class FxDialog(QDialog):
         if self.busy():
             return
         if not HAS_AUDIO:
-            self.status.setText("Este equipo no tiene reproductor integrado para la muestra.")
+            self.status.setText(T("Este equipo no tiene reproductor integrado para la muestra."))
             return
         self.stop_preview()
         fd, self.tmp = tempfile.mkstemp(prefix="mmfx_", suffix=".wav")
         os.close(fd)
         n = 30
         cmd = build_cmd(self.path, self.tmp, self.params(), self.sr, self.dur, preview=n, offset=self.offset)
-        self.status.setText("Preparando la muestra…")
+        self.status.setText(T("Preparando la muestra…"))
         self.set_busy(True)
         self.worker = FxWorker(cmd, self.tmp, n)
         self.worker.progress.connect(self.bar.setValue)
@@ -440,7 +441,7 @@ class FxDialog(QDialog):
             self.release(None)   # pausa el reproductor principal para no mezclar sonidos
         self.pplayer.setSource(QUrl.fromLocalFile(wav))
         self.pplayer.play()
-        self.status.setText("Reproduciendo la muestra. Puedes mover los ajustes y volver a pulsar «Escuchar».")
+        self.status.setText(T("Reproduciendo la muestra. Puedes mover los ajustes y volver a pulsar «Escuchar»."))
 
     def stop_preview(self):
         if self.pplayer is not None:
@@ -459,7 +460,7 @@ class FxDialog(QDialog):
             return
         p = self.params()
         if is_default(p):
-            self.status.setText("No has cambiado nada todavía.")
+            self.status.setText(T("No has cambiado nada todavía."))
             return
         if replace:
             if QMessageBox.question(self, "Reemplazar la original",
@@ -477,7 +478,7 @@ class FxDialog(QDialog):
         self.cur_dst = self.dst
         _, out = build_filters(p, self.sr, self.dur)
         cmd = build_cmd(self.path, self.dst, p, self.sr, self.dur)
-        self.status.setText("Aplicando los ajustes… (según la duración puede tardar un momento)")
+        self.status.setText(T("Aplicando los ajustes… (según la duración puede tardar un momento)"))
         self.set_busy(True)
         self.worker = FxWorker(cmd, self.dst, out or self.dur or 60)
         self.worker.progress.connect(self.bar.setValue)
@@ -502,8 +503,7 @@ class FxDialog(QDialog):
                 self.status.setText(f"No se pudo reemplazar el archivo: {e}. La versión nueva quedó en {dst}")
                 return
         self.set_busy(False)
-        self.status.setText(("✔ Original reemplazada: " if self.replace else "✔ Guardada como canción nueva: ")
-                            + os.path.basename(final))
+        self.status.setText(T(("✔ Original reemplazada: " if self.replace else "✔ Guardada como canción nueva: ") + os.path.basename(final)))
         if self.on_saved:
             self.on_saved(final, self.replace)
 
@@ -517,7 +517,7 @@ class FxDialog(QDialog):
             except OSError:
                 pass
         if msg != "cancelado":
-            self.status.setText("No se pudo aplicar: " + msg)
+            self.status.setText(T("No se pudo aplicar: " + msg))
 
     def closeEvent(self, e):
         if self.busy():

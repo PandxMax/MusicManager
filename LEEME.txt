@@ -329,3 +329,9 @@ VERSIÓN 1.45
 ------------
  - Rellenar con IA ahora completa todos los campos (incluidos compositor, pista, disco y comentario).
  - Álbum, año, pista y disco se toman del catálogo de iTunes/Deezer; la IA completa el resto.
+
+VERSIÓN 1.46
+------------
+ - Selector de idioma con banderitas (arriba a la derecha): Español, English, Русский al instante.
+ - Mucho más traducido al inglés y al ruso (ventanas, avisos, barra de estado, guía).
+ - Botones Sí/No/Aceptar/Cancelar en el idioma elegido.

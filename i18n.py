@@ -1,7 +1,10 @@
 """Traducción sencilla de la interfaz: español (base), inglés y ruso."""
 from PyQt6.QtCore import QObject
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QAbstractButton, QLabel, QGroupBox, QLineEdit, QMenu, QTabWidget, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (QAbstractButton, QLabel, QGroupBox, QLineEdit, QMenu, QTabWidget, QWidget, QComboBox,
+                             QMessageBox, QDialogButtonBox)
+import re
 
 LANGS = [("es", "Español"), ("en", "English"), ("ru", "Русский")]
 CUR = "es"
@@ -130,7 +133,25 @@ _ROWS = [
     ("Espectrogramas", "Spectrograms", "Спектрограммы"), ("Comparación", "Comparison", "Сравнение"),
     ("Análisis", "Analysis", "Анализ"),
 ]
-TABLE = {es: {"en": en, "ru": ru} for es, en, ru in _ROWS}
+try:
+    from i18n_more import ROWS as _MORE
+except Exception:   # pragma: no cover
+    _MORE = []
+TABLE = {es: {"en": en, "ru": ru} for es, en, ru in _ROWS + _MORE}
+# claves que sirven de prefijo («No se pudo: » + detalle) y claves con %s (texto variable en medio)
+_PREFIXES = sorted((k for k in TABLE if k.endswith((": ", " ")) and len(k.strip()) > 3), key=len, reverse=True)
+_PATTERNS = [(re.compile("^" + re.escape(k).replace("%s", "(.+?)") + "$", re.S), k) for k in TABLE if "%s" in k]
+
+# botones estándar de los cuadros de mensaje (Qt no trae traducciones)
+STD_BUTTONS = {
+    "Yes": ("Sí", "Yes", "Да"), "No": ("No", "No", "Нет"), "Ok": ("Aceptar", "OK", "ОК"),
+    "Cancel": ("Cancelar", "Cancel", "Отмена"), "Save": ("Guardar", "Save", "Сохранить"),
+    "Discard": ("Descartar", "Discard", "Не сохранять"), "Close": ("Cerrar", "Close", "Закрыть"),
+    "Apply": ("Aplicar", "Apply", "Применить"), "Retry": ("Reintentar", "Retry", "Повторить"),
+    "Ignore": ("Ignorar", "Ignore", "Пропустить"), "Abort": ("Abortar", "Abort", "Прервать"),
+    "Open": ("Abrir", "Open", "Открыть"), "Reset": ("Restablecer", "Reset", "Сбросить"),
+    "YesToAll": ("Sí a todo", "Yes to all", "Да для всех"), "NoToAll": ("No a todo", "No to all", "Нет для всех"),
+}
 
 
 def set_lang(code):
@@ -138,11 +159,53 @@ def set_lang(code):
     CUR = code if code in ("es", "en", "ru") else "es"
 
 
-def tr(s):
-    if CUR == "es":
-        return s
+def _lookup(s):
+    """Traducción de s o None si no se conoce (exacta, con %s, o por prefijo)."""
     d = TABLE.get(s)
-    return d[CUR] if d else s
+    if d:
+        return d[CUR]
+    for rx, k in _PATTERNS:
+        m = rx.match(s)
+        if m:
+            out = TABLE[k][CUR]
+            for g in m.groups():
+                out = out.replace("%s", g, 1)
+            return out
+    for k in _PREFIXES:
+        if s.startswith(k) and len(s) > len(k):
+            return TABLE[k][CUR] + s[len(k):]
+    return None
+
+
+def known(s):
+    return bool(s) and (s in TABLE or any(rx.match(s) for rx, _ in _PATTERNS)
+                        or any(s.startswith(k) and len(s) > len(k) for k in _PREFIXES))
+
+
+def tr(s):
+    if CUR == "es" or not s or not isinstance(s, str):
+        return s
+    out = _lookup(s)
+    return out if out is not None else s
+
+
+def fix_std_buttons(box):
+    """Pone «Sí / No / Aceptar…» en los botones estándar en el idioma actual."""
+    idx = {"es": 0, "en": 1, "ru": 2}.get(CUR, 0)
+    try:
+        if isinstance(box, QMessageBox):
+            pairs = [(box.standardButton(b), b) for b in box.buttons()]
+            enum = QMessageBox.StandardButton
+        else:
+            pairs = [(box.standardButton(b), b) for b in box.buttons()]
+            enum = QDialogButtonBox.StandardButton
+        for sb, b in pairs:
+            for name, texts in STD_BUTTONS.items():
+                if sb == getattr(enum, name, None):
+                    b.setText(texts[idx])
+                    break
+    except Exception:
+        pass
 
 
 def _deco(obj, text):
@@ -168,7 +231,7 @@ def _apply(obj, attr, get, set_, deco=False):
     ok, lk = "_i18n_o_" + attr, "_i18n_l_" + attr
     orig, last = obj.property(ok), obj.property(lk)
     if orig is None or cur != last:           # texto nuevo (o cambiado desde el programa)
-        if cur in TABLE:
+        if known(cur):
             orig = cur
         else:
             obj.setProperty(ok, None)
@@ -206,6 +269,15 @@ def retranslate(root):
                 _apply(o, "t", o.text, o.setText)
             elif isinstance(o, QGroupBox):
                 _apply(o, "t", o.title, o.setTitle)
+            elif isinstance(o, QComboBox):
+                for i in range(o.count()):
+                    role = Qt.ItemDataRole.UserRole + 77
+                    orig = o.itemData(i, role)
+                    if orig is None and known(o.itemText(i)):
+                        orig = o.itemText(i)
+                        o.setItemData(i, orig, role)
+                    if orig is not None and o.itemText(i) != tr(orig):
+                        o.setItemText(i, tr(orig))
             elif isinstance(o, QLineEdit):
                 _apply(o, "ph", o.placeholderText, o.setPlaceholderText)
             elif isinstance(o, QTabWidget):
@@ -215,9 +287,13 @@ def retranslate(root):
                     cur = o.tabText(i)
                     orig = o.property(key)
                     if orig is None or cur != tr(orig):
-                        orig = cur if cur in TABLE else orig
+                        orig = cur if known(cur) else orig
                     if orig is not None:
                         o.setProperty(key, orig)
                         o.setTabText(i, tr(orig))
+            if isinstance(o, (QMessageBox, QDialogButtonBox)):
+                fix_std_buttons(o)
+            if o.toolTip():
+                _apply(o, "wtip", o.toolTip, o.setToolTip)
             if o.windowTitle() and o.isWindow():
                 _apply(o, "wt", o.windowTitle, o.setWindowTitle)

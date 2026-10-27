@@ -345,7 +345,46 @@ def vicon(kind, color=None, ctx=None):
 
 
 from PyQt6.QtCore import QObject, QEvent
-from PyQt6.QtWidgets import QAbstractButton, QMenu
+from PyQt6.QtWidgets import QAbstractButton, QMenu, QDialog, QMessageBox
+
+
+def flag_pixmap(code, w=44, h=30):
+    """Banderita dibujada para el selector de idioma (es = España, en = EE. UU., ru = Rusia)."""
+    pm = QPixmap(w, h)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    clip = QPainterPath()
+    clip.addRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 4, 4)
+    p.setClipPath(clip)
+    p.setPen(Qt.PenStyle.NoPen)
+    if code == "es":
+        p.fillRect(QRectF(0, 0, w, h), QColor("#AA151B"))
+        p.fillRect(QRectF(0, h / 4, w, h / 2), QColor("#F1BF00"))
+    elif code == "ru":
+        for i, c in enumerate(("#FFFFFF", "#0039A6", "#D52B1E")):
+            p.fillRect(QRectF(0, i * h / 3, w, h / 3 + 0.5), QColor(c))
+    else:   # en
+        sh = h / 13.0
+        for i in range(13):
+            p.fillRect(QRectF(0, i * sh, w, sh + 0.3), QColor("#B22234" if i % 2 == 0 else "#FFFFFF"))
+        cw, ch = w * 0.42, sh * 7
+        p.fillRect(QRectF(0, 0, cw, ch), QColor("#3C3B6E"))
+        p.setBrush(QColor("#FFFFFF"))
+        for r in range(4):
+            for c in range(5):
+                p.drawEllipse(QPointF(cw * (c + 0.5) / 5, ch * (r + 0.5) / 4), 0.9, 0.9)
+    p.setClipping(False)
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.setPen(QPen(QColor(0, 0, 0, 60), 1))
+    p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 4, 4)
+    p.end()
+    pm.setDevicePixelRatio(2.0)
+    return pm
+
+
+def flag_icon(code):
+    return QIcon(flag_pixmap(code))
 
 
 class IconDeco(QObject):
@@ -362,8 +401,11 @@ class IconDeco(QObject):
                     import i18n
                     for a in o.actions():
                         t = a.text()
-                        if t and t[0] in LEAD and a.icon().isNull():
+                        if t and (t[0] in LEAD and a.icon().isNull() or i18n.CUR != "es"):
                             i18n.deco(a)
+                elif o.isWindow() and isinstance(o, (QDialog, QMessageBox)):
+                    import i18n
+                    i18n.retranslate(o)   # traduce ventanas y avisos creados sobre la marcha
         except Exception:
             pass
         return False

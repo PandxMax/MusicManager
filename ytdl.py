@@ -3,6 +3,7 @@ import os
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit, QPushButton,
                              QComboBox, QProgressBar, QPlainTextEdit, QFileDialog)
+from i18n import tr as T
 from spectro import ffmpeg_exe
 
 
@@ -128,22 +129,22 @@ class YoutubeDialog(QDialog):
     def start(self):
         url, out = self.url.text().strip(), self.dir.text().strip()
         if not url.lower().startswith("http"):
-            self.status.setText("Pega un enlace válido (empieza con https://).")
+            self.status.setText(T("Pega un enlace válido (empieza con https://)."))
             return
         if "deezer." in url.lower():
-            self.status.setText("Deezer no permite descargar canciones completas (están protegidas).")
+            self.status.setText(T("Deezer no permite descargar canciones completas (están protegidas)."))
             self.logbox.setPlainText("Las canciones de Deezer están cifradas (DRM) y solo hay 30 s de muestra pública, "
                                      "así que no se pueden bajar. Busca la misma canción en YouTube o SoundCloud y pega ese enlace.")
             return
         if not out or not os.path.isdir(out):
-            self.status.setText("Elige una carpeta de destino que exista.")
+            self.status.setText(T("Elige una carpeta de destino que exista."))
             return
         self.go.setEnabled(False)
         self.bar.setValue(0)
         self.logbox.clear()
-        self.status.setText("Empezando…")
+        self.status.setText(T("Empezando…"))
         self.worker = DlWorker(url, out, self.q.currentData())
-        self.worker.progress.connect(lambda p, t: (self.bar.setValue(p), self.status.setText(t)))
+        self.worker.progress.connect(lambda p, t: (self.bar.setValue(p), self.status.setText(T(t))))
         self.worker.log.connect(self.logbox.appendPlainText)
         self.worker.fail.connect(self.on_fail)
         self.worker.done.connect(self.on_ok)
@@ -151,16 +152,16 @@ class YoutubeDialog(QDialog):
 
     def on_fail(self, msg):
         self.go.setEnabled(True)
-        self.status.setText("No se pudo descargar.")
+        self.status.setText(T("No se pudo descargar."))
         self.logbox.appendPlainText(msg)
 
     def on_ok(self, files):
         self.go.setEnabled(True)
         self.bar.setValue(100)
         if not files:
-            self.status.setText("Terminó, pero no encuentro el MP3 nuevo (quizá ya existía).")
+            self.status.setText(T("Terminó, pero no encuentro el MP3 nuevo (quizá ya existía)."))
         else:
-            self.status.setText(f"✔ Listo: {os.path.basename(files[0])}. Se seleccionó en la lista para que le pongas metadatos y portada.")
+            self.status.setText(T(f"✔ Listo: {os.path.basename(files[0])}. Se seleccionó en la lista para que le pongas metadatos y portada."))
         if self.on_done:
             self.on_done(self.dir.text().strip(), files)
 
