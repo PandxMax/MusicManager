@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QRadioButton, QButtonGroup,
 )
 import mutagen
 import i18n
@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.53"
+APP_VERSION = "1.54"
 
 
 class TMenu(QMenu):
@@ -776,6 +776,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.54', [
+        'Ajustes → Reproductor: elige el estilo del reproductor. «Barra de reproducción abajo (clásico)» o «Reproductor estilo celular». Solo se usa uno a la vez: con el estilo celular desaparece la barra de abajo y el reproductor grande se abre desde la flechita del borde derecho.',
+    ]),
     ('1.53', [
         'Nuevo reproductor grande «estilo celular»: pulsa la flechita del borde derecho de la ventana y sale deslizándose un reproductor con la portada grande, fondo con los colores de la canción, barra de avance con tiempo restante, botones grandes, aleatorio, repetir (todas / una), volumen y la letra (sincronizada si tiene minutos). El reproductor de abajo sigue igual.',
         'Aleatorio y repetir también funcionan con el reproductor normal y se recuerdan al cerrar el programa.',
@@ -1137,7 +1140,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.53 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.54 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3008,8 +3011,7 @@ class Main(QMainWindow):
         if self.player is not None:
             import mobile
             self.mobile = mobile.MobilePlayer(self, central, inspect_file)
-            if int(self.cfg.value("mobile_open", 0) or 0):
-                QTimer.singleShot(400, self.mobile.open_panel)
+            QTimer.singleShot(300, lambda: self.set_player_style(str(self.cfg.value("player_style", "classic")), first=True))
         self.statusBar().addPermanentWidget(self.player_bar)   # reproductor en la línea de estado, a la derecha
         self.statusBar().setSizeGripEnabled(False)
         self.statusBar().showMessage("Arrastra carpetas o canciones sobre otra carpeta. Doble clic en una canción para reproducirla.")
@@ -3937,6 +3939,27 @@ class Main(QMainWindow):
             return list(self.playlist), True
         return [self.list.item(r).data(PATH_ROLE) for r in range(self.list.count())
                 if self.list.item(r).data(KIND_ROLE) != "dir"], False
+
+    def set_player_style(self, style, first=False):
+        """«classic» = solo la barra de abajo · «mobile» = solo el reproductor estilo celular del borde derecho."""
+        if self.mobile is None:
+            style = "classic"
+        self.player_style = style if style in ("classic", "mobile") else "classic"
+        self.cfg.setValue("player_style", self.player_style)
+        if self.player_style == "mobile":
+            self.player_bar.hide()
+            self.mobile.tab.show()
+            self.mobile.place()
+            if not first or int(self.cfg.value("mobile_open", 1) or 0):
+                if not self.mobile.isVisible():
+                    self.mobile.open_panel()
+        else:
+            self.player_bar.show()
+            if self.mobile is not None:
+                self.mobile.anim.stop()
+                self.mobile.hide()
+                self.mobile.tab.hide()
+        self.layout_overlay()
 
     def set_shuffle(self, on):
         self.shuffle = bool(on)
@@ -5756,6 +5779,22 @@ class Main(QMainWindow):
             chk("Abrir la última carpeta al iniciar", "open_last", 1),
             chk("Confirmar antes de eliminar (con papelera)", "confirm_delete", 1),
             chk("Mostrar la guía rápida cada vez que se inicia", "guide_every", 0)))
+        # Reproductor: barra clásica o estilo celular (solo uno a la vez)
+        snap_style = getattr(self, "player_style", "classic")
+        r_classic = QRadioButton("Barra de reproducción abajo (clásico)")
+        r_mobile = QRadioButton("Reproductor estilo celular (sale desde el borde derecho)")
+        grp_ps = QButtonGroup(dlg)
+        grp_ps.addButton(r_classic)
+        grp_ps.addButton(r_mobile)
+        (r_mobile if snap_style == "mobile" else r_classic).setChecked(True)
+        if self.mobile is None:
+            r_mobile.setEnabled(False)
+        r_classic.toggled.connect(lambda on: on and self.set_player_style("classic"))
+        r_mobile.toggled.connect(lambda on: on and self.set_player_style("mobile"))
+        hint_ps = QLabel("Solo se usa uno a la vez. En el estilo celular, la flechita del borde derecho lo abre y lo cierra.")
+        hint_ps.setWordWrap(True)
+        hint_ps.setObjectName("hint")
+        add_page("reproductor", "Reproductor", page(QLabel("Estilo del reproductor"), r_classic, r_mobile, hint_ps))
         # Apariencia
         theme_cb = QComboBox()
         theme_cb.addItem(T("Oscuro"), "dark")
@@ -5886,6 +5925,8 @@ class Main(QMainWindow):
                 self.set_accent(snap[1])
             if snap[2] != i18n.CUR:
                 self.set_language(snap[2])
+            if snap_style != getattr(self, "player_style", "classic"):
+                self.set_player_style(snap_style)
             self.provider.setCurrentText(str(self.cfg.value("provider", "Claude")))
             self.on_provider(self.provider.currentText())
         self.ai_cfg.hide()

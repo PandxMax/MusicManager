@@ -689,3 +689,13 @@ ROWS += [
     ("Repetir: desactivado", "Repeat: off", "Повтор: выкл."), ("Repetir: todas", "Repeat: all", "Повтор: все"),
     ("Repetir: esta canción", "Repeat: this song", "Повтор: эта песня"),
 ]
+
+ROWS += [
+    ("Reproductor", "Player", "Плеер"), ("Estilo del reproductor", "Player style", "Стиль плеера"),
+    ("Barra de reproducción abajo (clásico)", "Playback bar at the bottom (classic)", "Панель воспроизведения внизу (классика)"),
+    ("Reproductor estilo celular (sale desde el borde derecho)", "Phone-style player (slides in from the right edge)",
+     "Плеер в стиле телефона (выезжает справа)"),
+    ("Solo se usa uno a la vez. En el estilo celular, la flechita del borde derecho lo abre y lo cierra.",
+     "Only one is used at a time. In phone style, the little arrow on the right edge opens and closes it.",
+     "Используется только один. В стиле телефона его открывает и закрывает стрелка у правого края."),
+]

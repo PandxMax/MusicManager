@@ -262,6 +262,7 @@ class MobilePlayer(QFrame):
 
         self.tab = EdgeTab(parent)
         self.tab.clicked.connect(self.open_panel)
+        self.tab.hide()   # solo aparece con el estilo «celular» (Ajustes → Reproductor)
         self.hide()
         p = main.player
         if p is not None:

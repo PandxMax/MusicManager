@@ -370,3 +370,7 @@ VERSIÓN 1.53
  - Nuevo reproductor grande estilo celular: flechita en el borde derecho; portada grande, fondo con los colores de la canción, controles grandes, aleatorio, repetir, volumen y letra.
  - Aleatorio y repetir también en el reproductor normal.
  - Se quitó la barra que desplazaba todo el programa.
+
+VERSIÓN 1.54
+------------
+ - Ajustes → Reproductor: elige entre la barra clásica de abajo o el reproductor estilo celular (solo uno a la vez).
