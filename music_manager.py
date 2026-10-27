@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.63"
+APP_VERSION = "1.64"
 
 
 class TMenu(QMenu):
@@ -787,6 +787,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.64', [
+        'Con dos árboles: el primero se llama «De» (eliges lo que vas a enviar) y el segundo «A» (eliges a dónde va). Abajo se ve «De: … / A: …» con el botón «Enviar» (mueve), «Copiar» y «Invertir» para cambiar el sentido. Con un solo árbol se llama «Carpetas».',
+    ]),
     ('1.63', [
         'Árboles escondidos: al abrirlos con la flechita ahora empujan el resto del programa hacia la derecha (ya no se montan encima), y al cerrarlos todo vuelve a ocupar el ancho. La flechita queda en su propio canal del borde izquierdo y recuerda si los dejaste abiertos.',
     ]),
@@ -1225,7 +1228,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.63 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.64 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3258,6 +3261,9 @@ class Main(QMainWindow):
         lbl.setFont(f)
         v.addWidget(lbl)
         v.addWidget(tree)
+        if not hasattr(self, "pane_titles"):
+            self.pane_titles = {}
+        self.pane_titles[tree] = lbl
         return w
 
     def pinned(self):
@@ -3283,27 +3289,34 @@ class Main(QMainWindow):
 
     # ---------------------------------------------- pasar entre árboles sin arrastrar (como Kodi)
     def build_xfer_bar(self):
+        """Con dos árboles: el de «De» es el origen y el de «A» el destino. Abajo: qué se envía, «Enviar» e «Invertir»."""
+        self.xfer_src = self.tree   # árbol de origen («De»); el otro es el destino («A»)
         bar = QFrame()
         bar.setObjectName("xfer")
         v = QVBoxLayout(bar)
         v.setContentsMargins(8, 6, 8, 6)
-        v.setSpacing(4)
+        v.setSpacing(5)
         self.xfer_lbl = QLabel("")
-        self.xfer_lbl.setObjectName("hint")
         self.xfer_lbl.setWordWrap(True)
         self.xfer_lbl.setTextFormat(Qt.TextFormat.RichText)
         v.addWidget(self.xfer_lbl)
         row = QHBoxLayout()
         row.setSpacing(6)
-        self.xfer_copy = QPushButton("📋 Copiar al otro árbol")
-        self.xfer_move = QPushButton("✂️ Mover al otro árbol")
-        for b, mv, tip in ((self.xfer_copy, False, "Copia lo elegido a la carpeta abierta en el otro árbol (F7)"),
-                           (self.xfer_move, True, "Mueve lo elegido a la carpeta abierta en el otro árbol (F6)")):
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setToolTip(tip)
-            b.clicked.connect(lambda _=False, mv=mv: self.xfer(mv))
-            row.addWidget(b, 1)
+        self.xfer_swap = QPushButton("⇄ Invertir")
+        self.xfer_swap.setToolTip("Cambia el sentido: el árbol de «De» pasa a ser «A» y al revés")
+        self.xfer_swap.clicked.connect(self.xfer_invert)
+        self.xfer_copy = QPushButton("📋 Copiar")
+        self.xfer_copy.setToolTip("Copia lo elegido en «De» a la carpeta elegida en «A» (F7)")
+        self.xfer_copy.clicked.connect(lambda: self.xfer(False))
+        self.xfer_move = QPushButton("➡ Enviar")
         self.xfer_move.setObjectName("accent")
+        self.xfer_move.setToolTip("Mueve lo elegido en «De» a la carpeta elegida en «A» (F6)")
+        self.xfer_move.clicked.connect(lambda: self.xfer(True))
+        for b_ in (self.xfer_swap, self.xfer_copy, self.xfer_move):
+            b_.setCursor(Qt.CursorShape.PointingHandCursor)
+        row.addWidget(self.xfer_swap)
+        row.addWidget(self.xfer_copy)
+        row.addWidget(self.xfer_move, 1)
         v.addLayout(row)
         bar.hide()
         self.xfer_bar = bar
@@ -3315,21 +3328,45 @@ class Main(QMainWindow):
         self.xfer_timer.timeout.connect(self.update_xfer)
         return bar
 
+    def xfer_dst_tree(self):
+        return self.tree2 if self.xfer_src is self.tree else self.tree
+
+    def update_tree_titles(self):
+        titles = getattr(self, "pane_titles", {})
+        two = self.tree2_box.isVisible()
+        for t, lbl in titles.items():
+            if not two:
+                txt = "📁 Carpetas" if t is self.tree else "📁 Árbol 2"
+            elif t is self.xfer_src:
+                txt = "📤 De:  elige lo que vas a enviar"
+            else:
+                txt = "📥 A:  elige a dónde se envía"
+            lbl.setText(txt)
+            lbl.setStyleSheet("" if not two else ("color: palette(highlight);" if t is self.xfer_src else ""))
+
+    def xfer_invert(self):
+        self.xfer_src = self.xfer_dst_tree()
+        self.update_tree_titles()
+        self.update_xfer()
+
     def xfer_plan(self):
-        """(qué se pasa, a dónde, descripción). Canciones elegidas en la lista o, si no hay, la carpeta elegida en el árbol activo."""
+        """(qué se envía, a dónde, descripción). De = canciones elegidas en la lista (si la lista muestra la carpeta
+        de «De») o la carpeta elegida en el árbol «De». A = carpeta elegida en el árbol «A»."""
         if not self.tree2_box.isVisible():
             return [], None, ""
-        src_tree = self.active_tree if self.active_tree in (self.tree, self.tree2) else self.tree
-        other = self.tree2 if src_tree is self.tree else self.tree
-        oc = other.currentItem()
-        dst = oc.data(0, PATH_ROLE) if oc is not None else None
+        src_tree, dst_tree = self.xfer_src, self.xfer_dst_tree()
+        dc = dst_tree.currentItem()
+        dst = dc.data(0, PATH_ROLE) if dc is not None else None
+        sc = src_tree.currentItem()
+        src_dir = sc.data(0, PATH_ROLE) if sc is not None else None
         files = [p for p in self.selected_paths() if p and os.path.isfile(p)]
-        if files:
+        if files and src_dir and self.current_dir and \
+                os.path.normcase(os.path.normpath(self.current_dir)) == os.path.normcase(os.path.normpath(src_dir)):
             what = T(f"{len(files)} canción(es)") if len(files) > 1 else f"«{os.path.basename(files[0])}»"
             return files, dst, what
         dirs = [d for d in src_tree.selected_dirs() if d]
         if dirs:
-            what = f"«{os.path.basename(dirs[0].rstrip(os.sep)) or dirs[0]}»" if len(dirs) == 1 else T(f"{len(dirs)} carpetas")
+            what = f"📁 «{os.path.basename(dirs[0].rstrip(os.sep)) or dirs[0]}»" if len(dirs) == 1 else T(f"{len(dirs)} carpetas")
             return dirs, dst, what
         return [], dst, ""
 
@@ -3338,16 +3375,14 @@ class Main(QMainWindow):
             return
         on = self.tree2_box.isVisible()
         self.xfer_bar.setVisible(on)
+        self.update_tree_titles()
         if not on:
             return
         srcs, dst, what = self.xfer_plan()
-        dname = os.path.basename(dst.rstrip(os.sep)) or dst if dst else ""
-        if srcs and dst:
-            self.xfer_lbl.setText(f"{what} &nbsp;➜&nbsp; <b>{html.escape(dname)}</b>")
-        elif not dst:
-            self.xfer_lbl.setText(T("Elige en el otro árbol la carpeta de destino."))
-        else:
-            self.xfer_lbl.setText(T("Elige canciones en la lista o una carpeta en el árbol."))
+        dname = (os.path.basename(dst.rstrip(os.sep)) or dst) if dst else ""
+        de = what or f"<i>{html.escape(T('elige en «De»'))}</i>"
+        a = f"<b>{html.escape(dname)}</b>" if dname else f"<i>{html.escape(T('elige en «A»'))}</i>"
+        self.xfer_lbl.setText(f"<b>{html.escape(T('De'))}:</b> {de}<br><b>{html.escape(T('A'))}:</b> {a}")
         ok = bool(srcs and dst)
         self.xfer_copy.setEnabled(ok)
         self.xfer_move.setEnabled(ok)

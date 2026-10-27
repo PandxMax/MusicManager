@@ -413,3 +413,7 @@ VERSIÓN 1.62
 VERSIÓN 1.63
 ------------
  - Árboles escondidos: al abrirse empujan el contenido en vez de taparlo.
+
+VERSIÓN 1.64
+------------
+ - Dos árboles: «De» (origen) y «A» (destino), con «Enviar», «Copiar» e «Invertir» abajo. Con un solo árbol: «Carpetas».

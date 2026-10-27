@@ -751,3 +751,18 @@ ROWS += [
      "Скрыты: открываются стрелкой у левого края"),
     ("Mostrar las carpetas", "Show folders", "Показать папки"), ("Ocultar las carpetas", "Hide folders", "Скрыть папки"),
 ]
+
+ROWS += [
+    ("⇄ Invertir", "⇄ Swap", "⇄ Поменять"), ("📋 Copiar", "📋 Copy", "📋 Копировать"), ("➡ Enviar", "➡ Send", "➡ Отправить"),
+    ("Cambia el sentido: el árbol de «De» pasa a ser «A» y al revés", "Swaps direction: the “From” tree becomes “To” and vice versa",
+     "Меняет направление: «Откуда» становится «Куда» и наоборот"),
+    ("Copia lo elegido en «De» a la carpeta elegida en «A» (F7)", "Copies what's chosen in “From” to the folder chosen in “To” (F7)",
+     "Копирует выбранное в «Откуда» в папку «Куда» (F7)"),
+    ("Mueve lo elegido en «De» a la carpeta elegida en «A» (F6)", "Moves what's chosen in “From” to the folder chosen in “To” (F6)",
+     "Перемещает выбранное в «Откуда» в папку «Куда» (F6)"),
+    ("📁 Carpetas", "📁 Folders", "📁 Папки"), ("📁 Árbol 2", "📁 Tree 2", "📁 Дерево 2"),
+    ("📤 De:  elige lo que vas a enviar", "📤 From:  pick what to send", "📤 Откуда:  выберите, что отправить"),
+    ("📥 A:  elige a dónde se envía", "📥 To:  pick where it goes", "📥 Куда:  выберите, куда отправить"),
+    ("elige en «De»", "pick in “From”", "выберите в «Откуда»"), ("elige en «A»", "pick in “To”", "выберите в «Куда»"),
+    ("De", "From", "Откуда"), ("A", "To", "Куда"),
+]
