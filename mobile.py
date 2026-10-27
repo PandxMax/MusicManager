@@ -273,8 +273,11 @@ class MobilePlayer(QFrame):
         bot = QHBoxLayout()
         self.b_vol = RoundButton("vol2", 34)
         self.b_vol.clicked.connect(self.main.toggle_mute)
-        self.vol = QSlider(Qt.Orientation.Horizontal)
+        self.vol = JumpSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
+        self.vol.setSingleStep(2)
+        self.vol.setPageStep(5)
+        self.vol.jumped.connect(lambda x: self.main.vol.setValue(x))
         self.vol.setStyleSheet(self.seek.styleSheet())
         self.vol.valueChanged.connect(lambda x: self.main.vol.setValue(x))
         self.b_lyr = RoundButton("lyrics", 34)
@@ -326,6 +329,10 @@ class MobilePlayer(QFrame):
 
     def open_panel(self):
         par = self.parentWidget()
+        if par is None or not par.isVisible() or par.width() < 200:
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(150, self.open_panel)   # la ventana aún se está colocando: espera un momento
+            return
         self.track_changed(self.main.playing_path)
         self._closing = False
         self.setFixedHeight(par.height())
@@ -354,6 +361,11 @@ class MobilePlayer(QFrame):
         if self._closing:
             self.hide()
             self._closing = False
+        else:   # si la ventana cambió de tamaño mientras se abría, se pega otra vez al borde derecho
+            par = self.parentWidget()
+            if par is not None:
+                self.setFixedHeight(par.height())
+                self.move(par.width() - self.width(), 0)
         self.place_tab()
 
     # ------------------------------------------------------------ fondo

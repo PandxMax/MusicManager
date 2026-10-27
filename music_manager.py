@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.58"
+APP_VERSION = "1.59"
 
 
 class TMenu(QMenu):
@@ -643,6 +643,12 @@ def safe_filename(name):
     return name[:180]
 
 
+def vol_curve(x):
+    """0–100 de la barra → volumen real. El oído no es lineal: con esta curva cada paso se nota igual de suave."""
+    x = max(0.0, min(1.0, x / 100.0))
+    return x ** 2.2 if x > 0 else 0.0
+
+
 def fmt_ms(ms):
     s = int(ms // 1000)
     return f"{s // 60}:{s % 60:02d}"
@@ -780,6 +786,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.59', [
+        'Reproductor celular: al abrir el programa ya no aparece a mitad de la ventana; siempre queda pegado al borde derecho y ocupa todo el alto.',
+        'Volumen más suave: la barra sigue una curva de oído, así cada movimiento se siente parejo (antes casi todo el cambio estaba en la parte baja). La barra del reproductor celular salta adonde haces clic.',
+        'Al abrir el programa el volumen empieza a la mitad; mientras lo usas se queda donde lo dejes.',
+    ]),
     ('1.58', [
         'Reproductor estilo celular: al hacer doble clic en una canción, pulsar «Reproducir» o darle a play, el reproductor grande se despliega solo. Al pasar sola a la siguiente canción no se abre. Se puede desactivar en Ajustes → Reproductor.',
     ]),
@@ -1200,7 +1211,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.58 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.59 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3550,7 +3561,7 @@ class Main(QMainWindow):
         self.btn_mute.installEventFilter(self)
         self.vol = ClickSlider(Qt.Orientation.Vertical)
         self.vol.setRange(0, 100)
-        self.vol.setValue(70)
+        self.vol.setValue(50)          # cada vez que se abre el programa empieza a la mitad
         self.vol.wheel_step = 5
         self.vol.tip_fn = lambda v: f"Volumen: {v}%"
         self.seek.tip_fn = lambda v: f"{fmt_ms(v)} / {fmt_ms(self.seek.maximum())}"
@@ -3592,7 +3603,7 @@ class Main(QMainWindow):
             self.player = QMediaPlayer()
             self.audio = QAudioOutput()
             self.player.setAudioOutput(self.audio)
-            self.audio.setVolume(0.7)
+            self.audio.setVolume(vol_curve(50))
             self.player.positionChanged.connect(self.on_pos)
             self.player.durationChanged.connect(self.on_dur)
             self.player.playbackStateChanged.connect(self.on_state)
@@ -4098,7 +4109,7 @@ class Main(QMainWindow):
             return
         if x > 0 and self.audio.isMuted():
             self.audio.setMuted(False)
-        self.audio.setVolume(x / 100)
+        self.audio.setVolume(vol_curve(x))   # curva de oído: el cambio se siente parejo en todo el recorrido
         self.update_vol_icon()
 
     def toggle_mute(self):
