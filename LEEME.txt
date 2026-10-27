@@ -348,3 +348,8 @@ VERSIÓN 1.48
 VERSIÓN 1.49
 ------------
  - El archivo .lrc junto a la canción viene desactivado; se activa en Ajustes → Etiquetas.
+
+VERSIÓN 1.50
+------------
+ - Nuevo: Herramientas → Buscar canciones repetidas (deja marcadas las copias de peor calidad).
+ - La etiqueta de la portada ya no se monta encima de la imagen.

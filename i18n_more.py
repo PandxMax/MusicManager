@@ -578,3 +578,30 @@ NOKEY_RU = ("<h3>🔑 Для работы ИИ нужен ключ (API key)</h3
             "<p><small>У бесплатного тарифа есть лимит запросов в минуту и в день — этого с запасом хватит для тегов. "
             "Никому не сообщайте свой ключ. Claude и ChatGPT тоже работают, но их ключи платные.</small></p>")
 ROWS.append((NOKEY_ES, NOKEY_EN, NOKEY_RU))
+
+ROWS += [
+    ("✔ Esta canción ya tiene letra%s", "✔ This song already has lyrics%s", "✔ У этой песни уже есть текст%s"),
+    ("🔁 Buscar canciones repetidas…", "🔁 Find duplicate songs…", "🔁 Найти повторяющиеся песни…"),
+    ("Encuentra canciones duplicadas y deja marcadas las copias de peor calidad", "Finds duplicate songs and marks the lower-quality copies",
+     "Находит дубликаты и отмечает копии худшего качества"),
+    ("Abre primero una carpeta de música.", "Open a music folder first.", "Сначала откройте папку с музыкой."),
+    ("Canciones repetidas", "Duplicate songs", "Повторяющиеся песни"), ("Buscar en", "Search in", "Искать в"),
+    ("Esta carpeta", "This folder", "Эта папка"), ("Esta carpeta y sus subcarpetas", "This folder and its subfolders", "Эта папка и подпапки"),
+    ("Repetidas si tienen", "Duplicates if they have", "Дубликаты, если совпадает"),
+    ("El mismo artista y título (recomendado)", "The same artist and title (recommended)", "Исполнитель и название (рекомендуется)"),
+    ("Solo el mismo título", "Only the same title", "Только название"), ("Exactamente el mismo archivo", "Exactly the same file", "Полностью одинаковый файл"),
+    ("🔍 Buscar", "🔍 Search", "🔍 Искать"), ("Tamaño", "Size", "Размер"), ("Carpeta", "Folder", "Папка"),
+    ("Pulsa «Buscar». Se marcarán solas las copias de peor calidad; la mejor de cada grupo queda sin marcar.",
+     "Press “Search”. Lower-quality copies are marked automatically; the best one in each group stays unmarked.",
+     "Нажмите «Искать». Копии худшего качества отметятся сами; лучшая в каждой группе останется без отметки."),
+    ("🗑 Enviar las marcadas a la papelera", "🗑 Send marked ones to the Recycle Bin", "🗑 Отправить отмеченные в корзину"),
+    ("Leyendo las canciones…", "Reading the songs…", "Чтение песен…"),
+    ("✔ No hay canciones repetidas.", "✔ No duplicate songs.", "✔ Повторяющихся песен нет."),
+    ("La mejor copia del grupo", "The best copy in the group", "Лучшая копия в группе"),
+    ("%s grupos de repetidas · %s marcadas (%s). Doble clic para ver la canción en la lista.",
+     "%s duplicate groups · %s marked (%s). Double-click to show the song in the list.",
+     "Групп дубликатов: %s · отмечено: %s (%s). Двойной щелчок — показать песню в списке."),
+    ("En algún grupo están marcadas TODAS las copias. Deja al menos una sin marcar.",
+     "In some group ALL copies are marked. Leave at least one unmarked.", "В какой-то группе отмечены ВСЕ копии. Оставьте хотя бы одну."),
+    ("¿Enviar %s canción(es) %s?", "Send %s song(s) %s?", "Отправить песни (%s) %s?"),
+]

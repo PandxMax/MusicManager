@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.49"
+APP_VERSION = "1.50"
 
 
 class TMenu(QMenu):
@@ -773,6 +773,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.50', [
+        'Nuevo: Herramientas → «Buscar canciones repetidas». Encuentra duplicados (mismo artista y título, solo título o archivo idéntico), en la carpeta o también en subcarpetas, y deja marcadas las copias de peor calidad para enviarlas a la papelera. La mejor copia de cada grupo nunca se marca.',
+        'Portada: la etiqueta con formato y tamaño (JPEG · 1000×1000 px · 190 KB) va centrada justo debajo de la imagen y ya no se monta encima aunque la ventana sea pequeña.',
+    ]),
     ('1.49', [
         'El archivo .lrc (copia de la letra sincronizada junto a la canción) ya no se crea por defecto. Quien lo quiera puede activarlo en Ajustes → Etiquetas. La letra sigue guardándose dentro de la canción.',
     ]),
@@ -1116,7 +1120,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.49 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.50 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2810,21 +2814,29 @@ class Main(QMainWindow):
         self.info_lbl.setWordWrap(False)
         self.info_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_lbl.hide()
-        ch.addStretch(1)
-        ch.addLayout(left)
-        ch.addWidget(self.cover_lbl)
-        ch.addStretch(1)
-        cv.setContentsMargins(6, 4, 6, 4)
-        cv.setSpacing(3)
-        cv.addLayout(ch)
-        cv.addSpacing(8)
-        self.info_lbl.setFixedHeight(24)
+        # la etiqueta (JPEG · 1000×1000 px · 190 KB) va en su propia fila, centrada justo debajo de la portada
+        # y con espacio para la sombra: nunca se monta encima de la imagen
+        self.info_lbl.setFixedHeight(22)
+        self.info_lbl.setMaximumWidth(COVER + 24)
         sp_i = self.info_lbl.sizePolicy()
         sp_i.setRetainSizeWhenHidden(True)      # su sitio queda reservado: la portada no se mueve ni se tapa
         self.info_lbl.setSizePolicy(sp_i)
-        cv.addWidget(self.info_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
+        col = QVBoxLayout()
+        col.setSpacing(0)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.addWidget(self.cover_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
+        col.addSpacing(14)
+        col.addWidget(self.info_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
+        ch.addStretch(1)
+        ch.addLayout(left)
+        ch.addLayout(col)
+        ch.addStretch(1)
+        cv.setContentsMargins(6, 4, 6, 6)
+        cv.setSpacing(3)
+        cv.addLayout(ch)
         self.status_lbl.hide()
         cover_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        cover_box.setMinimumHeight(COVER + 14 + 22 + 22)   # no se puede encoger hasta tapar la portada
 
         ai_box = QGroupBox("Reconocer géneros con IA")
         av = QVBoxLayout(ai_box)
@@ -4173,7 +4185,7 @@ class Main(QMainWindow):
         dims = f"Portada: {pm.width()}×{pm.height()} px · {len(data) // 1024} KB" if data and not pm.isNull() else ""
         if data and not pm.isNull():
             kind = "PNG" if data[:4] == b"\x89PNG" else ("JPEG" if data[:2] == b"\xff\xd8" else "IMG")
-            self.info_lbl.setText(f"{kind}  ·  {pm.width()}×{pm.height()} px  ·  {len(data) // 1024} KB")
+            self.info_lbl.setText(f"{kind} · {pm.width()}×{pm.height()} px · {len(data) // 1024} KB")
         else:
             self.info_lbl.setText("")
         self.info_lbl.setVisible(bool(self.info_lbl.text()))
@@ -5322,6 +5334,8 @@ class Main(QMainWindow):
         t.addAction(self.act("✨ Portadas automáticas (alta calidad)", self.auto_cover,
                              "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
+        t.addAction(self.act("🔁 Buscar canciones repetidas…", self.open_dupes,
+                             "Encuentra canciones duplicadas y deja marcadas las copias de peor calidad"))
         t.addAction(self.act("🎚 Ajustes de la canción…", self.open_fx,
                              "Graves, agudos, tempo, tono, velocidad, bucle, eco… y guardar como canción nueva o reemplazar"))
         t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
@@ -5379,6 +5393,26 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         dlg.show()
         self._conv = dlg
+
+    def open_dupes(self):
+        import dupes
+        folder = self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else None
+        if not folder:
+            self.statusBar().showMessage("Abre primero una carpeta de música.")
+            return
+        dlg = dupes.DupesDialog(folder, AUDIO_EXT, self, on_changed=self.refresh_dir, on_open=self.reveal_file,
+                                send2trash=send2trash)
+        dlg.show()
+        self._dupes = dlg
+
+    def reveal_file(self, path):
+        """Abre la carpeta de esa canción en la lista y la deja seleccionada."""
+        folder = os.path.dirname(path)
+        if os.path.normpath(folder) != os.path.normpath(self.current_dir or ""):
+            self.open_dir(folder)
+        self.load_folder(folder, select=[path])
+        self.raise_()
+        self.activateWindow()
 
     def fx_release(self, path):
         """path=None: pausa el reproductor (para oír la muestra). path=archivo: suelta ese archivo si suena."""
