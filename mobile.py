@@ -4,6 +4,7 @@ import re
 from PyQt6.QtCore import (Qt, QPoint, QRect, QRectF, QPointF, QPropertyAnimation, QEasingCurve, QSize, pyqtSignal)
 from PyQt6.QtGui import (QPainter, QPixmap, QColor, QLinearGradient, QBrush, QPainterPath, QPen, QFont, QImage, QPalette)
 from PyQt6.QtWidgets import (QFrame, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider, QStackedWidget,
+                             QListWidget, QListWidgetItem,
                              QTextBrowser, QStyle, QStyleOptionSlider, QGraphicsDropShadowEffect, QSizePolicy)
 import icons
 from i18n import tr as T
@@ -113,26 +114,33 @@ class CoverArt(QWidget):
 
 
 class EdgeTab(QPushButton):
-    """La flechita centrada en el borde derecho que abre el reproductor."""
+    """Asa discreta en el borde: «‹» abre el reproductor; con el reproductor abierto se pega a su lado con «›» para cerrarlo."""
     def __init__(self, parent):
         super().__init__(parent)
-        self.setFixedSize(20, 72)
+        self.setFixedSize(18, 64)
+        self.opened = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip("Abrir el reproductor grande")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
+    def set_open(self, on):
+        self.opened = on
+        self.setToolTip("Cerrar el reproductor grande" if on else "Abrir el reproductor grande")
+        self.update()
+
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        base = self.palette().color(QPalette.ColorRole.Highlight)
-        a = 255 if self.underMouse() else 200
+        acc = self.palette().color(QPalette.ColorRole.Highlight)
+        hover = self.underMouse()
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         path = QPainterPath()
-        r = QRectF(self.rect())
-        path.addRoundedRect(QRectF(0, 0, r.width() + 12, r.height()), 10, 10)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(base.red(), base.green(), base.blue(), a))
+        path.addRoundedRect(QRectF(r.x(), r.y(), r.width() + 12, r.height()), 9, 9)   # redondeada solo por fuera
+        p.setPen(QPen(QColor(acc.red(), acc.green(), acc.blue(), 230 if hover else 120), 1))
+        p.setBrush(QColor(acc) if hover else QColor(28, 26, 38, 235))
         p.drawPath(path)
-        icons.draw_glyph(p, "chevron_l", QRectF(2, r.height() / 2 - 8, 16, 16), QColor("white"))
+        col = QColor("white") if hover else QColor(acc).lighter(130)
+        icons.draw_glyph(p, "chevron_r" if self.opened else "chevron_l", QRectF(2, r.height() / 2 - 7, 14, 14), col)
 
 
 class MobilePlayer(QFrame):
@@ -155,6 +163,7 @@ class MobilePlayer(QFrame):
         self.anim.setDuration(260)
         self.anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self.anim.finished.connect(self._anim_done)
+        self.anim.valueChanged.connect(lambda _v: self.place_tab())
         self._closing = False
 
         white = "color: white;"
@@ -185,8 +194,29 @@ class MobilePlayer(QFrame):
         self.lyr.setStyleSheet("QTextBrowser { background: transparent; color: rgba(255,255,255,190); font-size: 15px; border: none; }")
         self.lyr.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.lyr.mousePressEvent = lambda e: self.toggle_lyrics()
+        self.queue = QListWidget()
+        self.queue.setFrameShape(QFrame.Shape.NoFrame)
+        self.queue.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.queue.setStyleSheet(
+            "QListWidget { background: transparent; color: rgba(255,255,255,200); font-size: 13px; border: none; outline: none; }"
+            "QListWidget::item { padding: 8px 6px; border-radius: 8px; }"
+            "QListWidget::item:hover { background: rgba(255,255,255,22); }"
+            "QListWidget::item:selected { background: rgba(255,255,255,40); color: white; }"
+            "QScrollBar:vertical { background: transparent; width: 6px; }"
+            "QScrollBar::handle:vertical { background: rgba(255,255,255,70); border-radius: 3px; min-height: 30px; }"
+            "QScrollBar::add-line, QScrollBar::sub-line { height: 0; }")
+        self.queue.itemDoubleClicked.connect(self.play_from_queue)
+        self.q_head = QLabel("")
+        self.q_head.setStyleSheet("color: rgba(255,255,255,150); font-size: 11px; font-weight: 700; letter-spacing: 1px;")
+        qbox = QWidget()
+        qv = QVBoxLayout(qbox)
+        qv.setContentsMargins(0, 0, 0, 0)
+        qv.setSpacing(6)
+        qv.addWidget(self.q_head)
+        qv.addWidget(self.queue, 1)
         self.stack.addWidget(self.cover)
         self.stack.addWidget(self.lyr)
+        self.stack.addWidget(qbox)
         v.addWidget(self.stack, 1)
 
         self.title = QLabel("—")
@@ -252,7 +282,7 @@ class MobilePlayer(QFrame):
         self.b_lyr.clicked.connect(self.toggle_lyrics)
         self.b_list = RoundButton("menu", 34)
         self.b_list.setToolTip("Lista de reproducción")
-        self.b_list.clicked.connect(self.main.show_playlist)
+        self.b_list.clicked.connect(lambda: self.show_page(0 if self.stack.currentIndex() == 2 else 2))
         bot.addWidget(self.b_vol)
         bot.addWidget(self.vol, 1)
         bot.addSpacing(8)
@@ -261,7 +291,7 @@ class MobilePlayer(QFrame):
         v.addLayout(bot)
 
         self.tab = EdgeTab(parent)
-        self.tab.clicked.connect(self.open_panel)
+        self.tab.clicked.connect(lambda: self.close_panel() if self.isVisible() and not self._closing else self.open_panel())
         self.tab.hide()   # solo aparece con el estilo «celular» (Ajustes → Reproductor)
         self.hide()
         p = main.player
@@ -278,33 +308,42 @@ class MobilePlayer(QFrame):
         par = self.parentWidget()
         if par is None:
             return
-        h = par.height()
-        self.setFixedHeight(h)
-        if self.isVisible() and self.anim.state() != QPropertyAnimation.State.Running:
+        self.setFixedHeight(par.height())
+        if self.isVisible() and self.anim.state() != QPropertyAnimation.State.Running and not self._closing:
             self.move(par.width() - self.width(), 0)
-        self.tab.move(par.width() - self.tab.width(), (h - self.tab.height()) // 2)
-        self.tab.raise_()
+        self.place_tab()
         if self.isVisible():
             self.raise_()
+        self.tab.raise_()
+
+    def place_tab(self):
+        par = self.parentWidget()
+        if par is None:
+            return
+        x = (self.x() if self.isVisible() else par.width()) - self.tab.width()
+        self.tab.move(x, (par.height() - self.tab.height()) // 2)
+        self.tab.raise_()
 
     def open_panel(self):
         par = self.parentWidget()
-        self.place()
         self.track_changed(self.main.playing_path)
         self._closing = False
+        self.setFixedHeight(par.height())
         self.move(par.width(), 0)
         self.show()
         self.raise_()
-        self.tab.hide()
+        self.tab.set_open(True)
         self.anim.stop()
         self.anim.setStartValue(QPoint(par.width(), 0))
         self.anim.setEndValue(QPoint(par.width() - self.width(), 0))
         self.anim.start()
+        self.place_tab()
         self.main.cfg.setValue("mobile_open", 1)
 
     def close_panel(self):
         par = self.parentWidget()
         self._closing = True
+        self.tab.set_open(False)
         self.anim.stop()
         self.anim.setStartValue(self.pos())
         self.anim.setEndValue(QPoint(par.width(), 0))
@@ -314,8 +353,8 @@ class MobilePlayer(QFrame):
     def _anim_done(self):
         if self._closing:
             self.hide()
-            self.tab.show()
-            self.tab.raise_()
+            self._closing = False
+        self.place_tab()
 
     # ------------------------------------------------------------ fondo
     def paintEvent(self, _):
@@ -368,6 +407,8 @@ class MobilePlayer(QFrame):
         self.cover.set_pixmap(pm if data and pm.loadFromData(data) else None)
         self.make_bg(data)
         self.load_lyrics(path)
+        if self.stack.currentIndex() == 2:
+            self.fill_queue()
         if m.player is not None:
             self.on_dur(m.player.duration())
             self.on_pos(m.player.position())
@@ -417,8 +458,54 @@ class MobilePlayer(QFrame):
             self.lyr.setHtml("<p style='text-align:center; margin-top:60px'>" + html.escape(T("Esta canción no tiene letra.")) + "</p>")
 
     def toggle_lyrics(self):
-        self.stack.setCurrentIndex(1 - self.stack.currentIndex())
-        self.b_lyr.set_active(self.stack.currentIndex() == 1)
+        self.show_page(0 if self.stack.currentIndex() == 1 else 1)
+
+    def show_page(self, i):
+        """0 = portada · 1 = letra · 2 = cola de reproducción (todo dentro del reproductor, sin ventanas aparte)."""
+        if i == 2:
+            self.fill_queue()
+        self.stack.setCurrentIndex(i)
+        self.b_lyr.set_active(i == 1)
+        self.b_list.set_active(i == 2)
+
+    def fill_queue(self):
+        import os
+        seq, from_pl = self.main.play_seq()
+        self._q_from_pl = from_pl
+        self.queue.clear()
+        cur = self.main.playing_path
+        cur_item = None
+        for n, p in enumerate(seq, 1):
+            t = self.main.val(p, "title") or os.path.splitext(os.path.basename(p))[0]
+            a = self.main.val(p, "artist")
+            it = QListWidgetItem(f"{n}.  {t}" + (f"  ·  {a}" if a else ""))
+            it.setData(Qt.ItemDataRole.UserRole, p)
+            it.setToolTip(p)
+            if p == cur:
+                f = it.font()
+                f.setBold(True)
+                it.setFont(f)
+                it.setForeground(QColor("white"))
+                it.setText("▶  " + it.text())
+                cur_item = it
+            self.queue.addItem(it)
+        head = T("COLA DE REPRODUCCIÓN") if from_pl else T("CANCIONES DE LA CARPETA")
+        self.q_head.setText(f"{head}  ·  {len(seq)}")
+        if cur_item is not None:
+            self.queue.setCurrentItem(cur_item)
+            self.queue.scrollToItem(cur_item, QListWidget.ScrollHint.PositionAtCenter)
+
+    def play_from_queue(self, it):
+        p = it.data(Qt.ItemDataRole.UserRole)
+        if not p:
+            return
+        if getattr(self, "_q_from_pl", False):
+            self.main.play_file(p)
+        else:
+            r = self.main.row_index.get(p)
+            if r is not None:
+                self.main.play_item(self.main.list.item(r))
+        self.fill_queue()
 
     # ------------------------------------------------------------ reproductor
     def on_pos(self, ms):

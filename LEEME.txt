@@ -378,3 +378,7 @@ VERSIÓN 1.54
 VERSIÓN 1.55
 ------------
  - Corregido: un solo apartado «Reproductor» en Ajustes, con el estilo del reproductor visible.
+
+VERSIÓN 1.56
+------------
+ - Reproductor celular: lista dentro del reproductor, sin el botón redondo, y flechita que ya no tapa nada (con el reproductor abierto, «›» a su lado para ocultarlo).

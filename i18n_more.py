@@ -702,3 +702,5 @@ ROWS += [
 
 ROWS += [("<b>Estilo del reproductor</b>", "<b>Player style</b>", "<b>Стиль плеера</b>"),
          ("Pasar a la siguiente canción al terminar", "Go to the next song when one ends", "Переходить к следующей песне по окончании")]
+
+ROWS += [("COLA DE REPRODUCCIÓN", "PLAY QUEUE", "ОЧЕРЕДЬ"), ("CANCIONES DE LA CARPETA", "SONGS IN FOLDER", "ПЕСНИ ПАПКИ")]

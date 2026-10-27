@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.55"
+APP_VERSION = "1.56"
 
 
 class TMenu(QMenu):
@@ -776,6 +776,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.56', [
+        'Reproductor celular: la lista de reproducción ahora se ve dentro del propio reproductor (en lugar de abrir otra ventana encima), con la canción actual resaltada; doble clic para reproducir otra.',
+        'Reproductor celular: ya no aparece el botón redondo de la lista (ese es solo del reproductor clásico).',
+        'Reproductor celular: la flechita tiene su propio espacio en el borde y ya no tapa nada; con el reproductor abierto se coloca pegada a su lado izquierdo con «›» para ocultarlo.',
+    ]),
     ('1.55', [
         'Corregido: en Ajustes salían dos apartados «Reproductor» y la opción del estilo (clásico / celular) no se veía. Ahora hay uno solo con el estilo del reproductor y «Pasar a la siguiente canción al terminar».',
     ]),
@@ -1143,7 +1148,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.55 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.56 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3005,6 +3010,7 @@ class Main(QMainWindow):
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(0)
         cl.addWidget(main, 1)   # sin barra general: el programa entero no se desplaza
+        self._central_lay = cl
         self.setCentralWidget(central)
         self.build_pl_panel(central)
         self.shuffle = bool(int(self.cfg.value("shuffle", 0) or 0))
@@ -3924,6 +3930,11 @@ class Main(QMainWindow):
 
     def show_playlist(self):
         """Muestra u oculta el panel flotante de la lista de reproducción."""
+        if getattr(self, "player_style", "classic") == "mobile" and self.mobile is not None:
+            if not self.mobile.isVisible():
+                self.mobile.open_panel()
+            self.mobile.show_page(2)   # en el estilo celular la lista va dentro del reproductor
+            return
         if self.pl_panel.isVisible():
             self.pl_panel.hide()
             self.pl_fab.setIcon(icons.vicon("menu", "white"))
@@ -3951,6 +3962,9 @@ class Main(QMainWindow):
         self.cfg.setValue("player_style", self.player_style)
         if self.player_style == "mobile":
             self.player_bar.hide()
+            self.pl_fab.hide()            # la lista va dentro del reproductor celular
+            self.pl_panel.hide()
+            self._central_lay.setContentsMargins(0, 0, 20, 0)   # canal propio para la flechita: no tapa nada
             self.mobile.tab.show()
             self.mobile.place()
             if not first or int(self.cfg.value("mobile_open", 1) or 0):
@@ -3958,6 +3972,8 @@ class Main(QMainWindow):
                     self.mobile.open_panel()
         else:
             self.player_bar.show()
+            self.pl_fab.show()
+            self._central_lay.setContentsMargins(0, 0, 0, 0)
             if self.mobile is not None:
                 self.mobile.anim.stop()
                 self.mobile.hide()
