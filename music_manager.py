@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.56"
+APP_VERSION = "1.57"
 
 
 class TMenu(QMenu):
@@ -213,7 +213,8 @@ def _pop(tags, key):
 
 @lru_cache(maxsize=4096)
 def _tech(path, mtime):
-    out = {"codec": "—", "enc": "—", "enc_full": "", "tag": "—", "bitrate": "—", "freq": "—", "dur": "—", "mode": "—", "size": "—"}
+    out = {"codec": "—", "enc": "—", "enc_full": "", "tag": "—", "bitrate": "—", "freq": "—", "dur": "—", "mode": "—", "size": "—",
+           "ch": "—"}
     try:
         out["size"] = f"{os.path.getsize(path) / 1048576:.2f} MB"
         f = mutagen.File(path)
@@ -251,6 +252,9 @@ def _tech(path, mtime):
             out["freq"] = f"{sr / 1000:g} kHz"
         secs = int(getattr(i, "length", 0) or 0)
         out["dur"] = f"{secs // 60}:{secs % 60:02d}"
+        chn = int(getattr(i, "channels", 0) or 0)
+        if chn:
+            out["ch"] = {1: "Mono", 2: "Estéreo"}.get(chn, f"{chn} canales")
         bm = getattr(i, "bitrate_mode", None)
         if bm is not None and str(bm).split(".")[-1] not in ("UNKNOWN", "0"):
             out["mode"] = str(bm).split(".")[-1]
@@ -404,7 +408,7 @@ QToolButton#webbtn::menu-indicator { image: none; width: 0px; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
-QLabel#techchip { background: @surface2; border: 1px solid @border; border-radius: 9px; padding: 1px 6px; font-size: 10px; }
+QLabel#techchip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 8px; font-size: 12px; }
 QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 7px; font-size: 11px; }
 QPushButton#tabbtn { border-radius: 10px; padding: 7px 10px; }
 QFrame#plpanel { background: @window; border: 1px solid @border; border-radius: 14px; }
@@ -776,6 +780,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.57', [
+        'Datos técnicos de la canción más grandes y ordenados en dos filas fijas que ocupan todo el ancho; si un texto no cabe se recorta con «…» (al pasar el ratón se ve completo), así nada se empuja.',
+        'Nuevo dato: Tonalidad (key) de la canción, por ejemplo «Am · 8A» (La menor, con su código Camelot para DJ). Se lee de la etiqueta si la tiene; si no, se calcula analizando el audio (es una estimación).',
+        'Nuevo dato: canales (Mono / Estéreo).',
+    ]),
     ('1.56', [
         'Reproductor celular: la lista de reproducción ahora se ve dentro del propio reproductor (en lugar de abrir otra ventana encima), con la canción actual resaltada; doble clic para reproducir otra.',
         'Reproductor celular: ya no aparece el botón redondo de la lista (ese es solo del reproductor clásico).',
@@ -1085,6 +1094,46 @@ class UpdateDownloadWorker(QThread):
             self.failed.emit(str(getattr(e, "reason", e)))
 
 
+class ChipLabel(QLabel):
+    """Etiqueta técnica que recorta el texto con «…» si no cabe (nunca empuja a las demás)."""
+    def __init__(self):
+        super().__init__("")
+        self._full = ""
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMinimumWidth(40)
+
+    def set_full(self, text, tip=""):
+        self._full = text
+        self.setToolTip(tip or text)
+        self._fit()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._fit()
+
+    def _fit(self):
+        w = max(10, self.width() - 18)
+        super().setText(self.fontMetrics().elidedText(self._full, Qt.TextElideMode.ElideRight, w))
+
+
+class KeyWorker(QThread):
+    """Estima la tonalidad en segundo plano (analizando el audio)."""
+    done = pyqtSignal(str, int, bool, float)
+
+    def __init__(self, path):
+        super().__init__()
+        self.path = path
+
+    def run(self):
+        try:
+            import keydetect
+            pc, minor, conf = keydetect.detect_file(self.path)
+            self.done.emit(self.path, pc, minor, conf)
+        except Exception:
+            self.done.emit(self.path, -1, False, 0.0)
+
+
 class FlowLayout(QLayout):
     """Reparte los widgets en filas y pasa a otra línea cuando no caben (así no ensancha la ventana)."""
     def __init__(self, parent=None, hspacing=4, vspacing=4):
@@ -1148,7 +1197,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.56 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.57 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2698,24 +2747,33 @@ class Main(QMainWindow):
         tb_l.setContentsMargins(0, 0, 0, 4)
         tb_l.setSpacing(8)
         chips_w = QWidget()
-        tbl = FlowLayout(chips_w, 4, 4)
+        tbl = QGridLayout(chips_w)          # dos filas iguales: cada etiqueta tiene su sitio fijo
         tbl.setContentsMargins(0, 0, 0, 0)
-        for k in ("codec", "enc", "tag", "bitrate", "freq", "dur", "mode", "size"):
-            chip = QLabel("")
-            chip.setObjectName("techchip")
-            self.tech[k] = chip
-            tbl.addWidget(chip)
+        tbl.setHorizontalSpacing(6)
+        tbl.setVerticalSpacing(6)
+        order = (("codec", "enc", "tag", "bitrate", "freq"), ("ch", "dur", "mode", "size", "key"))
+        for r_, row_keys in enumerate(order):
+            for c_, k in enumerate(row_keys):
+                chip = ChipLabel()
+                chip.setObjectName("techchip")
+                chip.setFixedHeight(28)
+                self.tech[k] = chip
+                tbl.addWidget(chip, r_, c_)
+        for c_ in range(5):
+            tbl.setColumnStretch(c_, 1)
+        self.key_cache, self.key_worker = {}, None
         self.fill_tech([])
-        tb_l.addWidget(chips_w, 1, Qt.AlignmentFlag.AlignTop)
+        tb_l.addWidget(chips_w, 1)
         self.save_btn = QPushButton("💾")
         self.save_btn.setObjectName("accent")
         self.save_btn.setToolTip("Guardar cambios (Ctrl+S)")
         self.save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.save_btn.setFixedSize(34, 26)
+        self.save_btn.setFixedSize(44, 62)
+        self.save_btn.setIconSize(QSize(20, 20))
         self.save_btn.clicked.connect(self.save_all)
         self.save_btn.setEnabled(False)
-        tb_l.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
-        self.tech_bar.setFixedHeight(52)      # sitio para dos filas de etiquetas: nada de lo de abajo sube ni baja
+        tb_l.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.tech_bar.setFixedHeight(68)      # dos filas fijas de etiquetas: nada de lo de abajo sube ni baja
         grid.addWidget(self.tech_bar, 0, 0, 1, 4)
         grid.setVerticalSpacing(6)
         grid.setContentsMargins(10, 8, 10, 8)
@@ -4229,19 +4287,71 @@ class Main(QMainWindow):
         self.update_suggestions()
 
     def fill_tech(self, paths):
-        icons = {"codec": "🎵", "enc": "🧩", "tag": "🏷", "bitrate": "⚡", "freq": "🔊", "dur": "⏱", "mode": "⚙", "size": "💾"}
+        icons_ = {"codec": "🎵", "enc": "🧩", "tag": "🏷", "bitrate": "⚡", "freq": "🔊", "dur": "⏱", "mode": "⚙",
+                  "size": "💾", "ch": "🎧", "key": "🎹"}
+        names = {"codec": "Formato", "enc": "Códec", "tag": "Etiqueta", "bitrate": "Bitrate", "freq": "Frecuencia",
+                 "dur": "Duración", "mode": "Modo", "size": "Tamaño", "ch": "Canales", "key": "Tonalidad"}
         if not paths:
             for k, chip in self.tech.items():
-                chip.setText(f"{icons[k]} -")
-                chip.show()
+                chip.set_full(f"{icons_[k]} —", T(names[k]))
             return
         infos = [tech_info(p) for p in paths[:150]]
         for k, chip in self.tech.items():
-            vs = {i[k] for i in infos}
-            v = next(iter(vs)) if len(vs) == 1 else "‹varios›"
-            chip.setText(f"{icons[k]} {v}")
-            chip.setToolTip(infos[0].get("enc_full", "") if (k == "enc" and len(infos) == 1) else "")
-            chip.show()
+            if k == "key":
+                continue
+            vs = {i.get(k, "—") for i in infos}
+            v = T(next(iter(vs))) if len(vs) == 1 else T("‹varios›")
+            tip = infos[0].get("enc_full", "") if (k == "enc" and len(infos) == 1) else ""
+            chip.set_full(f"{icons_[k]} {v}", f"{T(names[k])}: {tip or v}")
+        self.fill_key(paths)
+
+    def fill_key(self, paths):
+        """Tonalidad: de la etiqueta si la tiene; si no, se estima analizando el audio (solo con una canción)."""
+        import keydetect
+        chip = self.tech["key"]
+        if len(paths) != 1:
+            chip.set_full("🎹 " + T("‹varios›") if len(paths) > 1 else "🎹 —", T("Tonalidad"))
+            return
+        p = paths[0]
+        tag = keydetect.read_tag(p)
+        if tag:
+            parsed = keydetect.parse_tag(tag)
+            if parsed:
+                short, long_ = keydetect.describe(*parsed)
+                chip.set_full(f"🎹 {short}", f"{T('Tonalidad')}: {T(long_)} ({T('de la etiqueta')})")
+            else:
+                chip.set_full(f"🎹 {tag}", f"{T('Tonalidad')}: {tag} ({T('de la etiqueta')})")
+            return
+        try:
+            key = (p, os.path.getmtime(p))
+        except OSError:
+            key = (p, 0)
+        if key in self.key_cache:
+            self.show_key(p, *self.key_cache[key])
+            return
+        chip.set_full("🎹 …", T("Calculando la tonalidad…"))
+        w = KeyWorker(p)
+        w.done.connect(lambda path, pc, mi, conf, key=key: self.on_key(key, path, pc, mi, conf))
+        w.finished.connect(lambda w=w: self._key_workers.discard(w))
+        if not hasattr(self, "_key_workers"):
+            self._key_workers = set()
+        self._key_workers.add(w)
+        w.start()
+
+    def on_key(self, key, path, pc, minor, conf):
+        self.key_cache[key] = (pc, minor, conf)
+        if self.cur_paths == [path]:
+            self.show_key(path, pc, minor, conf)
+
+    def show_key(self, path, pc, minor, conf):
+        import keydetect
+        chip = self.tech["key"]
+        if pc < 0:
+            chip.set_full("🎹 —", T("No se pudo calcular la tonalidad"))
+            return
+        short, long_ = keydetect.describe(pc, minor)
+        sure = "" if conf >= 0.5 else " ?"
+        chip.set_full(f"🎹 {short}{sure}", f"{T('Tonalidad')}: {T(long_)} · {T('estimada analizando el audio (puede fallar)')}")
 
     def show_current(self, path, n):
         self._loading = True

@@ -704,3 +704,25 @@ ROWS += [("<b>Estilo del reproductor</b>", "<b>Player style</b>", "<b>Стиль
          ("Pasar a la siguiente canción al terminar", "Go to the next song when one ends", "Переходить к следующей песне по окончании")]
 
 ROWS += [("COLA DE REPRODUCCIÓN", "PLAY QUEUE", "ОЧЕРЕДЬ"), ("CANCIONES DE LA CARPETA", "SONGS IN FOLDER", "ПЕСНИ ПАПКИ")]
+
+ROWS += [
+    ("Formato", "Format", "Формат"), ("Códec", "Codec", "Кодек"), ("Etiqueta", "Tag", "Тег"), ("Bitrate", "Bitrate", "Битрейт"),
+    ("Frecuencia", "Sample rate", "Частота"), ("Modo", "Mode", "Режим"), ("Canales", "Channels", "Каналы"),
+    ("Tonalidad", "Key", "Тональность"), ("Mono", "Mono", "Моно"), ("Estéreo", "Stereo", "Стерео"),
+    ("%s canales", "%s channels", "Каналов: %s"), ("de la etiqueta", "from the tag", "из тега"),
+    ("Calculando la tonalidad…", "Detecting the key…", "Определение тональности…"),
+    ("No se pudo calcular la tonalidad", "Couldn't detect the key", "Не удалось определить тональность"),
+    ("estimada analizando el audio (puede fallar)", "estimated by analyzing the audio (may be wrong)", "оценка по анализу звука (может ошибаться)"),
+    ("Do menor", "C minor", "До минор"), ("Do mayor", "C major", "До мажор"),
+    ("Do♯ menor", "C♯ minor", "До♯ минор"), ("Do♯ mayor", "C♯ major", "До♯ мажор"),
+    ("Re menor", "D minor", "Ре минор"), ("Re mayor", "D major", "Ре мажор"),
+    ("Mi♭ menor", "E♭ minor", "Ми♭ минор"), ("Mi♭ mayor", "E♭ major", "Ми♭ мажор"),
+    ("Mi menor", "E minor", "Ми минор"), ("Mi mayor", "E major", "Ми мажор"),
+    ("Fa menor", "F minor", "Фа минор"), ("Fa mayor", "F major", "Фа мажор"),
+    ("Fa♯ menor", "F♯ minor", "Фа♯ минор"), ("Fa♯ mayor", "F♯ major", "Фа♯ мажор"),
+    ("Sol menor", "G minor", "Соль минор"), ("Sol mayor", "G major", "Соль мажор"),
+    ("La♭ menor", "A♭ minor", "Ля♭ минор"), ("La♭ mayor", "A♭ major", "Ля♭ мажор"),
+    ("La menor", "A minor", "Ля минор"), ("La mayor", "A major", "Ля мажор"),
+    ("Si♭ menor", "B♭ minor", "Си♭ минор"), ("Si♭ mayor", "B♭ major", "Си♭ мажор"),
+    ("Si menor", "B minor", "Си минор"), ("Si mayor", "B major", "Си мажор"),
+]

@@ -382,3 +382,9 @@ VERSIÓN 1.55
 VERSIÓN 1.56
 ------------
  - Reproductor celular: lista dentro del reproductor, sin el botón redondo, y flechita que ya no tapa nada (con el reproductor abierto, «›» a su lado para ocultarlo).
+
+VERSIÓN 1.57
+------------
+ - Datos técnicos más grandes, en dos filas fijas que no se empujan.
+ - Nuevo: Tonalidad (key) de la canción con código Camelot (de la etiqueta o calculada analizando el audio).
+ - Nuevo: canales (Mono / Estéreo).
