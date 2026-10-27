@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.57"
+APP_VERSION = "1.58"
 
 
 class TMenu(QMenu):
@@ -780,6 +780,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.58', [
+        'Reproductor estilo celular: al hacer doble clic en una canción, pulsar «Reproducir» o darle a play, el reproductor grande se despliega solo. Al pasar sola a la siguiente canción no se abre. Se puede desactivar en Ajustes → Reproductor.',
+    ]),
     ('1.57', [
         'Datos técnicos de la canción más grandes y ordenados en dos filas fijas que ocupan todo el ancho; si un texto no cabe se recorta con «…» (al pasar el ratón se ve completo), así nada se empuja.',
         'Nuevo dato: Tonalidad (key) de la canción, por ejemplo «Am · 8A» (La menor, con su código Camelot para DJ). Se lee de la etiqueta si la tiene; si no, se calcula analizando el audio (es una estimación).',
@@ -1197,7 +1200,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.57 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.58 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3605,12 +3608,20 @@ class Main(QMainWindow):
                 w.setEnabled(False)
         return bar
 
-    def play_item(self, item):
+    def play_item(self, item, user=True):
         path = item.data(PATH_ROLE) if item is not None else None
         if not path:
             return
         self.pl_active = False   # reproducir desde la carpeta: sigue el orden de la carpeta
         self.play_file(path)
+        if user:
+            self.expand_player()
+
+    def expand_player(self):
+        """Con el estilo celular, al reproducir (doble clic, «Reproducir»…) se despliega el reproductor grande."""
+        if (getattr(self, "player_style", "classic") == "mobile" and self.mobile is not None
+                and not self.mobile.isVisible() and int(self.cfg.value("auto_expand", 1) or 0)):
+            self.mobile.open_panel()
 
     def play_file(self, path):
         if self.player is None:
@@ -3648,6 +3659,7 @@ class Main(QMainWindow):
             self.play_item(it)
         else:
             self.player.play()
+            self.expand_player()
 
     def stop_play(self):
         if self.player is not None:
@@ -4079,7 +4091,7 @@ class Main(QMainWindow):
                 return
             it = self.list.item(r)
             self.list.scrollToItem(it)
-            self.play_item(it)
+            self.play_item(it, user=False)
 
     def on_vol(self, x):
         if self.player is None:
@@ -5925,7 +5937,9 @@ class Main(QMainWindow):
         hint_ps.setObjectName("hint")
         lbl_ps = QLabel("<b>Estilo del reproductor</b>")
         add_page("reproductor", "Reproductor", page(lbl_ps, r_classic, r_mobile, hint_ps, QLabel(" "),
-                                                    chk("Pasar a la siguiente canción al terminar", "autonext", 1)))
+                                                    chk("Pasar a la siguiente canción al terminar", "autonext", 1),
+                                                    chk("Estilo celular: abrir el reproductor grande al reproducir una canción",
+                                                        "auto_expand", 1)))
         # Apariencia
         theme_cb = QComboBox()
         theme_cb.addItem(T("Oscuro"), "dark")

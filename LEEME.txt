@@ -388,3 +388,7 @@ VERSIÓN 1.57
  - Datos técnicos más grandes, en dos filas fijas que no se empujan.
  - Nuevo: Tonalidad (key) de la canción con código Camelot (de la etiqueta o calculada analizando el audio).
  - Nuevo: canales (Mono / Estéreo).
+
+VERSIÓN 1.58
+------------
+ - Estilo celular: el reproductor grande se despliega solo al reproducir una canción (desactivable en Ajustes → Reproductor).

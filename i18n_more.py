@@ -726,3 +726,6 @@ ROWS += [
     ("Si♭ menor", "B♭ minor", "Си♭ минор"), ("Si♭ mayor", "B♭ major", "Си♭ мажор"),
     ("Si menor", "B minor", "Си минор"), ("Si mayor", "B major", "Си мажор"),
 ]
+
+ROWS += [("Estilo celular: abrir el reproductor grande al reproducir una canción",
+          "Phone style: open the big player when playing a song", "Стиль телефона: открывать большой плеер при воспроизведении")]
