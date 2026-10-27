@@ -364,3 +364,9 @@ VERSIÓN 1.51
 VERSIÓN 1.52
 ------------
  - Debajo de la portada: un solo botón «Buscar la canción en…» (YouTube, Spotify, Tidal, Qobuz, Wikipedia); ya no se amontonan ni tapan nada.
+
+VERSIÓN 1.53
+------------
+ - Nuevo reproductor grande estilo celular: flechita en el borde derecho; portada grande, fondo con los colores de la canción, controles grandes, aleatorio, repetir, volumen y letra.
+ - Aleatorio y repetir también en el reproductor normal.
+ - Se quitó la barra que desplazaba todo el programa.

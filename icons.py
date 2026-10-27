@@ -295,6 +295,30 @@ def draw_glyph(p, kind, rect, col):
         line((14, 3.5), (17, 6.5), (14, 9.5))
         line((18, 14), (18, 15.5), (16, 17.5), (7, 17.5))
         line((10, 14.5), (7, 17.5), (10, 20.5))
+    elif k == "shuffle":
+        p.drawPath(_line_path([(4, 7), (8, 7), (15, 17), (19.5, 17)]))
+        p.drawPath(_line_path([(4, 17), (8, 17), (10.5, 13.3)]))
+        p.drawPath(_line_path([(12.6, 10.4), (15, 7), (19.5, 7)]))
+        line((17, 4.5), (19.5, 7), (17, 9.5))
+        line((17, 14.5), (19.5, 17), (17, 19.5))
+    elif k in ("loop1", "chevron_l", "chevron_r"):
+        if k == "loop1":
+            line((6, 10), (6, 8.5), (8, 6.5), (17, 6.5))
+            line((14, 3.5), (17, 6.5), (14, 9.5))
+            line((18, 14), (18, 15.5), (16, 17.5), (7, 17.5))
+            line((10, 14.5), (7, 17.5), (10, 20.5))
+            f = QFont()
+            f.setBold(True)
+            f.setPixelSize(8)
+            p.setFont(f)
+            p.setPen(col)
+            p.drawText(QRectF(8, 8, 8, 8), Qt.AlignmentFlag.AlignCenter, "1")
+        elif k == "chevron_l":
+            p.setPen(_pen(col, 2.6))
+            p.drawPath(_line_path([(15, 5), (8, 12), (15, 19)]))
+        else:
+            p.setPen(_pen(col, 2.6))
+            p.drawPath(_line_path([(9, 5), (16, 12), (9, 19)]))
     elif k == "gear":
         p.drawEllipse(QPointF(12, 12), 3, 3)
         for i in range(8):

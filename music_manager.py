@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.52"
+APP_VERSION = "1.53"
 
 
 class TMenu(QMenu):
@@ -776,6 +776,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.53', [
+        'Nuevo reproductor grande «estilo celular»: pulsa la flechita del borde derecho de la ventana y sale deslizándose un reproductor con la portada grande, fondo con los colores de la canción, barra de avance con tiempo restante, botones grandes, aleatorio, repetir (todas / una), volumen y la letra (sincronizada si tiene minutos). El reproductor de abajo sigue igual.',
+        'Aleatorio y repetir también funcionan con el reproductor normal y se recuerdan al cerrar el programa.',
+        'Se quitó la barra que desplazaba todo el programa hacia arriba y hacia abajo.',
+    ]),
     ('1.52', [
         'Debajo de la portada, los botones de YouTube, Spotify, Tidal, Qobuz y Wikipedia se amontonaban y tapaban la etiqueta de la portada. Ahora es un solo botón «Buscar la canción en…» con un menú, y la portada ya no se puede aplastar.',
     ]),
@@ -1132,7 +1137,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.52 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.53 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2993,14 +2998,18 @@ class Main(QMainWindow):
         cl = QVBoxLayout(central)
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(0)
-        sa = NoWheelScroll()          # si la ventana es muy pequeña, aparecen barras en vez de cortar el contenido
-        sa.setWidgetResizable(True)
-        sa.setFrameShape(QFrame.Shape.NoFrame)
-        sa.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-        sa.setWidget(main)
-        cl.addWidget(sa, 1)
+        cl.addWidget(main, 1)   # sin barra general: el programa entero no se desplaza
         self.setCentralWidget(central)
         self.build_pl_panel(central)
+        self.shuffle = bool(int(self.cfg.value("shuffle", 0) or 0))
+        self.repeat = str(self.cfg.value("repeat", "off") or "off")
+        self._shuffle_hist = []
+        self.mobile = None
+        if self.player is not None:
+            import mobile
+            self.mobile = mobile.MobilePlayer(self, central, inspect_file)
+            if int(self.cfg.value("mobile_open", 0) or 0):
+                QTimer.singleShot(400, self.mobile.open_panel)
         self.statusBar().addPermanentWidget(self.player_bar)   # reproductor en la línea de estado, a la derecha
         self.statusBar().setSizeGripEnabled(False)
         self.statusBar().showMessage("Arrastra carpetas o canciones sobre otra carpeta. Doble clic en una canción para reproducirla.")
@@ -3541,6 +3550,8 @@ class Main(QMainWindow):
         self.playing_path = path
         self.player.setSource(QUrl.fromLocalFile(path))
         self.player.play()
+        if getattr(self, "mobile", None) is not None and self.mobile.isVisible():
+            self.mobile.track_changed(path)
         artist, album = self.val(path, "artist"), self.val(path, "album")
         self.set_now(self.val(path, "title") or os.path.splitext(os.path.basename(path))[0],
                      " · ".join(x for x in (artist, album) if x))
@@ -3897,10 +3908,14 @@ class Main(QMainWindow):
         r = self.cover_col
         tl = r.mapTo(c, QPoint(0, 0))
         self.pl_panel.setGeometry(tl.x(), tl.y(), max(300, r.width()), max(200, c.height() - tl.y()))
-        self.pl_fab.move(c.width() - self.pl_fab.width() - 16, c.height() - self.pl_fab.height() - 12)
+        mob = getattr(self, "mobile", None)
+        right = mob.width() if mob is not None and mob.isVisible() else 0
+        self.pl_fab.move(c.width() - right - self.pl_fab.width() - 16, c.height() - self.pl_fab.height() - 12)
         if self.pl_panel.isVisible():
             self.pl_panel.raise_()
         self.pl_fab.raise_()
+        if mob is not None:
+            mob.place()
 
     def show_playlist(self):
         """Muestra u oculta el panel flotante de la lista de reproducción."""
@@ -3916,24 +3931,53 @@ class Main(QMainWindow):
             self.pl_fab.setIcon(icons.vicon("close", "white"))
             self.pl_fab.raise_()
 
-    def step_play(self, d):
-        if self.player is not None and self.pl_active and self.playlist:
-            try:
-                idx = self.playlist.index(self.playing_path)
-            except ValueError:
-                idx = -1 if d > 0 else len(self.playlist)
+    def play_seq(self):
+        """Canciones que se van a recorrer: la lista de reproducción activa o las de la carpeta, en su orden."""
+        if self.pl_active and self.playlist:
+            return list(self.playlist), True
+        return [self.list.item(r).data(PATH_ROLE) for r in range(self.list.count())
+                if self.list.item(r).data(KIND_ROLE) != "dir"], False
+
+    def set_shuffle(self, on):
+        self.shuffle = bool(on)
+        self._shuffle_hist = []
+        self.cfg.setValue("shuffle", 1 if on else 0)
+
+    def set_repeat(self, mode):
+        self.repeat = mode if mode in ("off", "all", "one") else "off"
+        self.cfg.setValue("repeat", self.repeat)
+
+    def step_play(self, d, auto=False):
+        if self.player is None:
+            return
+        seq, from_pl = self.play_seq()
+        if not seq:
+            return
+        cur = self.playing_path
+        nxt = None
+        if self.shuffle and len(seq) > 1:
+            if d < 0 and self._shuffle_hist:
+                nxt = self._shuffle_hist.pop()
+            else:
+                import random
+                nxt = random.choice([p for p in seq if p != cur])
+                if cur:
+                    self._shuffle_hist = (self._shuffle_hist + [cur])[-200:]
+        else:
+            idx = seq.index(cur) if cur in seq else (-1 if d > 0 else len(seq))
             n = idx + d
-            if 0 <= n < len(self.playlist):
-                self.play_file(self.playlist[n])
-            return
-        if self.player is None or self.list.count() == 0:
-            return
-        r = self.row_index.get(self.playing_path, -1 if d > 0 else self.list.count())
-        n = r + d
-        while 0 <= n < self.list.count() and self.list.item(n).data(KIND_ROLE) == "dir":
-            n += d
-        if 0 <= n < self.list.count():
-            it = self.list.item(n)
+            if not 0 <= n < len(seq):
+                if self.repeat != "all":
+                    return
+                n %= len(seq)   # «repetir todas»: al final vuelve al principio
+            nxt = seq[n]
+        if from_pl:
+            self.play_file(nxt)
+        else:
+            r = self.row_index.get(nxt)
+            if r is None:
+                return
+            it = self.list.item(r)
             self.list.scrollToItem(it)
             self.play_item(it)
 
@@ -3965,8 +4009,12 @@ class Main(QMainWindow):
         self.pl_update_np()
 
     def on_media_status(self, st):
-        if st == QMediaPlayer.MediaStatus.EndOfMedia and int(self.cfg.value("autonext", 1) or 0):
-            self.step_play(1)  # pasa a la siguiente canción de la lista
+        if st == QMediaPlayer.MediaStatus.EndOfMedia:
+            if getattr(self, "repeat", "off") == "one":
+                self.player.setPosition(0)
+                self.player.play()
+            elif int(self.cfg.value("autonext", 1) or 0):
+                self.step_play(1, auto=True)  # pasa a la siguiente canción de la lista
 
     def on_pos(self, ms):
         if not self.seek.isSliderDown():

@@ -678,3 +678,14 @@ ROWS += [
     ("▶ YouTube", "▶ YouTube", "▶ YouTube"), ("🎵 Spotify", "🎵 Spotify", "🎵 Spotify"), ("🎧 Tidal", "🎧 Tidal", "🎧 Tidal"),
     ("💿 Qobuz", "💿 Qobuz", "💿 Qobuz"), ("📖 Wikipedia", "📖 Wikipedia", "📖 Википедия"),
 ]
+
+ROWS += [
+    ("Clic: ver la letra", "Click: show lyrics", "Щелчок: показать текст"),
+    ("Abrir el reproductor grande", "Open the big player", "Открыть большой плеер"),
+    ("Cerrar el reproductor grande", "Close the big player", "Закрыть большой плеер"),
+    ("REPRODUCIENDO", "NOW PLAYING", "СЕЙЧАС ИГРАЕТ"), ("Aleatorio", "Shuffle", "Перемешать"),
+    ("Repetir: no / todas / una", "Repeat: off / all / one", "Повтор: нет / все / одна"), ("Letra", "Lyrics", "Текст"),
+    ("Esta canción no tiene letra.", "This song has no lyrics.", "У этой песни нет текста."),
+    ("Repetir: desactivado", "Repeat: off", "Повтор: выкл."), ("Repetir: todas", "Repeat: all", "Повтор: все"),
+    ("Repetir: esta canción", "Repeat: this song", "Повтор: эта песня"),
+]
