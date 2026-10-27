@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.50"
+APP_VERSION = "1.51"
 
 
 class TMenu(QMenu):
@@ -773,6 +773,12 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.51', [
+        'Nuevo: Herramientas → «Informe de la biblioteca»: cuántas canciones no tienen portada (o la tienen pequeña), letra, género, año, álbum, artista/título o son de calidad baja. Doble clic en cualquiera para ir a ella y arreglarla.',
+        'Nuevo: Herramientas → «Organizar en carpetas»: mueve las canciones a «Artista / Álbum» (u otras estructuras) según sus etiquetas, con vista previa antes de mover y la letra .lrc acompañando a su canción.',
+        'Nuevo: Herramientas → «Etiquetas desde el nombre del archivo»: saca artista, título, pista, álbum… de nombres como «Artista - Título.mp3». Elige solo el formato que más archivos reconoce.',
+        'Nuevo: Herramientas → «Normalizar volumen»: deja las canciones seleccionadas con el mismo volumen (-14, -16 o -11 LUFS), en copias o reemplazando, conservando etiquetas y portada.',
+    ]),
     ('1.50', [
         'Nuevo: Herramientas → «Buscar canciones repetidas». Encuentra duplicados (mismo artista y título, solo título o archivo idéntico), en la carpeta o también en subcarpetas, y deja marcadas las copias de peor calidad para enviarlas a la papelera. La mejor copia de cada grupo nunca se marca.',
         'Portada: la etiqueta con formato y tamaño (JPEG · 1000×1000 px · 190 KB) va centrada justo debajo de la imagen y ya no se monta encima aunque la ventana sea pequeña.',
@@ -1120,7 +1126,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.50 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.51 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5334,6 +5340,15 @@ class Main(QMainWindow):
         t.addAction(self.act("✨ Portadas automáticas (alta calidad)", self.auto_cover,
                              "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
         t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
+        t.addSeparator()
+        t.addAction(self.act("📋 Informe de la biblioteca…", self.open_report,
+                             "Cuántas canciones no tienen portada, letra, género, año… y acceso directo a cada una"))
+        t.addAction(self.act("🗂 Organizar en carpetas (Artista / Álbum)…", self.open_organize,
+                             "Mueve las canciones a carpetas según sus etiquetas"))
+        t.addAction(self.act("🏷 Etiquetas desde el nombre del archivo…", self.open_tags_from_name,
+                             "Saca artista, título, pista… del nombre de los archivos seleccionados"))
+        t.addAction(self.act("🔊 Normalizar volumen…", self.open_normalize,
+                             "Deja todas las canciones seleccionadas con el mismo volumen"))
         t.addAction(self.act("🔁 Buscar canciones repetidas…", self.open_dupes,
                              "Encuentra canciones duplicadas y deja marcadas las copias de peor calidad"))
         t.addAction(self.act("🎚 Ajustes de la canción…", self.open_fx,
@@ -5404,6 +5419,49 @@ class Main(QMainWindow):
                                 send2trash=send2trash)
         dlg.show()
         self._dupes = dlg
+
+    def _lib_folder(self):
+        f = self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else None
+        if not f:
+            self.statusBar().showMessage("Abre primero una carpeta de música.")
+        return f
+
+    def _lib_paths(self):
+        paths = self.selected_paths() or [self.list.item(r).data(PATH_ROLE) for r in range(self.list.count())
+                                          if self.list.item(r).data(KIND_ROLE) != "dir"]
+        paths = [p for p in paths if p and os.path.isfile(p)]
+        if not paths:
+            self.statusBar().showMessage("Selecciona una o varias canciones.")
+        return paths
+
+    def _show_tool(self, dlg):
+        i18n.retranslate(dlg)
+        dlg.show()
+        self._tool = dlg
+
+    def open_report(self):
+        import libtools
+        f = self._lib_folder()
+        if f:
+            self._show_tool(libtools.ReportDialog(self, f, AUDIO_EXT, inspect_file, read_tags))
+
+    def open_organize(self):
+        import libtools
+        f = self._lib_folder()
+        if f:
+            self._show_tool(libtools.OrganizeDialog(self, f, AUDIO_EXT))
+
+    def open_tags_from_name(self):
+        import libtools
+        paths = self._lib_paths()
+        if paths:
+            self._show_tool(libtools.TagsFromNameDialog(self, paths))
+
+    def open_normalize(self):
+        import libtools
+        paths = self._lib_paths()
+        if paths:
+            self._show_tool(libtools.NormalizeDialog(self, paths))
 
     def reveal_file(self, path):
         """Abre la carpeta de esa canción en la lista y la deja seleccionada."""

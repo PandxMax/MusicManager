@@ -108,7 +108,7 @@ def build_filters(p, sr=44100, dur=0.0):
     if q["volume"]:
         f.append(f"volume={float(q['volume']):.1f}dB")
     if q["normalize"]:
-        f.append("loudnorm=I=-14:TP=-1.5:LRA=11")
+        f.append(f"loudnorm=I={float(q.get('lufs', -14)):g}:TP=-1.5:LRA=11")
     if q["fade_in"] > 0:
         f.append(f"afade=t=in:st=0:d={float(q['fade_in']):.2f}")
     if q["fade_out"] > 0 and out_dur > q["fade_out"]:

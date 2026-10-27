@@ -353,3 +353,10 @@ VERSIÓN 1.50
 ------------
  - Nuevo: Herramientas → Buscar canciones repetidas (deja marcadas las copias de peor calidad).
  - La etiqueta de la portada ya no se monta encima de la imagen.
+
+VERSIÓN 1.51
+------------
+ - Nuevo: Informe de la biblioteca (sin portada, sin letra, sin género, calidad baja…).
+ - Nuevo: Organizar en carpetas (Artista / Álbum) con vista previa.
+ - Nuevo: Etiquetas desde el nombre del archivo.
+ - Nuevo: Normalizar volumen.
