@@ -12,7 +12,7 @@ from urllib.parse import quote_plus, quote
 
 from PyQt6.QtCore import (QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
                           QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
-from PyQt6.QtGui import (QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
+from PyQt6.QtGui import (QFontMetrics, QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
                          QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent, QPen)
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QSplitter, QTreeWidget, QTreeWidgetItem,
@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.59"
+APP_VERSION = "1.60"
 
 
 class TMenu(QMenu):
@@ -786,6 +786,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.60', [
+        'Estilo celular: la barra de abajo ahora tiene cuadritos a todo lo ancho que bailan al ritmo de la canción (en espejo, con los graves al centro, tapitas que caen despacio y los colores del programa). Los mensajes se siguen leyendo encima.',
+    ]),
     ('1.59', [
         'Reproductor celular: al abrir el programa ya no aparece a mitad de la ventana; siempre queda pegado al borde derecho y ocupa todo el alto.',
         'Volumen más suave: la barra sigue una curva de oído, así cada movimiento se siente parejo (antes casi todo el cambio estaba en la parte baja). La barra del reproductor celular salta adonde haces clic.',
@@ -1211,7 +1214,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.59 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.60 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1609,6 +1612,111 @@ class VizBar(QWidget):
         for x, y, _vy, al, _vx in self.parts:
             p.setBrush(QColor(base.red(), base.green(), base.blue(), int(110 * max(0, al))))
             p.drawRoundedRect(QRectF(x, y, self.SQ, self.SQ), 1.5, 1.5)
+
+
+class WideViz(QWidget):
+    """Barra inferior con cuadritos a todo lo ancho que bailan al ritmo de la canción (en espejo: graves al centro).
+    Se dibuja detrás de los mensajes de la barra de estado, que se pintan encima para que se sigan leyendo."""
+    SQ, GAP = 7, 3
+
+    def __init__(self, status_bar, src_viz):
+        super().__init__(status_bar)
+        self.sb, self.src = status_bar, src_viz
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.lvl, self.peak, self.t = [], [], 0.0
+        self.timer = QTimer(self)
+        self.timer.setInterval(33)
+        self.timer.timeout.connect(self.tick)
+        status_bar.installEventFilter(self)
+        status_bar.messageChanged.connect(lambda _m: self.update())
+        self.hide()
+
+    def eventFilter(self, obj, ev):
+        if obj is self.sb and ev.type() in (QEvent.Type.Resize, QEvent.Type.Show):
+            self.setGeometry(self.sb.rect())
+            self.lower()
+        return False
+
+    def cols(self):
+        return max(8, (self.width() - 8) // (self.SQ + self.GAP))
+
+    def rows(self):
+        return max(2, (self.height() - 8) // (self.SQ + self.GAP))
+
+    def start(self):
+        if not self.timer.isActive():
+            self.timer.start()
+
+    def tick(self):
+        import math
+        dt = 0.033
+        self.t += dt
+        n, rows = self.cols(), self.rows()
+        if len(self.lvl) != n:
+            self.lvl, self.peak = [0.0] * n, [0.0] * n
+        src = self.src
+        playing = src.state == "playing"
+        row = None
+        if playing and src.data is not None and len(src.data):
+            i = min(len(src.data) - 1, max(0, int(src.pos_fn() / 1000.0 * src.fps)))
+            row = src.data[i]
+        half = (n + 1) // 2
+        for c in range(n):
+            d = abs(c - (n - 1) / 2.0) / max(1.0, (n - 1) / 2.0)     # 0 en el centro, 1 en los bordes
+            if row is not None:
+                pos = d * (len(row) - 1)
+                k = int(pos)
+                f = pos - k
+                v = float(row[k]) * (1 - f) + float(row[min(k + 1, len(row) - 1)]) * f
+                tgt = (v ** 1.5) * rows * (1.0 - 0.25 * d)
+            elif playing:   # mientras se analiza la canción: ola suave
+                tgt = (0.3 + 0.22 * math.sin(self.t * 3 + c * 0.35) + 0.12 * math.sin(self.t * 5.3 + c * 0.9)) * rows * (1 - 0.4 * d)
+            else:
+                tgt = 0.0
+            self.lvl[c] = tgt if tgt > self.lvl[c] else max(tgt, self.lvl[c] - 10 * dt)
+            self.peak[c] = self.lvl[c] if self.lvl[c] > self.peak[c] else max(0.0, self.peak[c] - 3.2 * dt)
+        if not playing and max(self.peak or [0]) <= 0.01:
+            self.timer.stop()
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        base = self.palette().color(QPalette.ColorRole.Highlight)
+        hi = base.lighter(160)
+        cell = self.SQ + self.GAP
+        n, rows = self.cols(), self.rows()
+        x0 = (self.width() - n * cell + self.GAP) / 2
+        bottom = self.height() - 4
+        p.setPen(Qt.PenStyle.NoPen)
+        for c in range(n):
+            v = self.lvl[c] if c < len(self.lvl) else 0.0
+            pk = self.peak[c] if c < len(self.peak) else 0.0
+            x = x0 + c * cell
+            for r in range(rows):
+                y = bottom - (r + 1) * cell + self.GAP
+                if r < int(v + 0.5):
+                    t = r / max(1, rows - 1)
+                    col = QColor(int(base.red() + (hi.red() - base.red()) * t), int(base.green() + (hi.green() - base.green()) * t),
+                                 int(base.blue() + (hi.blue() - base.blue()) * t), 150 + int(80 * t))
+                else:
+                    col = QColor(base.red(), base.green(), base.blue(), 18)   # «pantalla LED» apagada
+                p.setBrush(col)
+                p.drawRoundedRect(QRectF(x, y, self.SQ, self.SQ), 2, 2)
+            if pk > 0.6:   # tapita que cae despacio
+                r = min(rows - 1, int(pk + 0.5))
+                p.setBrush(QColor(255, 255, 255, 170))
+                p.drawRoundedRect(QRectF(x, bottom - (r + 1) * cell + self.GAP + self.SQ - 2, self.SQ, 2), 1, 1)
+        msg = self.sb.currentMessage()
+        if msg:   # el mensaje de la barra de estado, legible encima de los cuadritos
+            f = p.font()
+            fm = QFontMetrics(f)
+            text = fm.elidedText(msg, Qt.TextElideMode.ElideRight, max(50, int(self.width() * 0.6)))
+            w = fm.horizontalAdvance(text) + 20
+            p.setBrush(QColor(0, 0, 0, 150))
+            p.drawRoundedRect(QRectF(8, (self.height() - fm.height() - 8) / 2, w, fm.height() + 8), 8, 8)
+            p.setPen(QColor(235, 235, 245))
+            p.drawText(QRectF(18, 0, w, self.height()), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
 
 
 class PlaylistList(QListWidget):
@@ -3095,6 +3203,7 @@ class Main(QMainWindow):
             QTimer.singleShot(300, lambda: self.set_player_style(str(self.cfg.value("player_style", "classic")), first=True))
         self.statusBar().addPermanentWidget(self.player_bar)   # reproductor en la línea de estado, a la derecha
         self.statusBar().setSizeGripEnabled(False)
+        self.wide_viz = WideViz(self.statusBar(), self.viz)
         self.statusBar().showMessage("Arrastra carpetas o canciones sobre otra carpeta. Doble clic en una canción para reproducirla.")
         self.build_menus()
         if int(self.cfg.value("tree2", 0) or 0):
@@ -4046,6 +4155,11 @@ class Main(QMainWindow):
             self.pl_fab.hide()            # la lista va dentro del reproductor celular
             self.pl_panel.hide()
             self._central_lay.setContentsMargins(0, 0, 20, 0)   # canal propio para la flechita: no tapa nada
+            self.statusBar().setMinimumHeight(44)
+            self.wide_viz.setGeometry(self.statusBar().rect())
+            self.wide_viz.show()
+            self.wide_viz.lower()
+            self.wide_viz.start()
             self.mobile.tab.show()
             self.mobile.place()
             if not first or int(self.cfg.value("mobile_open", 1) or 0):
@@ -4055,6 +4169,8 @@ class Main(QMainWindow):
             self.player_bar.show()
             self.pl_fab.show()
             self._central_lay.setContentsMargins(0, 0, 0, 0)
+            self.statusBar().setMinimumHeight(0)
+            self.wide_viz.hide()
             if self.mobile is not None:
                 self.mobile.anim.stop()
                 self.mobile.hide()
@@ -4127,6 +4243,8 @@ class Main(QMainWindow):
     def on_state(self, st):
         self.btn_play.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
         self.disc.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
+        if getattr(self, "wide_viz", None) is not None and self.wide_viz.isVisible():
+            QTimer.singleShot(0, self.wide_viz.start)
         self.viz.set_state({QMediaPlayer.PlaybackState.PlayingState: "playing",
                             QMediaPlayer.PlaybackState.PausedState: "paused"}.get(st, "stopped"))
         self.pl_update_np()

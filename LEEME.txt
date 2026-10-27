@@ -397,3 +397,7 @@ VERSIÓN 1.59
 ------------
  - Reproductor celular siempre pegado al borde derecho al abrir el programa.
  - Volumen más suave (curva de oído); empieza a la mitad cada vez que abres el programa.
+
+VERSIÓN 1.60
+------------
+ - Estilo celular: cuadritos a todo lo ancho de la barra de abajo que bailan al ritmo de la canción.
