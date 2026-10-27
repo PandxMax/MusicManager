@@ -169,7 +169,8 @@ def _lookup(s):
         if m:
             out = TABLE[k][CUR]
             for g in m.groups():
-                out = out.replace("%s", g, 1)
+                sub = _lookup(g) if g and g != s and any(c.isalpha() for c in g) else None
+                out = out.replace("%s", sub if sub is not None else g, 1)
             return out
     for k in _PREFIXES:
         if s.startswith(k) and len(s) > len(k):
@@ -224,7 +225,19 @@ def _deco(obj, text):
     return text
 
 
+_IN_APPLY = False
+
+
 def _apply(obj, attr, get, set_, deco=False):
+    global _IN_APPLY
+    _IN_APPLY = True
+    try:
+        _apply_inner(obj, attr, get, set_, deco)
+    finally:
+        _IN_APPLY = False
+
+
+def _apply_inner(obj, attr, get, set_, deco=False):
     cur = get()
     if not cur:
         return
@@ -247,6 +260,100 @@ def _apply(obj, attr, get, set_, deco=False):
     obj.setProperty(lk, new)
     if new != cur:
         set_(new)
+
+
+def retranslate_widget(o):
+    """Traduce un solo control (sin recorrer sus hijos): para los que aparecen después de abrir la ventana."""
+    try:
+        if isinstance(o, QAbstractButton):
+            _apply(o, "t", o.text, o.setText, True)
+        elif isinstance(o, QLabel):
+            _apply(o, "t", o.text, o.setText)
+        elif isinstance(o, QGroupBox):
+            _apply(o, "t", o.title, o.setTitle)
+        elif isinstance(o, QLineEdit):
+            _apply(o, "ph", o.placeholderText, o.setPlaceholderText)
+        elif hasattr(o, "placeholderText") and hasattr(o, "setPlaceholderText"):
+            _apply(o, "ph", o.placeholderText, o.setPlaceholderText)
+        if o.toolTip():
+            _apply(o, "wtip", o.toolTip, o.setToolTip)
+    except Exception:
+        pass
+
+
+def _has_letters(t):
+    return any(c.isalpha() for c in t)
+
+
+def install_hooks():
+    """Traduce automáticamente los textos que el programa pone mientras funciona (setText, avisos, títulos…)."""
+    from PyQt6.QtWidgets import (QPlainTextEdit, QTextEdit, QStatusBar, QTableWidget, QInputDialog, QFileDialog)
+
+    def hook(cls, meth, attr, deco_=False):
+        orig = getattr(cls, meth)
+
+        def f(self, *args, **kw):
+            if not _IN_APPLY and args and isinstance(args[0], str) and args[0] and _has_letters(args[0]):
+                text = args[0]
+                new = tr(text)
+                if attr:
+                    if new != text or known(text):
+                        try:
+                            self.setProperty("_i18n_o_" + attr, text)
+                        except Exception:
+                            pass
+                    if deco_:
+                        new = _deco(self, new)
+                    try:
+                        self.setProperty("_i18n_l_" + attr, new)
+                    except Exception:
+                        pass
+                args = (new,) + tuple(args[1:])
+            return orig(self, *args, **kw)
+        setattr(cls, meth, f)
+
+    for cls, meth, attr, d in (
+            (QLabel, "setText", "t", False), (QAbstractButton, "setText", "t", True), (QAction, "setText", "t", True),
+            (QGroupBox, "setTitle", "t", False), (QMenu, "setTitle", "m", False),
+            (QWidget, "setToolTip", "wtip", False), (QAction, "setToolTip", "tip", False),
+            (QWidget, "setWindowTitle", "wt", False), (QLineEdit, "setPlaceholderText", "ph", False),
+            (QPlainTextEdit, "setPlaceholderText", "ph", False), (QTextEdit, "setPlaceholderText", "ph", False),
+            (QMessageBox, "setText", None, False), (QMessageBox, "setInformativeText", None, False),
+            (QStatusBar, "showMessage", None, False), (QTextEdit, "setHtml", None, False)):
+        try:
+            hook(cls, meth, attr, d)
+        except Exception:
+            pass
+
+    try:
+        o_hdr = QTableWidget.setHorizontalHeaderLabels
+        QTableWidget.setHorizontalHeaderLabels = lambda self, labels: o_hdr(self, [tr(x) for x in labels])
+    except Exception:
+        pass
+    # diálogos estáticos: título y texto
+    try:
+        o_get = QInputDialog.getText
+        QInputDialog.getText = staticmethod(lambda parent, title, label, *a, **k: o_get(parent, tr(title), tr(label), *a, **k))
+        o_item = QInputDialog.getItem
+        QInputDialog.getItem = staticmethod(lambda parent, title, label, *a, **k: o_item(parent, tr(title), tr(label), *a, **k))
+        o_int = QInputDialog.getInt
+        QInputDialog.getInt = staticmethod(lambda parent, title, label, *a, **k: o_int(parent, tr(title), tr(label), *a, **k))
+    except Exception:
+        pass
+    try:
+        for name in ("getSaveFileName", "getOpenFileName", "getOpenFileNames", "getExistingDirectory"):
+            o_fd = getattr(QFileDialog, name)
+
+            def mk(o_fd):
+                def g(parent=None, caption="", *a, **k):
+                    a = list(a)
+                    if len(a) >= 2 and isinstance(a[1], str):
+                        a[1] = tr(a[1])   # filtro de tipos de archivo
+                    return o_fd(parent, tr(caption), *a, **k)
+                return staticmethod(g)
+            setattr(QFileDialog, name, mk(o_fd))
+    except Exception:
+        pass
 
 
 def deco(obj):
@@ -279,6 +386,8 @@ def retranslate(root):
                     if orig is not None and o.itemText(i) != tr(orig):
                         o.setItemText(i, tr(orig))
             elif isinstance(o, QLineEdit):
+                _apply(o, "ph", o.placeholderText, o.setPlaceholderText)
+            elif hasattr(o, "placeholderText") and hasattr(o, "setPlaceholderText") and not isinstance(o, QComboBox):
                 _apply(o, "ph", o.placeholderText, o.setPlaceholderText)
             elif isinstance(o, QTabWidget):
                 for i in range(o.count()):

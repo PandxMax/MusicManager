@@ -423,3 +423,158 @@ ROWS += [
     ("Acerca de Music Manager", "About Music Manager", "О программе Music Manager"),
     ("Versión", "Version", "Версия"), ("Creado por", "Created by", "Автор"),
 ]
+
+# ---------------- textos con datos variables (%s = el dato)
+ROWS += [
+    ("%s portada(s) redimensionada(s) a máx. %s px (pendiente de guardar)", "%s cover(s) resized to max. %s px (not saved yet)",
+     "Обложек изменено: %s, макс. %s px (не сохранено)"),
+    ("Hablar con la IA — %s", "Talk to the AI — %s", "Поговорить с ИИ — %s"),
+    ("Nombre (dentro de %s):", "Name (inside %s):", "Имя (внутри %s):"),
+    ("%s — %s canciones", "%s — %s songs", "%s — песен: %s"),
+    ("%s canción(es) añadida(s) a «%s» (%s en total).", "%s song(s) added to “%s” (%s in total).", "Добавлено песен: %s в «%s» (всего %s)."),
+    ("Reproduciendo la carpeta «%s» (%s canciones).", "Playing folder “%s” (%s songs).", "Воспроизводится папка «%s» (песен: %s)."),
+    ("%s canciones", "%s songs", "песен: %s"),
+    ("Portada: %s×%s px · %s KB", "Cover: %s×%s px · %s KB", "Обложка: %s×%s px · %s КБ"),
+    ("<br><i>(+%s seleccionadas más)</i>", "<br><i>(+%s more selected)</i>", "<br><i>(+ ещё выбрано: %s)</i>"),
+    ("🖼 Portada: %s &nbsp; 📝 Letra: %s<br>🎼 Género: <b>%s</b>%s", "🖼 Cover: %s &nbsp; 📝 Lyrics: %s<br>🎼 Genre: <b>%s</b>%s",
+     "🖼 Обложка: %s &nbsp; 📝 Текст: %s<br>🎼 Жанр: <b>%s</b>%s"),
+    ("Buscando opciones de portada para %s álbum(es) en iTunes, Deezer y SoundCloud…",
+     "Looking for cover options for %s album(s) on iTunes, Deezer and SoundCloud…", "Поиск обложек для альбомов (%s) в iTunes, Deezer и SoundCloud…"),
+    ("Portada puesta en %s de %s canciones (en naranja). Revísalas y pulsa «Guardar».",
+     "Cover set on %s of %s songs (in orange). Check them and press “Save”.", "Обложка установлена: %s из %s песен (оранжевым). Проверьте и нажмите «Сохранить»."),
+    (" Campos no soportados por algún formato: %s.", " Fields not supported by some format: %s.", " Поля, не поддерживаемые форматом: %s."),
+    ("%s archivo(s) son .mp4 y Windows no muestra la portada de esos.\n\n¿Renombrarlos a .m4a? Es el mismo archivo (mismo audio); solo cambia la extensión y así el Explorador muestra la portada.",
+     "%s file(s) are .mp4 and Windows doesn't show covers for those.\n\nRename them to .m4a? It's the same file (same audio); only the extension changes so Explorer shows the cover.",
+     "Файлов .mp4: %s — Windows не показывает их обложки.\n\nПереименовать в .m4a? Это тот же файл (тот же звук), меняется только расширение, и Проводник покажет обложку."),
+    ("La IA dio opciones para %s canciones. Elige el subgénero en el cuadro de la derecha.",
+     "The AI gave options for %s songs. Pick the subgenre in the panel on the right.", "ИИ предложил варианты для песен: %s. Выберите поджанр в панели справа."),
+    (" (%s ya tenían letra y se omiten)", " (%s already had lyrics and were skipped)", " (у %s уже был текст, пропущены)"),
+    ("Buscando %s letra(s) en LRCLIB…%s", "Looking for %s lyric(s) on LRCLIB…%s", "Поиск текстов (%s) в LRCLIB…%s"),
+    ("Letra puesta en %s de %s canciones (en naranja). Revísalas y pulsa «Guardar». En las demás, LRCLIB no tiene la letra.",
+     "Lyrics set on %s of %s songs (in orange). Check them and press “Save”. LRCLIB has no lyrics for the rest.",
+     "Текст добавлен: %s из %s песен (оранжевым). Проверьте и нажмите «Сохранить». Для остальных в LRCLIB текста нет."),
+    ("%s dato(s) rellenados con IA (pendientes de guardar).", "%s field(s) filled with AI (not saved yet).", "Заполнено ИИ полей: %s (не сохранено)."),
+    ("Género «%s» puesto (pendiente de guardar).", "Genre “%s” set (not saved yet).", "Жанр «%s» установлен (не сохранено)."),
+    (". %s sin cambios (sin portada o ya eran más pequeñas)", ". %s unchanged (no cover or already smaller)", ". Без изменений: %s (нет обложки или уже меньше)"),
+    ("%s elemento(s) %s. Elige la carpeta de destino y pega (Ctrl+V).", "%s item(s) %s. Choose the destination folder and paste (Ctrl+V).",
+     "Элементов: %s %s. Выберите папку назначения и вставьте (Ctrl+V)."),
+    ("Portada pegada en %s canción(es) (pendiente de guardar).", "Cover pasted on %s song(s) (not saved yet).", "Обложка вставлена в песни: %s (не сохранено)."),
+    ("Buscando «%s» en YouTube…", "Searching “%s” on YouTube…", "Поиск «%s» на YouTube…"),
+    ("Abriendo «%s» en el navegador…", "Opening “%s” in the browser…", "Открываю «%s» в браузере…"),
+    ("Versión %s disponible (tienes la %s).", "Version %s available (you have %s).", "Доступна версия %s (у вас %s)."),
+    ("%s  (género general)", "%s  (general genre)", "%s  (общий жанр)"),
+    ("Opciones para «%s». Doble clic o selecciona una y pulsa «Usar esta».", "Options for “%s”. Double-click or select one and press “Use this one”.",
+     "Варианты для «%s». Дважды щёлкните или выберите и нажмите «Использовать»."),
+    ("Usar la primera opción en las %s restantes", "Use the first option for the remaining %s", "Использовать первый вариант для оставшихся %s"),
+    ("No pude leer la respuesta de la IA: %s", "Couldn't read the AI's answer: %s", "Не удалось прочитать ответ ИИ: %s"),
+    ("●  %s archivo(s) con cambios sin guardar · Ctrl+S", "●  %s file(s) with unsaved changes · Ctrl+S", "●  Файлов с несохранёнными изменениями: %s · Ctrl+S"),
+    ("Nuevo nombre (sin «%s»):", "New name (without “%s”):", "Новое имя (без «%s»):"),
+    ("Nombrar los %s archivos como:", "Name the %s files as:", "Назвать файлы (%s) так:"),
+    ("\n\n(Faltan %s álbumes; te abro el primero. Para los demás, usa clic derecho en la portada → «Buscar en Google Imágenes».)",
+     "\n\n(%s albums missing; I'll open the first one. For the rest, right-click the cover → “Search Google Images”.)",
+     "\n\n(Не найдено альбомов: %s; открываю первый. Для остальных: правый клик по обложке → «Искать в Google Картинках».)"),
+    ("➡ Mover al otro árbol  (%s)", "➡ Move to the other tree  (%s)", "➡ Переместить в другое дерево  (%s)"),
+    ("⧉ Copiar al otro árbol  (%s)", "⧉ Copy to the other tree  (%s)", "⧉ Копировать в другое дерево  (%s)"),
+    ("Las portadas nuevas se reducirán a un máximo de %s px.", "New covers will be reduced to a maximum of %s px.", "Новые обложки будут уменьшены до %s px."),
+    ("💾 Guardar las %s portadas en una carpeta…", "💾 Save the %s covers to a folder…", "💾 Сохранить обложки (%s) в папку…"),
+    ("La última actualización no se pudo instalar.\n\nDescarga el .zip nuevo desde la página de GitHub (Releases) y reemplaza la carpeta.\n\nDetalle técnico:\n%s",
+     "The last update couldn't be installed.\n\nDownload the new .zip from the GitHub page (Releases) and replace the folder.\n\nTechnical detail:\n%s",
+     "Не удалось установить последнее обновление.\n\nСкачайте новый .zip со страницы GitHub (Releases) и замените папку.\n\nТехнические подробности:\n%s"),
+    ("  (quedan %s por elegir)", "  (%s left to choose)", "  (осталось выбрать: %s)"),
+    ("Elige el género/subgénero para «%s»:%s", "Choose the genre/subgenre for “%s”:%s", "Выберите жанр/поджанр для «%s»:%s"),
+    ("«%s» es una carpeta principal y no se puede mover.", "“%s” is a main folder and can't be moved.", "«%s» — главная папка, её нельзя переместить."),
+    ("No puedes mover «%s» dentro de sí misma.", "You can't move “%s” into itself.", "Нельзя переместить «%s» в саму себя."),
+    ("No puedes copiar «%s» dentro de sí misma.", "You can't copy “%s” into itself.", "Нельзя скопировать «%s» в саму себя."),
+    ("Tamaño de los archivos: %s px (Ctrl + rueda)", "File size: %s px (Ctrl + wheel)", "Размер значков: %s px (Ctrl + колесо)"),
+    ("Lista guardada en %s", "Playlist saved to %s", "Плейлист сохранён в %s"),
+    ("%s: nombre vacío o faltan datos (artista/título).", "%s: empty name or missing data (artist/title).", "%s: пустое имя или нет данных (исполнитель/название)."),
+    ("¿Eliminar %s?\n\n%s", "Delete %s?\n\n%s", "Удалить %s?\n\n%s"),
+    ("Portada guardada en %s", "Cover saved to %s", "Обложка сохранена в %s"),
+    ("%s portada(s) guardada(s) en %s", "%s cover(s) saved to %s", "Обложек сохранено: %s в %s"),
+    ("Ya tienes la última versión (%s).", "You already have the latest version (%s).", "У вас последняя версия (%s)."),
+    ("Descargando la actualización… %s", "Downloading the update… %s", "Загрузка обновления… %s"),
+    ("No se pudo preparar la actualización:\n%s", "Couldn't prepare the update:\n%s", "Не удалось подготовить обновление:\n%s"),
+    ("✔ Music Manager se actualizó correctamente (versión %s).", "✔ Music Manager was updated successfully (version %s).",
+     "✔ Music Manager успешно обновлён (версия %s)."),
+    ("<p style='margin:2px 0'>Se actualizó desde la versión %s. Esto es lo nuevo:</p>",
+     "<p style='margin:2px 0'>Updated from version %s. Here's what's new:</p>", "<p style='margin:2px 0'>Обновлено с версии %s. Что нового:</p>"),
+    ("El archivo descargado no contiene %s.", "The downloaded file doesn't contain %s.", "Скачанный файл не содержит %s."),
+    ("No se pudo reemplazar el archivo: %s. La versión nueva quedó en %s", "Couldn't replace the file: %s. The new version was left at %s",
+     "Не удалось заменить файл: %s. Новая версия сохранена в %s"),
+    ("Hay recortes (clipping) en %s % de las muestras.", "There is clipping in %s % of the samples.", "Клиппинг в %s % сэмплов."),
+    ("El archivo es %s, pero el audio se corta en %s kHz%s. Suele pasar al convertir un MP3/AAC a FLAC: no gana calidad real.",
+     "The file is %s, but the audio cuts off at %s kHz%s. This usually happens when converting MP3/AAC to FLAC: no real quality gain.",
+     "Файл в формате %s, но звук обрезан на %s кГц%s. Так бывает при конвертации MP3/AAC во FLAC: качество не растёт."),
+    (" con un borde muy marcado", " with a very sharp edge", " с очень резкой границей"),
+    ("%s a %s kbps con contenido hasta %s kHz. Casi indistinguible del original al oído.",
+     "%s at %s kbps with content up to %s kHz. Almost indistinguishable from the original by ear.",
+     "%s, %s кбит/с, содержимое до %s кГц. На слух почти не отличить от оригинала."),
+    ("%s · %s kHz%s%s · %s:%s  |  Corte ≈ <b>%s kHz</b> (máx. posible %s kHz)  |  Pico %s dB · RMS %s dB · Rango dinámico %s dB",
+     "%s · %s kHz%s%s · %s:%s  |  Cutoff ≈ <b>%s kHz</b> (max. possible %s kHz)  |  Peak %s dB · RMS %s dB · Dynamic range %s dB",
+     "%s · %s кГц%s%s · %s:%s  |  Срез ≈ <b>%s кГц</b> (макс. возможно %s кГц)  |  Пик %s дБ · RMS %s дБ · Дин. диапазон %s дБ"),
+    ("🏆 Más contenido de agudos: <b>%s</b> (hasta %s kHz)", "🏆 Most treble content: <b>%s</b> (up to %s kHz)", "🏆 Больше всего высоких: <b>%s</b> (до %s кГц)"),
+    ("Formato sin pérdida a %s kHz / %s bits y con contenido hasta %s kHz.", "Lossless format at %s kHz / %s bits with content up to %s kHz.",
+     "Формат без потерь %s кГц / %s бит, содержимое до %s кГц."),
+    ("%s a %s kbps; el audio llega hasta %s kHz.", "%s at %s kbps; the audio reaches %s kHz.", "%s, %s кбит/с; звук доходит до %s кГц."),
+    ("%s a %s kbps; el audio se corta en %s kHz (se pierden agudos).", "%s at %s kbps; the audio cuts off at %s kHz (treble is lost).",
+     "%s, %s кбит/с; звук обрезан на %s кГц (теряются высокие)."),
+    ("Es %s kHz / %s bits, pero el contenido llega a %s kHz: probablemente sea calidad CD dentro de un contenedor Hi-Res.",
+     "It's %s kHz / %s bits, but the content reaches %s kHz: probably CD quality inside a Hi-Res container.",
+     "Это %s кГц / %s бит, но содержимое доходит до %s кГц: вероятно, CD-качество в Hi-Res контейнере."),
+    ("Sin pérdida y con contenido hasta %s kHz (cerca del límite de %s kHz).", "Lossless with content up to %s kHz (close to the %s kHz limit).",
+     "Без потерь, содержимое до %s кГц (близко к пределу %s кГц)."),
+    ("<b>%s</b> canción(es) seleccionada(s)", "<b>%s</b> song(s) selected", "Выбрано песен: <b>%s</b>"),
+    ("Guardar en: %s", "Save to: %s", "Сохранить в: %s"),
+    ("\nListo: %s de %s convertida(s).", "\nDone: %s of %s converted.", "\nГотово: преобразовано %s из %s."),
+    ("%s Fuente de etiquetas: %s", "%s Tag source: %s", "%s Источник тегов: %s"),
+    ("%s resultado(s). Elige el correcto:", "%s result(s). Pick the right one:", "Результатов: %s. Выберите нужный:"),
+    ("<b>Título:</b> %s &nbsp; <b>Artista:</b> %s &nbsp; <b>Álbum:</b> %s<br><b>Año:</b> %s &nbsp; <b>Pista:</b> %s &nbsp; <b>Géneros:</b> %s",
+     "<b>Title:</b> %s &nbsp; <b>Artist:</b> %s &nbsp; <b>Album:</b> %s<br><b>Year:</b> %s &nbsp; <b>Track:</b> %s &nbsp; <b>Genres:</b> %s",
+     "<b>Название:</b> %s &nbsp; <b>Исполнитель:</b> %s &nbsp; <b>Альбом:</b> %s<br><b>Год:</b> %s &nbsp; <b>Трек:</b> %s &nbsp; <b>Жанры:</b> %s"),
+    ("No hay conexión: %s", "No connection: %s", "Нет соединения: %s"),
+    ("ffmpeg terminó con el código %s", "ffmpeg exited with code %s", "ffmpeg завершился с кодом %s"),
+    ("LRCLIB respondió «%s» (%s)", "LRCLIB replied “%s” (%s)", "LRCLIB ответил «%s» (%s)"),
+    ("No hay conexión con LRCLIB (%s)", "No connection to LRCLIB (%s)", "Нет соединения с LRCLIB (%s)"),
+    ("GitHub respondió %s", "GitHub replied %s", "GitHub ответил %s"),
+    ("Pega tu API key de %s en Ajustes → Ajustes de IA.", "Paste your %s API key in Settings → AI settings.", "Вставьте API-ключ %s в Настройки → Настройки ИИ."),
+    # sueltos que faltaban
+    ("Frecuencia máxima:", "Max frequency:", "Макс. частота:"), ("Espectrogramas", "Spectrograms", "Спектрограммы"),
+    ("Comparación", "Comparison", "Сравнение"), ("Análisis", "Analysis", "Анализ"), ("Aplicar:", "Apply:", "Применить:"),
+    ("Archivo", "File", "Файл"), ("Formato", "Format", "Формат"), ("Duración", "Duration", "Длительность"),
+    ("Veredicto", "Verdict", "Вердикт"), ("Muestreo", "Sample rate", "Частота дискр."), ("Frecuencia", "Frequency", "Частота"), ("Bits", "Bits", "Биты"),
+    ("Calidad", "Quality", "Качество"), ("Fuente de etiquetas", "Tag source", "Источник тегов"),
+    ("Formato de salida", "Output format", "Выходной формат"),
+    # ayuda para conseguir una clave de IA gratis
+    ("Falta la clave de la IA", "AI key missing", "Нет ключа ИИ"),
+    ("🔑 Conseguir clave gratis de Gemini", "🔑 Get a free Gemini key", "🔑 Получить бесплатный ключ Gemini"),
+    ("⚙ Pegar la clave (Gemini)", "⚙ Paste the key (Gemini)", "⚙ Вставить ключ (Gemini)"),
+]
+
+NOKEY_ES = ("<h3>🔑 Necesitas una clave (API key) para usar la IA</h3>"
+            "<p>La opción más fácil es <b>Gemini de Google, que es gratis</b>:</p><ol>"
+            "<li>Pulsa <b>«Conseguir clave gratis de Gemini»</b>: se abre Google AI Studio en tu navegador.</li>"
+            "<li>Inicia sesión con tu cuenta de Google (la de Gmail).</li>"
+            "<li>Pulsa <b>«Create API key»</b> (Crear clave de API) y acepta.</li>"
+            "<li>Copia la clave que aparece (empieza por <code>AIza…</code>).</li>"
+            "<li>Vuelve aquí, pulsa <b>«Pegar la clave (Gemini)»</b>, pégala en «API key» y pulsa Aceptar.</li></ol>"
+            "<p><small>La versión gratuita tiene un límite de consultas por minuto y por día, de sobra para etiquetar tu música. "
+            "No compartas tu clave con nadie. Claude y ChatGPT también funcionan, pero sus claves son de pago.</small></p>")
+NOKEY_EN = ("<h3>🔑 You need a key (API key) to use the AI</h3>"
+            "<p>The easiest option is <b>Google's Gemini, which is free</b>:</p><ol>"
+            "<li>Press <b>“Get a free Gemini key”</b>: Google AI Studio opens in your browser.</li>"
+            "<li>Sign in with your Google (Gmail) account.</li>"
+            "<li>Press <b>“Create API key”</b> and accept.</li>"
+            "<li>Copy the key that appears (it starts with <code>AIza…</code>).</li>"
+            "<li>Come back here, press <b>“Paste the key (Gemini)”</b>, paste it into “API key” and press OK.</li></ol>"
+            "<p><small>The free tier has a per-minute and per-day request limit, more than enough to tag your music. "
+            "Don't share your key with anyone. Claude and ChatGPT work too, but their keys are paid.</small></p>")
+NOKEY_RU = ("<h3>🔑 Для работы ИИ нужен ключ (API key)</h3>"
+            "<p>Проще всего — <b>Gemini от Google, он бесплатный</b>:</p><ol>"
+            "<li>Нажмите <b>«Получить бесплатный ключ Gemini»</b> — в браузере откроется Google AI Studio.</li>"
+            "<li>Войдите в свой аккаунт Google (Gmail).</li>"
+            "<li>Нажмите <b>«Create API key»</b> и подтвердите.</li>"
+            "<li>Скопируйте появившийся ключ (начинается с <code>AIza…</code>).</li>"
+            "<li>Вернитесь сюда, нажмите <b>«Вставить ключ (Gemini)»</b>, вставьте его в поле «API key» и нажмите ОК.</li></ol>"
+            "<p><small>У бесплатного тарифа есть лимит запросов в минуту и в день — этого с запасом хватит для тегов. "
+            "Никому не сообщайте свой ключ. Claude и ChatGPT тоже работают, но их ключи платные.</small></p>")
+ROWS.append((NOKEY_ES, NOKEY_EN, NOKEY_RU))

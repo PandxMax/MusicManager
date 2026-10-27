@@ -189,6 +189,7 @@ def verdict(r):
 
 
 # ====================================================================== UI
+from i18n import tr as T
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QRectF, QPointF
 from PyQt6.QtGui import QImage, QPainter, QColor, QPen, QFont, QLinearGradient, QBrush
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QLabel,
@@ -527,7 +528,7 @@ class SpectrumDialog(QWidget):
             inf = r["info"]
             vals = [r["name"], inf["codec"], f"{r['sr']/1000:g} kHz", str(inf["bits"] or "—"),
                     f"{inf['bitrate']/1000:.0f} kbps" if inf["bitrate"] else "—", f"{r['cutoff']/1000:.1f}",
-                    f"{r['peak']:.1f}", f"{r['rms']:.1f}", f"{r['dyn']:.1f}", r["verdict"]]
+                    f"{r['peak']:.1f}", f"{r['rms']:.1f}", f"{r['dyn']:.1f}", T(r["verdict"])]
             for j, s in enumerate(vals):
                 it = QTableWidgetItem(s)
                 if j == 0:
@@ -552,11 +553,11 @@ class SpectrumDialog(QWidget):
         out = []
         for r in self.ordered():
             c = LEVEL_COLOR[r["level"]]
-            out.append(f"<h3>{r['name']}</h3><p style='color:{c}'><b>{r['verdict']}</b></p><ul>" +
-                       "".join(f"<li>{w}</li>" for w in r["why"]) + "</ul>")
-        out.append("<hr><p><small>Cómo leerlo: el eje vertical es la frecuencia (kHz) y el color es el volumen (dBFS). "
-                   "Un corte horizontal brusco indica compresión con pérdida (MP3, AAC…) o un archivo convertido desde ella. "
-                   "El análisis se hace sobre la mezcla mono. Es una estimación, no una prueba definitiva.</small></p>")
+            out.append(f"<h3>{r['name']}</h3><p style='color:{c}'><b>{T(r['verdict'])}</b></p><ul>" +
+                       "".join(f"<li>{T(w)}</li>" for w in r["why"]) + "</ul>")
+        out.append(T("<hr><p><small>Cómo leerlo: el eje vertical es la frecuencia (kHz) y el color es el volumen (dBFS). "
+                     "Un corte horizontal brusco indica compresión con pérdida (MP3, AAC…) o un archivo convertido desde ella. "
+                     "El análisis se hace sobre la mezcla mono. Es una estimación, no una prueba definitiva.</small></p>"))
         self.txt.setHtml("".join(out))
 
     def apply_fmax(self):

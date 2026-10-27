@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.46"
+APP_VERSION = "1.47"
 
 
 class TMenu(QMenu):
@@ -773,6 +773,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.47', [
+        'Inglés y ruso mucho más completos: ahora se traducen también los textos que cambian mientras usas el programa (letra, análisis del espectrograma, comparación, portadas, fuentes de etiquetas, avisos con nombres y cantidades…).',
+        'Si usas la IA sin clave, aparece una guía paso a paso para conseguir gratis una clave de Gemini, con un botón que abre la página de Google y otro para pegarla.',
+    ]),
     ('1.46', [
         'Nuevo selector de idioma con banderitas arriba a la derecha: cambia entre Español, English y Русский al instante, sin reiniciar.',
         'Mucho más traducido al inglés y al ruso: ventanas de IA, ajustes de la canción, descargas, espectrograma, portadas, listas de reproducción, avisos, mensajes de la barra de estado, guía rápida y «Acerca de».',
@@ -1106,7 +1110,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.46 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.47 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4483,8 +4487,7 @@ class Main(QMainWindow):
         prov = self.provider.currentText()
         key, model = self.key_le.text().strip(), self.model_cb.currentText().strip()
         if not key:
-            QMessageBox.information(self, "Falta la API key", f"Pega tu API key de {prov} en Ajustes → Ajustes de IA.")
-            self.open_settings(0)
+            self.no_key_help(prov)
             return
         self.cfg.setValue("provider", prov)
         self.cfg.setValue(f"key_{prov}", key)
@@ -4533,12 +4536,34 @@ class Main(QMainWindow):
         self.statusBar().showMessage("Falló la consulta a la IA.")
         QMessageBox.warning(self, "Error de IA", msg)
 
+    def no_key_help(self, prov=""):
+        """Explica cómo conseguir gratis una clave de Gemini y abre los ajustes para pegarla."""
+        box = QMessageBox(self)
+        box.setWindowTitle("Falta la clave de la IA")
+        box.setIconPixmap(self.logo_pm.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio,
+                                              Qt.TransformationMode.SmoothTransformation))
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(i18n_more.NOKEY_ES)
+        get = box.addButton("🔑 Conseguir clave gratis de Gemini", QMessageBox.ButtonRole.ActionRole)
+        paste = box.addButton("⚙ Pegar la clave (Gemini)", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(QMessageBox.StandardButton.Close)
+        while True:
+            box.exec()
+            b = box.clickedButton()
+            if b is get:
+                QDesktopServices.openUrl(QUrl("https://aistudio.google.com/apikey"))
+                continue   # deja la ventana abierta para seguir los pasos
+            break
+        if b is paste:
+            self.provider.setCurrentText("Gemini")
+            self.on_provider("Gemini")
+            self.open_settings(0)
+
     def ai_settings(self):
         prov = self.provider.currentText()
         key, model = self.key_le.text().strip(), self.model_cb.currentText().strip()
         if not key:
-            QMessageBox.information(self, "Falta la API key", f"Pega tu API key de {prov} en Ajustes → Ajustes de IA.")
-            self.open_settings(0)
+            self.no_key_help(prov)
             return None
         self.cfg.setValue("provider", prov)
         self.cfg.setValue(f"key_{prov}", key)
@@ -6013,6 +6038,7 @@ if __name__ == "__main__":
             pass
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Music Manager")
+    i18n.install_hooks()
     _deco = icons.IconDeco(app)
     app.installEventFilter(_deco)
     w = Main()

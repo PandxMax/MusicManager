@@ -345,7 +345,7 @@ def vicon(kind, color=None, ctx=None):
 
 
 from PyQt6.QtCore import QObject, QEvent
-from PyQt6.QtWidgets import QAbstractButton, QMenu, QDialog, QMessageBox
+from PyQt6.QtWidgets import QAbstractButton, QMenu, QDialog, QMessageBox, QWidget
 
 
 def flag_pixmap(code, w=44, h=30):
@@ -406,6 +406,10 @@ class IconDeco(QObject):
                 elif o.isWindow() and isinstance(o, (QDialog, QMessageBox)):
                     import i18n
                     i18n.retranslate(o)   # traduce ventanas y avisos creados sobre la marcha
+                if not o.isWindow() and isinstance(o, QWidget):
+                    import i18n
+                    if i18n.CUR != "es":
+                        i18n.retranslate_widget(o)   # controles que aparecen después (resultados, avisos…)
         except Exception:
             pass
         return False

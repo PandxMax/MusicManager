@@ -335,3 +335,8 @@ VERSIÓN 1.46
  - Selector de idioma con banderitas (arriba a la derecha): Español, English, Русский al instante.
  - Mucho más traducido al inglés y al ruso (ventanas, avisos, barra de estado, guía).
  - Botones Sí/No/Aceptar/Cancelar en el idioma elegido.
+
+VERSIÓN 1.47
+------------
+ - Inglés y ruso mucho más completos (también los textos que cambian mientras usas el programa).
+ - Sin clave de IA: guía para conseguir gratis una clave de Gemini.
