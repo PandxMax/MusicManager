@@ -409,3 +409,7 @@ VERSIÓN 1.61
 VERSIÓN 1.62
 ------------
  - Árboles de carpetas plegables (Ajustes → General): escondidos, salen con la flechita del borde izquierdo.
+
+VERSIÓN 1.63
+------------
+ - Árboles escondidos: al abrirse empujan el contenido en vez de taparlo.

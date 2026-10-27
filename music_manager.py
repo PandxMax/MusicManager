@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.62"
+APP_VERSION = "1.63"
 
 
 class TMenu(QMenu):
@@ -406,7 +406,6 @@ QToolButton#webbtn { background: @accent_soft; border: 1px solid @accent; border
 QToolButton#webbtn:hover { background: @accent; color: white; }
 QToolButton#webbtn::menu-indicator { image: none; width: 0px; }
 QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 10px; }
-QFrame#drawer { background: @surface; border: 1px solid @border; border-left: none; border-top-right-radius: 16px; border-bottom-right-radius: 16px; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
@@ -788,6 +787,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.63', [
+        'Árboles escondidos: al abrirlos con la flechita ahora empujan el resto del programa hacia la derecha (ya no se montan encima), y al cerrarlos todo vuelve a ocupar el ancho. La flechita queda en su propio canal del borde izquierdo y recuerda si los dejaste abiertos.',
+    ]),
     ('1.62', [
         'Árboles de carpetas plegables: en Ajustes → General → «Árboles de carpetas» elige «Siempre visibles (normal)» o «Escondidas». Escondidas, la lista de canciones gana todo el ancho y las carpetas salen deslizándose con la flechita del borde izquierdo; la misma flechita, pegada al lado del panel, las vuelve a esconder.',
     ]),
@@ -1223,7 +1225,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.62 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.63 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
