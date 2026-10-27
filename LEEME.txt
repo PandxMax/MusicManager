@@ -374,3 +374,7 @@ VERSIÓN 1.53
 VERSIÓN 1.54
 ------------
  - Ajustes → Reproductor: elige entre la barra clásica de abajo o el reproductor estilo celular (solo uno a la vez).
+
+VERSIÓN 1.55
+------------
+ - Corregido: un solo apartado «Reproductor» en Ajustes, con el estilo del reproductor visible.

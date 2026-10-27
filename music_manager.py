@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.54"
+APP_VERSION = "1.55"
 
 
 class TMenu(QMenu):
@@ -776,6 +776,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.55', [
+        'Corregido: en Ajustes salían dos apartados «Reproductor» y la opción del estilo (clásico / celular) no se veía. Ahora hay uno solo con el estilo del reproductor y «Pasar a la siguiente canción al terminar».',
+    ]),
     ('1.54', [
         'Ajustes → Reproductor: elige el estilo del reproductor. «Barra de reproducción abajo (clásico)» o «Reproductor estilo celular». Solo se usa uno a la vez: con el estilo celular desaparece la barra de abajo y el reproductor grande se abre desde la flechita del borde derecho.',
     ]),
@@ -1140,7 +1143,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.54 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.55 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5794,7 +5797,9 @@ class Main(QMainWindow):
         hint_ps = QLabel("Solo se usa uno a la vez. En el estilo celular, la flechita del borde derecho lo abre y lo cierra.")
         hint_ps.setWordWrap(True)
         hint_ps.setObjectName("hint")
-        add_page("reproductor", "Reproductor", page(QLabel("Estilo del reproductor"), r_classic, r_mobile, hint_ps))
+        lbl_ps = QLabel("<b>Estilo del reproductor</b>")
+        add_page("reproductor", "Reproductor", page(lbl_ps, r_classic, r_mobile, hint_ps, QLabel(" "),
+                                                    chk("Pasar a la siguiente canción al terminar", "autonext", 1)))
         # Apariencia
         theme_cb = QComboBox()
         theme_cb.addItem(T("Oscuro"), "dark")
@@ -5871,8 +5876,6 @@ class Main(QMainWindow):
         # Inteligencia artificial (los campos que usa el resto del programa)
         self.ai_cfg.show()
         add_page("ia", "Inteligencia artificial", page(QLabel("Elige el proveedor, el modelo y pega tu clave."), self.ai_cfg))
-        # Reproductor
-        add_page("reproductor", "Reproductor", page(chk("Pasar a la siguiente canción al terminar", "autonext", 1)))
 
         nav.expandAll()
 

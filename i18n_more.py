@@ -699,3 +699,6 @@ ROWS += [
      "Only one is used at a time. In phone style, the little arrow on the right edge opens and closes it.",
      "Используется только один. В стиле телефона его открывает и закрывает стрелка у правого края."),
 ]
+
+ROWS += [("<b>Estilo del reproductor</b>", "<b>Player style</b>", "<b>Стиль плеера</b>"),
+         ("Pasar a la siguiente canción al terminar", "Go to the next song when one ends", "Переходить к следующей песне по окончании")]
