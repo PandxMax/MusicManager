@@ -729,3 +729,17 @@ ROWS += [
 
 ROWS += [("Estilo celular: abrir el reproductor grande al reproducir una canción",
           "Phone style: open the big player when playing a song", "Стиль телефона: открывать большой плеер при воспроизведении")]
+
+ROWS += [
+    ("📋 Copiar al otro árbol", "📋 Copy to the other tree", "📋 Копировать в другое дерево"),
+    ("✂️ Mover al otro árbol", "✂️ Move to the other tree", "✂️ Переместить в другое дерево"),
+    ("Copia lo elegido a la carpeta abierta en el otro árbol (F7)", "Copies the selection to the folder open in the other tree (F7)",
+     "Копирует выбранное в папку, открытую в другом дереве (F7)"),
+    ("Mueve lo elegido a la carpeta abierta en el otro árbol (F6)", "Moves the selection to the folder open in the other tree (F6)",
+     "Перемещает выбранное в папку, открытую в другом дереве (F6)"),
+    ("%s canción(es)", "%s song(s)", "песен: %s"), ("%s carpetas", "%s folders", "папок: %s"),
+    ("Elige en el otro árbol la carpeta de destino.", "Pick the destination folder in the other tree.", "Выберите папку назначения в другом дереве."),
+    ("Elige canciones en la lista o una carpeta en el árbol.", "Pick songs in the list or a folder in the tree.", "Выберите песни в списке или папку в дереве."),
+    ("Ya está en esa carpeta.", "It's already in that folder.", "Уже в этой папке."),
+    ("➡ Mover al otro árbol  (%s)", "➡ Move to the other tree  (%s)", "➡ Переместить в другое дерево  (%s)"),
+]

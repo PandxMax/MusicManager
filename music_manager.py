@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.60"
+APP_VERSION = "1.61"
 
 
 class TMenu(QMenu):
@@ -405,6 +405,7 @@ QToolButton#langbtn::menu-indicator { image: none; width: 0px; }
 QToolButton#webbtn { background: @accent_soft; border: 1px solid @accent; border-radius: 12px; padding: 4px 14px; }
 QToolButton#webbtn:hover { background: @accent; color: white; }
 QToolButton#webbtn::menu-indicator { image: none; width: 0px; }
+QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 10px; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
@@ -786,6 +787,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.61', [
+        'Pasar entre árboles sin arrastrar (como el explorador de Kodi): con el 2.º árbol visible aparece abajo una barra que dice qué vas a pasar y a dónde («3 canciones ➜ Rock»), con los botones «Copiar al otro árbol» (F7) y «Mover al otro árbol» (F6). Sirve para canciones elegidas en la lista o carpetas elegidas en un árbol; el destino es la carpeta abierta en el otro árbol. Arrastrar sigue funcionando igual.',
+        'Clic derecho en canciones: «Mover / Copiar al otro árbol».',
+    ]),
     ('1.60', [
         'Estilo celular: la barra de abajo ahora tiene cuadritos a todo lo ancho que bailan al ritmo de la canción (en espejo, con los graves al centro, tapitas que caen despacio y los colores del programa). Los mensajes se siguen leyendo encima.',
     ]),
@@ -1214,7 +1219,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.60 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.61 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2827,6 +2832,7 @@ class Main(QMainWindow):
         self.sel_timer.setInterval(150)
         self.sel_timer.timeout.connect(self.on_select)
         self.list.itemSelectionChanged.connect(self.schedule_select)
+        self.list.itemSelectionChanged.connect(lambda: getattr(self, "xfer_timer", None) and self.xfer_timer.start())
         self.list.selection_done.connect(self.on_select)
         self.list.dropped.connect(self.defer_move)
         self.set_view(True)
@@ -3174,7 +3180,13 @@ class Main(QMainWindow):
         middle.setSizes([430, 300])
 
         main = QSplitter()
-        main.addWidget(self.left_split)
+        left_box = QWidget()
+        lb_l = QVBoxLayout(left_box)
+        lb_l.setContentsMargins(0, 0, 0, 0)
+        lb_l.setSpacing(4)
+        lb_l.addWidget(self.left_split, 1)
+        lb_l.addWidget(self.build_xfer_bar())
+        main.addWidget(left_box)
         main.addWidget(middle)
         main.setStretchFactor(1, 1)
         self.left_split.setMinimumWidth(210)
@@ -3259,8 +3271,93 @@ class Main(QMainWindow):
         self.tree.refresh()
         self.tree2.refresh()
 
+    # ---------------------------------------------- pasar entre árboles sin arrastrar (como Kodi)
+    def build_xfer_bar(self):
+        bar = QFrame()
+        bar.setObjectName("xfer")
+        v = QVBoxLayout(bar)
+        v.setContentsMargins(8, 6, 8, 6)
+        v.setSpacing(4)
+        self.xfer_lbl = QLabel("")
+        self.xfer_lbl.setObjectName("hint")
+        self.xfer_lbl.setWordWrap(True)
+        self.xfer_lbl.setTextFormat(Qt.TextFormat.RichText)
+        v.addWidget(self.xfer_lbl)
+        row = QHBoxLayout()
+        row.setSpacing(6)
+        self.xfer_copy = QPushButton("📋 Copiar al otro árbol")
+        self.xfer_move = QPushButton("✂️ Mover al otro árbol")
+        for b, mv, tip in ((self.xfer_copy, False, "Copia lo elegido a la carpeta abierta en el otro árbol (F7)"),
+                           (self.xfer_move, True, "Mueve lo elegido a la carpeta abierta en el otro árbol (F6)")):
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setToolTip(tip)
+            b.clicked.connect(lambda _=False, mv=mv: self.xfer(mv))
+            row.addWidget(b, 1)
+        self.xfer_move.setObjectName("accent")
+        v.addLayout(row)
+        bar.hide()
+        self.xfer_bar = bar
+        QShortcut(QKeySequence("F6"), self, activated=lambda: self.xfer(True))
+        QShortcut(QKeySequence("F7"), self, activated=lambda: self.xfer(False))
+        self.xfer_timer = QTimer(self)
+        self.xfer_timer.setSingleShot(True)
+        self.xfer_timer.setInterval(120)
+        self.xfer_timer.timeout.connect(self.update_xfer)
+        return bar
+
+    def xfer_plan(self):
+        """(qué se pasa, a dónde, descripción). Canciones elegidas en la lista o, si no hay, la carpeta elegida en el árbol activo."""
+        if not self.tree2_box.isVisible():
+            return [], None, ""
+        src_tree = self.active_tree if self.active_tree in (self.tree, self.tree2) else self.tree
+        other = self.tree2 if src_tree is self.tree else self.tree
+        oc = other.currentItem()
+        dst = oc.data(0, PATH_ROLE) if oc is not None else None
+        files = [p for p in self.selected_paths() if p and os.path.isfile(p)]
+        if files:
+            what = T(f"{len(files)} canción(es)") if len(files) > 1 else f"«{os.path.basename(files[0])}»"
+            return files, dst, what
+        dirs = [d for d in src_tree.selected_dirs() if d]
+        if dirs:
+            what = f"«{os.path.basename(dirs[0].rstrip(os.sep)) or dirs[0]}»" if len(dirs) == 1 else T(f"{len(dirs)} carpetas")
+            return dirs, dst, what
+        return [], dst, ""
+
+    def update_xfer(self):
+        if not getattr(self, "xfer_bar", None):
+            return
+        on = self.tree2_box.isVisible()
+        self.xfer_bar.setVisible(on)
+        if not on:
+            return
+        srcs, dst, what = self.xfer_plan()
+        dname = os.path.basename(dst.rstrip(os.sep)) or dst if dst else ""
+        if srcs and dst:
+            self.xfer_lbl.setText(f"{what} &nbsp;➜&nbsp; <b>{html.escape(dname)}</b>")
+        elif not dst:
+            self.xfer_lbl.setText(T("Elige en el otro árbol la carpeta de destino."))
+        else:
+            self.xfer_lbl.setText(T("Elige canciones en la lista o una carpeta en el árbol."))
+        ok = bool(srcs and dst)
+        self.xfer_copy.setEnabled(ok)
+        self.xfer_move.setEnabled(ok)
+
+    def xfer(self, move):
+        srcs, dst, what = self.xfer_plan()
+        if not srcs or not dst:
+            self.update_xfer()
+            return
+        dn = os.path.normcase(os.path.normpath(dst))
+        srcs = [p for p in srcs if os.path.normcase(os.path.dirname(os.path.normpath(p))) != dn]
+        if not srcs:
+            self.statusBar().showMessage(T("Ya está en esa carpeta."))
+            return
+        (self.move_items if move else self.copy_items)(srcs, dst)
+        self.update_xfer()
+
     def toggle_tree2(self, on):
         self.tree2_box.setVisible(on)
+        QTimer.singleShot(0, self.update_xfer)
         self.cfg.setValue("tree2", 1 if on else 0)
         if on:
             self.left_split.setSizes([400, 400])
@@ -3270,6 +3367,8 @@ class Main(QMainWindow):
             "Segundo árbol activado: arrastra carpetas de un árbol al otro." if on else "Segundo árbol oculto.")
 
     def on_tree_current(self, tree, cur):
+        if getattr(self, "xfer_timer", None):
+            self.xfer_timer.start()
         if cur is None:
             return
         self.active_tree = tree
@@ -3277,6 +3376,8 @@ class Main(QMainWindow):
 
     def on_tree_click(self, tree, item):
         self.active_tree = tree
+        if getattr(self, "xfer_timer", None):
+            self.xfer_timer.start()
         p = item.data(0, PATH_ROLE)
         if p and p != self.current_dir:
             self.load_folder(p)
@@ -5298,6 +5399,13 @@ class Main(QMainWindow):
             m.addAction("📋 Copiar (Ctrl+C)", lambda: self.clip_set("copy"))
         m.addAction("📥 Pegar aquí (Ctrl+V)", self.paste_here)
         m.addAction("➕ Nueva carpeta aquí", lambda: self.new_folder(self.current_dir))
+        if it is not None and self.tree2_box.isVisible():
+            _s, dst, _w = self.xfer_plan()
+            if dst:
+                dn = os.path.basename(dst.rstrip(os.sep)) or dst
+                m.addSeparator()
+                m.addAction(f"➡ Mover al otro árbol  ({dn})", lambda: self.xfer(True))
+                m.addAction(f"⧉ Copiar al otro árbol  ({dn})", lambda: self.xfer(False))
         if it is not None:
             m.addSeparator()
             m.addAction("🗑 Eliminar (Supr)", lambda: self.delete_paths(self.selected_all_paths()))
