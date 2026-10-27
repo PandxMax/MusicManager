@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.48"
+APP_VERSION = "1.49"
 
 
 class TMenu(QMenu):
@@ -773,6 +773,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.49', [
+        'El archivo .lrc (copia de la letra sincronizada junto a la canción) ya no se crea por defecto. Quien lo quiera puede activarlo en Ajustes → Etiquetas. La letra sigue guardándose dentro de la canción.',
+    ]),
     ('1.48', [
         'Descargas de YouTube / SoundCloud: ya no quedan archivos sueltos sin icono junto al MP3 (el audio original, .part o .ytdl). Se borran solos al terminar o si la descarga falla.',
     ]),
@@ -1113,7 +1116,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.48 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.49 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4398,7 +4401,7 @@ class Main(QMainWindow):
                     skipped |= set(write_tags(path, easy))
                 if "lyrics" in ch or "_cover" in ch:
                     write_extra(path, ch.get("lyrics"), ch.get("_cover"))
-                if ch.get("lyrics") and is_lrc(ch["lyrics"]) and int(self.cfg.value("save_lrc", 1) or 0):
+                if ch.get("lyrics") and is_lrc(ch["lyrics"]) and int(self.cfg.value("save_lrc_v2", 0) or 0):
                     try:  # archivo .lrc junto a la canción: lo leen casi todos los reproductores
                         with open(os.path.splitext(path)[0] + ".lrc", "w", encoding="utf-8") as fh:
                             fh.write(ch["lyrics"])
@@ -5660,7 +5663,7 @@ class Main(QMainWindow):
         apply_fns.append(lambda: self.set_cover_max(parse_side(size_cb.currentData())))
         add_page("letras", "Letras", page(
             chk("Preferir la letra sincronizada (con minutos) al buscar en LRCLIB", "prefer_synced", 1),
-            chk("Guardar también un archivo .lrc junto a la canción", "save_lrc", 1)), grp)
+            chk("Guardar también un archivo .lrc junto a la canción", "save_lrc_v2", 0)), grp)
         add_page("portadas", "Portadas", page(QLabel("Tamaño máximo de las portadas nuevas (nunca se agranda):"), size_cb), grp)
         # Fuentes de etiquetas
         tok = QLineEdit(str(self.cfg.value("discogs_token", "") or ""))

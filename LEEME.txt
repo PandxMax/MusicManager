@@ -344,3 +344,7 @@ VERSIÓN 1.47
 VERSIÓN 1.48
 ------------
  - Descargas: ya no quedan archivos sueltos sin icono junto al MP3; se borran solos.
+
+VERSIÓN 1.49
+------------
+ - El archivo .lrc junto a la canción viene desactivado; se activa en Ajustes → Etiquetas.
