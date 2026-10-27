@@ -672,3 +672,9 @@ ROWS += [
      "Проанализировано песен: %s. Двойной щелчок — перейти к песне и исправить."),
     ("Volumen normalizado", "Volumen normalizado", "Volumen normalizado"),
 ]
+
+ROWS += [
+    ("🌐 Buscar la canción en…", "🌐 Search the song on…", "🌐 Искать песню на…"),
+    ("▶ YouTube", "▶ YouTube", "▶ YouTube"), ("🎵 Spotify", "🎵 Spotify", "🎵 Spotify"), ("🎧 Tidal", "🎧 Tidal", "🎧 Tidal"),
+    ("💿 Qobuz", "💿 Qobuz", "💿 Qobuz"), ("📖 Wikipedia", "📖 Wikipedia", "📖 Википедия"),
+]

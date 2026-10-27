@@ -360,3 +360,7 @@ VERSIÓN 1.51
  - Nuevo: Organizar en carpetas (Artista / Álbum) con vista previa.
  - Nuevo: Etiquetas desde el nombre del archivo.
  - Nuevo: Normalizar volumen.
+
+VERSIÓN 1.52
+------------
+ - Debajo de la portada: un solo botón «Buscar la canción en…» (YouTube, Spotify, Tidal, Qobuz, Wikipedia); ya no se amontonan ni tapan nada.

@@ -13,7 +13,7 @@ LEAD = {
     "🤖": "bot", "🎨": "palette", "🌍": "globe", "❓": "help", "ℹ": "info", "⬇": "download", "🎼": "note",
     "💿": "disc", "💬": "chat", "✔": "check", "🔳": "grid", "🆕": "sparkle", "🔊": "vol3", "🔉": "vol2",
     "🔈": "vol1", "🔇": "vol0", "⋯": "more", "✕": "close", "◀": "arrow_l", "▲": "arrow_u", "🎚": "fx",
-    "🔁": "loop", "🎵": "note", "⚙": "gear",
+    "🔁": "loop", "🎵": "note", "⚙": "gear", "🌐": "globe", "🎧": "note", "📖": "lyrics", "🏷": "edit", "📤": "download",
 }
 
 

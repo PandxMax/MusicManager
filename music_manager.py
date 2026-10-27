@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.51"
+APP_VERSION = "1.52"
 
 
 class TMenu(QMenu):
@@ -398,6 +398,9 @@ QToolBar QToolButton:checked { background: @accent; color: white; }
 QToolButton#langbtn { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 3px 8px; font-weight: 600; }
 QToolButton#langbtn:hover { border-color: @accent; background: @accent_soft; }
 QToolButton#langbtn::menu-indicator { image: none; width: 0px; }
+QToolButton#webbtn { background: @accent_soft; border: 1px solid @accent; border-radius: 12px; padding: 4px 14px; }
+QToolButton#webbtn:hover { background: @accent; color: white; }
+QToolButton#webbtn::menu-indicator { image: none; width: 0px; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
@@ -773,6 +776,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.52', [
+        'Debajo de la portada, los botones de YouTube, Spotify, Tidal, Qobuz y Wikipedia se amontonaban y tapaban la etiqueta de la portada. Ahora es un solo botón «Buscar la canción en…» con un menú, y la portada ya no se puede aplastar.',
+    ]),
     ('1.51', [
         'Nuevo: Herramientas → «Informe de la biblioteca»: cuántas canciones no tienen portada (o la tienen pequeña), letra, género, año, álbum, artista/título o son de calidad baja. Doble clic en cualquiera para ir a ella y arreglarla.',
         'Nuevo: Herramientas → «Organizar en carpetas»: mueve las canciones a «Artista / Álbum» (u otras estructuras) según sus etiquetas, con vista previa antes de mover y la letra .lrc acompañando a su canción.',
@@ -1126,7 +1132,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.51 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.52 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2910,23 +2916,32 @@ class Main(QMainWindow):
         cvw.setContentsMargins(4, 0, 0, 0)
         cvw.setSpacing(0)
         cvw.addWidget(cover_box)
-        web_w = QWidget()
-        web_l = FlowLayout(web_w, 6, 6)
-        web_l.setContentsMargins(6, 8, 6, 0)
+        # un solo botón con menú para buscar la canción fuera: nunca se monta sobre la portada ni se amontona
+        self.web_btn = QToolButton()
+        self.web_btn.setObjectName("webbtn")
+        self.web_btn.setText("🌐 Buscar la canción en…")
+        self.web_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.web_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.web_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        wm = QMenu(self.web_btn)
         for kind, label, tip in (("youtube", "▶ YouTube", "Buscar esta canción en YouTube"),
-                                 ("spotify", "🟢 Spotify", "Buscar esta canción en Spotify"),
-                                 ("tidal", "🌊 Tidal", "Buscar esta canción en Tidal"),
-                                 ("qobuz", "🎧 Qobuz", "Buscar esta canción en Qobuz"),
+                                 ("spotify", "🎵 Spotify", "Buscar esta canción en Spotify"),
+                                 ("tidal", "🎧 Tidal", "Buscar esta canción en Tidal"),
+                                 ("qobuz", "💿 Qobuz", "Buscar esta canción en Qobuz"),
                                  ("wiki", "📖 Wikipedia", "Buscar esta canción o artista en Wikipedia")):
-            wb = QPushButton(label)
-            wb.setObjectName("tabbtn")
-            wb.setCursor(Qt.CursorShape.PointingHandCursor)
-            wb.setToolTip(tip)
-            wb.clicked.connect(lambda _=False, k=kind: self.web_song(k))
-            web_l.addWidget(wb)
-        cvw.addWidget(web_w)
+            a = wm.addAction(label)
+            a.setToolTip(tip)
+            a.triggered.connect(lambda _=False, k=kind: self.web_song(k))
+        self.web_btn.setMenu(wm)
+        web_row = QHBoxLayout()
+        web_row.setContentsMargins(0, 6, 0, 0)
+        web_row.addStretch(1)
+        web_row.addWidget(self.web_btn)
+        web_row.addStretch(1)
+        cvw.addLayout(web_row)
         cvw.addStretch(1)
         coverw.setMinimumWidth(330)
+        coverw.setMinimumHeight(cover_box.minimumHeight() + 46)   # la fila de arriba no puede aplastar la portada
         self.cover_col = coverw
 
         top_split = QSplitter(Qt.Orientation.Horizontal)       # fila de arriba: lista | portada
