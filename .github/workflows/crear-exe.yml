@@ -1,5 +1,13 @@
 name: Crear EXE
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  # cada vez que se sube una versión nueva del programa, el EXE se crea solo
+  push:
+    branches: [main]
+    paths: ['**.py', 'requirements.txt', 'MusicManager.ico', '.github/workflows/crear-exe.yml', '.github/slim_build.py']
+concurrency:
+  group: crear-exe
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
