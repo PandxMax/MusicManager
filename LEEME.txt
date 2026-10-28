@@ -421,3 +421,9 @@ VERSIÓN 1.64
 VERSIÓN 1.65
 ------------
  - Nuevo: mejorar la calidad de la portada con IA (Real-ESRGAN, en tu PC). Clic derecho en la portada.
+
+VERSIÓN 1.66
+------------
+ - Spotify / Tidal: se abre el programa si está instalado; si no, la web.
+ - Arrastrar varias canciones a la vez funciona.
+ - La rueda del ratón desplaza los árboles mientras arrastras.

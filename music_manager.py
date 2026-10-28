@@ -10,7 +10,7 @@ import sys, os, json, re, shutil, time, base64, html, urllib.request, urllib.err
 from functools import lru_cache
 from urllib.parse import quote_plus, quote
 
-from PyQt6.QtCore import (QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
+from PyQt6.QtCore import (QAbstractNativeEventFilter, QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
                           QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
 from PyQt6.QtGui import (QFontMetrics, QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
                          QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent, QPen)
@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QRadioButton, QButtonGroup,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QRadioButton, QButtonGroup,
 )
 import mutagen
 import i18n
@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.65"
+APP_VERSION = "1.66"
 
 
 class TMenu(QMenu):
@@ -644,6 +644,54 @@ def safe_filename(name):
     return name[:180]
 
 
+def app_installed(scheme):
+    """¿Hay un programa de Windows registrado para abrir enlaces «scheme:» (spotify:, tidal:)?"""
+    if sys.platform != "win32":
+        return False
+    try:
+        import winreg
+        for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_CLASSES_ROOT):
+            sub = f"Software\\Classes\\{scheme}" if root == winreg.HKEY_CURRENT_USER else scheme
+            try:
+                with winreg.OpenKey(root, sub) as k:
+                    winreg.QueryValueEx(k, "URL Protocol")
+                    return True
+            except OSError:
+                continue
+    except Exception:
+        pass
+    return False
+
+
+DRAG_ACTIVE = [False]   # True mientras se arrastran archivos (para que la rueda mueva lo que está debajo)
+
+
+class DragWheelFilter(QAbstractNativeEventFilter):
+    """Mientras arrastras archivos, Windows no deja que la rueda del ratón desplace las listas: aquí se hace a mano
+    sobre el árbol o la lista que está debajo del cursor."""
+    def nativeEventFilter(self, etype, message):
+        if not DRAG_ACTIVE[0] or sys.platform != "win32":
+            return False, 0
+        try:
+            import ctypes
+            from ctypes import wintypes
+            msg = wintypes.MSG.from_address(int(message))
+            if msg.message not in (0x020A, 0x020E):   # WM_MOUSEWHEEL / WM_MOUSEHWHEEL
+                return False, 0
+            delta = ctypes.c_short((msg.wParam >> 16) & 0xFFFF).value
+            w = QApplication.widgetAt(QCursor.pos())
+            while w is not None and not isinstance(w, QAbstractScrollArea):
+                w = w.parentWidget()
+            if w is None:
+                return False, 0
+            sb = w.verticalScrollBar() if msg.message == 0x020A else w.horizontalScrollBar()
+            step = max(20, sb.singleStep() * 3)
+            sb.setValue(sb.value() - int(delta / 120 * step))
+            return True, 0
+        except Exception:
+            return False, 0
+
+
 def vol_curve(x):
     """0–100 de la barra → volumen real. El oído no es lineal: con esta curva cada paso se nota igual de suave."""
     x = max(0.0, min(1.0, x / 100.0))
@@ -787,6 +835,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.66', [
+        'Spotify y Tidal: si tienes el programa instalado, la búsqueda se abre directamente en él; si no, en la página web.',
+        'Arrastrar varias canciones: al sombrear varias y arrastrar desde cualquiera de ellas, ahora se mueven todas (antes solo una).',
+        'Mientras arrastras archivos, la rueda del ratón desplaza el árbol o la lista que está debajo del cursor, para llegar con calma a la carpeta de destino.',
+    ]),
     ('1.65', [
         'Nuevo: clic derecho en la portada → «Mejorar calidad con IA (agrandar)». Usa Real-ESRGAN en tu PC (gratis, sin internet ni claves) para agrandar portadas de baja calidad a 1000–2000 px reconstruyendo la nitidez. Estilos «Anime / ilustración» y «General / foto», vista de antes y después, y se puede usar en todas las canciones seleccionadas. El motor (unos 45 MB) se descarga solo la primera vez.',
     ]),
@@ -1231,7 +1284,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.65 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.66 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2036,7 +2089,11 @@ class FolderTree(QTreeWidget):
         drag = QDrag(self)
         drag.setMimeData(self.mimeData(items))
         drag.setPixmap(self.folder_icon.pixmap(QSize(32, 32)))
-        drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction, Qt.DropAction.CopyAction)
+        DRAG_ACTIVE[0] = True
+        try:
+            drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction, Qt.DropAction.CopyAction)
+        finally:
+            DRAG_ACTIVE[0] = False
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls():
@@ -2571,10 +2628,18 @@ class SongList(QListWidget):
     def mousePressEvent(self, e):
         if not (QApplication.mouseButtons() & ~Qt.MouseButton.LeftButton) and self.state() != QAbstractItemView.State.NoState:
             self.reset_state()
+        self._keep_multi = None
         if e.button() == Qt.MouseButton.LeftButton:
             self._press = e.position().toPoint()
             self._press_item = self.itemAt(self._press)
             self._selecting = True
+            it = self._press_item
+            if (it is not None and it.isSelected() and len(self.selectedItems()) > 1
+                    and not (e.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier))):
+                # pulsas sobre una de varias ya elegidas: no se deshace la selección (así se arrastran todas)
+                self._keep_multi = it
+                self._selecting = False
+                return
         else:
             self._press, self._press_item = None, None
         super().mousePressEvent(e)
@@ -2584,12 +2649,35 @@ class SongList(QListWidget):
                 and e.buttons() & Qt.MouseButton.LeftButton
                 and (e.position().toPoint() - self._press).manhattanLength() >= QApplication.startDragDistance()):
             item, self._press, self._press_item = self._press_item, None, None
+            self._keep_multi = None
             self.begin_drag(item)
             return
         super().mouseMoveEvent(e)
 
+    def mouseDoubleClickEvent(self, e):
+        # el doble clic siempre abre/reproduce lo que está bajo el cursor (aunque antes hubiera varias elegidas)
+        it = self.itemAt(e.position().toPoint())
+        if e.button() == Qt.MouseButton.LeftButton and it is not None:
+            self._keep_multi = None
+            self.clearSelection()
+            it.setSelected(True)
+            self.setCurrentItem(it)
+            self.itemDoubleClicked.emit(it)
+            e.accept()
+            return
+        super().mouseDoubleClickEvent(e)
+
     def mouseReleaseEvent(self, e):
         self._press, self._press_item = None, None
+        keep = getattr(self, "_keep_multi", None)
+        self._keep_multi = None
+        if keep is not None and e.button() == Qt.MouseButton.LeftButton:
+            # fue un clic (no un arrastre): ahora sí queda elegida solo esa
+            self.clearSelection()
+            keep.setSelected(True)
+            self.setCurrentItem(keep)
+            self.selection_done.emit()
+            return
         super().mouseReleaseEvent(e)
         if e.button() == Qt.MouseButton.LeftButton:
             self._selecting = False
@@ -2621,7 +2709,9 @@ class SongList(QListWidget):
         hover_timer.start()
         result = Qt.DropAction.IgnoreAction
         try:
+            DRAG_ACTIVE[0] = True
             result = drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction, Qt.DropAction.MoveAction)
+            DRAG_ACTIVE[0] = False
             hover_timer.stop()
             if result == Qt.DropAction.IgnoreAction:   # Qt no aceptó el soltar: lo resolvemos nosotros
                 lp = self.viewport().mapFromGlobal(QCursor.pos())
@@ -2629,6 +2719,7 @@ class SongList(QListWidget):
                 if it is not None and it.data(PATH_ROLE) not in paths:
                     self.dropped.emit(paths, it.data(PATH_ROLE))
         finally:
+            DRAG_ACTIVE[0] = False
             hover_timer.stop()
             self._selecting = False
             self._set_hover(None)
@@ -6095,6 +6186,12 @@ class Main(QMainWindow):
             url = "https://www.qobuz.com/search?q=" + quote_plus(name)
         else:
             url = "https://open.spotify.com/search/" + quote(name)
+        app = {"spotify": ("spotify", "spotify:search:" + quote(name)),
+               "tidal": ("tidal", "tidal://search/" + quote(name))}.get(kind)
+        if app and app_installed(app[0]):   # programa instalado: se abre directamente en él
+            if QDesktopServices.openUrl(QUrl(app[1])):
+                self.statusBar().showMessage(f"Abriendo «{name}» en {kind.capitalize()}…")
+                return
         QDesktopServices.openUrl(QUrl(url))
         self.statusBar().showMessage(f"Abriendo «{name}» en el navegador…")
 
@@ -6716,6 +6813,8 @@ if __name__ == "__main__":
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Music Manager")
     i18n.install_hooks()
+    _wheel = DragWheelFilter()
+    app.installNativeEventFilter(_wheel)
     _deco = icons.IconDeco(app)
     app.installEventFilter(_deco)
     w = Main()
