@@ -417,3 +417,7 @@ VERSIÓN 1.63
 VERSIÓN 1.64
 ------------
  - Dos árboles: «De» (origen) y «A» (destino), con «Enviar», «Copiar» e «Invertir» abajo. Con un solo árbol: «Carpetas».
+
+VERSIÓN 1.65
+------------
+ - Nuevo: mejorar la calidad de la portada con IA (Real-ESRGAN, en tu PC). Clic derecho en la portada.

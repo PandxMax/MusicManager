@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.64"
+APP_VERSION = "1.65"
 
 
 class TMenu(QMenu):
@@ -787,6 +787,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.65', [
+        'Nuevo: clic derecho en la portada → «Mejorar calidad con IA (agrandar)». Usa Real-ESRGAN en tu PC (gratis, sin internet ni claves) para agrandar portadas de baja calidad a 1000–2000 px reconstruyendo la nitidez. Estilos «Anime / ilustración» y «General / foto», vista de antes y después, y se puede usar en todas las canciones seleccionadas. El motor (unos 45 MB) se descarga solo la primera vez.',
+    ]),
     ('1.64', [
         'Con dos árboles: el primero se llama «De» (eliges lo que vas a enviar) y el segundo «A» (eliges a dónde va). Abajo se ve «De: … / A: …» con el botón «Enviar» (mueve), «Copiar» y «Invertir» para cambiar el sentido. Con un solo árbol se llama «Carpetas».',
     ]),
@@ -1228,7 +1231,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.64 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.65 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4906,6 +4909,29 @@ class Main(QMainWindow):
             self.show_current(path, len(self.cur_paths))
         self.statusBar().showMessage("Portada puesta (pendiente de guardar, en naranja).")
 
+    def apply_cover_bytes(self, paths, data):
+        """Pone esta portada (ya preparada) en las canciones indicadas, pendiente de guardar."""
+        self.apply_form()
+        for p in paths:
+            self.pending.setdefault(p, {})["_cover"] = data
+        self.mark_items()
+        cur = self.current_path()
+        if cur in paths:
+            self.show_current(cur, len(self.cur_paths))
+        self.statusBar().showMessage("Portada puesta (pendiente de guardar, en naranja).")
+
+    def open_upscale(self):
+        import upscale
+        p = self.current_path()
+        data = self.cover_data_of(p) if p else None
+        if not data:
+            QMessageBox.information(self, "Mejorar calidad con IA", "Esta canción no tiene portada.")
+            return
+        dlg = upscale.UpscaleDialog(self, self.cur_paths or [p], data)
+        i18n.retranslate(dlg)
+        dlg.show()
+        self._upscale = dlg
+
     def remove_cover(self):
         if not self.cur_paths:
             return
@@ -5624,6 +5650,7 @@ class Main(QMainWindow):
         m.addAction("🖼 Cambiar portada…", self.set_cover)
         m.addAction("✨ Buscar portada automáticamente", self.auto_cover)
         m.addAction("🌐 Buscar en Google Imágenes…", lambda: self.google_cover())
+        m.addAction("🪄 Mejorar calidad con IA (agrandar)…", self.open_upscale)
         m.addAction("🗑 Quitar portada", self.remove_cover)
         m.addSeparator()
         m.addAction("📋 Copiar portada", self.copy_cover)
