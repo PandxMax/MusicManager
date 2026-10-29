@@ -16,7 +16,7 @@
 
 <br/>
 
-![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.66-7C5CFF)
+![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.67-7C5CFF)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![PyQt6](https://img.shields.io/badge/Interfaz-PyQt6-41CD52?logo=qt&logoColor=white)

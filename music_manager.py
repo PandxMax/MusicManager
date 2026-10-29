@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.66"
+APP_VERSION = "1.67"
 
 
 class TMenu(QMenu):
@@ -405,6 +405,12 @@ QToolButton#langbtn::menu-indicator { image: none; width: 0px; }
 QToolButton#webbtn { background: @accent_soft; border: 1px solid @accent; border-radius: 12px; padding: 4px 14px; }
 QToolButton#webbtn:hover { background: @accent; color: white; }
 QToolButton#webbtn::menu-indicator { image: none; width: 0px; }
+QToolButton#viewbtn { background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 3px; }
+QToolButton#viewbtn:hover { background: @accent_soft; }
+QToolButton#viewbtn:checked { background: @accent; border-color: @accent; }
+QHeaderView::section { background: @surface2; color: @text; border: none; border-right: 1px solid @border;
+                       border-bottom: 1px solid @border; padding: 4px 8px; font-weight: 600; }
+QHeaderView::section:hover { background: @accent_soft; }
 QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 10px; }
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
@@ -692,6 +698,9 @@ class DragWheelFilter(QAbstractNativeEventFilter):
             return False, 0
 
 
+ROW_STEP = 26   # desplazamiento de la rueda en la vista detalles (una fila)
+
+
 def vol_curve(x):
     """0–100 de la barra → volumen real. El oído no es lineal: con esta curva cada paso se nota igual de suave."""
     x = max(0.0, min(1.0, x / 100.0))
@@ -835,6 +844,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.67', [
+        'Nueva vista «Lista con detalles» (como Mp3tag o el Explorador): columnas con nombre de archivo, título, intérprete, álbum, género, año, pista, duración, tasa de bits, frecuencia, códec, etiqueta y tamaño. Clic en el título de una columna para ordenar (otra vez para invertir); arrastra los bordes para cambiar el ancho y clic derecho en la cabecera para elegir qué columnas se ven.',
+        'Botones de vista junto a la ruta: iconos, lista y lista con detalles. También en clic derecho → «Ver como».',
+        'Ordenar en cualquier vista: clic derecho → «Ordenar por» (nombre, título, intérprete, álbum, género, año, pista, duración, bitrate, tamaño o fecha), ascendente o descendente. Se recuerda la vista y el orden elegidos.',
+    ]),
     ('1.66', [
         'Spotify y Tidal: si tienes el programa instalado, la búsqueda se abre directamente en él; si no, en la página web.',
         'Arrastrar varias canciones: al sombrear varias y arrastrar desde cualquiera de ellas, ahora se mueven todas (antes solo una).',
@@ -1284,7 +1298,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.66 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.67 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2938,6 +2952,11 @@ class Main(QMainWindow):
         self.list.itemSelectionChanged.connect(lambda: getattr(self, "xfer_timer", None) and self.xfer_timer.start())
         self.list.selection_done.connect(self.on_select)
         self.list.dropped.connect(self.defer_move)
+        self.sort_key = str(self.cfg.value("sort_key", "file") or "file")
+        self.sort_desc = bool(int(self.cfg.value("sort_desc", 0) or 0))
+        import details
+        self.details = details.DetailsView(self, self.list, tech_info)
+        self.view_mode = "icons"
         self.set_view(True)
         self.list.itemDoubleClicked.connect(self.on_list_double)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -3085,6 +3104,20 @@ class Main(QMainWindow):
                 b_.clicked.connect(lambda _=False, s_=src: self.open_tag_source(s_))
             navbar.addWidget(b_)
         navbar.addSpacing(8)
+        self.view_btns = {}
+        for mode, ic, tip in (("icons", "grid", "Ver como iconos"), ("list", "menu", "Ver como lista"),
+                              ("details", "table", "Ver como lista con detalles (columnas que se pueden ordenar)")):
+            vb = QToolButton()
+            vb.setObjectName("viewbtn")
+            vb.setCheckable(True)
+            vb.setIcon(icons.vicon(ic, ctx="check"))
+            vb.setIconSize(QSize(18, 18))
+            vb.setToolTip(tip)
+            vb.setCursor(Qt.CursorShape.PointingHandCursor)
+            vb.clicked.connect(lambda _=False, m_=mode: self.set_view_mode(m_))
+            self.view_btns[mode] = vb
+            navbar.addWidget(vb)
+        navbar.addSpacing(6)
         lpv.addLayout(navbar)
         lpv.addWidget(self.list, 1)
         QShortcut(QKeySequence("Alt+Left"), self, activated=self.nav_back)
@@ -3650,33 +3683,90 @@ class Main(QMainWindow):
 
     # ---------------------------------------------------- Lista de canciones
     def toggle_view(self):
-        self.set_view(not self.icons_mode)
+        self.set_view_mode({"icons": "list", "list": "details", "details": "icons"}[getattr(self, "view_mode", "icons")])
 
     def set_view(self, icons):
-        self.icons_mode = icons
-        if icons:
+        self.set_view_mode("icons" if icons else "list", save=False)
+
+    def set_view_mode(self, mode, save=True):
+        """«icons» = iconos grandes · «list» = lista · «details» = lista con columnas (ordenables)."""
+        mode = mode if mode in ("icons", "list", "details") else "icons"
+        self.view_mode = mode
+        self.icons_mode = mode == "icons"
+        if mode == "icons":
             self.list.setViewMode(QListView.ViewMode.IconMode)
             self.list.setIconSize(QSize(self.icon_px, self.icon_px))
             self.list.setGridSize(QSize(self.icon_px + 38, self.icon_px + 60))
             self.list.setSpacing(6)
             self.list.setWordWrap(True)
-            self.act_view.setText("☰ Lista"); i18n.deco(self.act_view)
         else:
             self.list.setViewMode(QListView.ViewMode.ListMode)
-            self.list.setIconSize(QSize(self.list_px, self.list_px))
+            self.list.setIconSize(QSize(20, 20) if mode == "details" else QSize(self.list_px, self.list_px))
             self.list.setGridSize(QSize())
-            self.list.setSpacing(2)
+            self.list.setSpacing(0 if mode == "details" else 2)
             self.list.setWordWrap(False)
-            self.act_view.setText("🔳 Iconos"); i18n.deco(self.act_view)
+        if getattr(self, "details", None) is not None:
+            self.details.set_enabled(mode == "details")
+        nxt = {"icons": "☰ Lista", "list": "▤ Detalles", "details": "🔳 Iconos"}[mode]
+        self.act_view.setText(nxt)
+        i18n.deco(self.act_view)
+        for m_, b_ in getattr(self, "view_btns", {}).items():
+            b_.setChecked(m_ == mode)
         self.list.setMovement(QListView.Movement.Static)
         self.list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        self.list.verticalScrollBar().setSingleStep(48)
+        self.list.verticalScrollBar().setSingleStep(ROW_STEP if mode == "details" else 48)
+        if save:
+            self.cfg.setValue("view_mode", mode)
+
+    def set_sort(self, key, desc=False):
+        self.sort_key, self.sort_desc = key, bool(desc)
+        self.cfg.setValue("sort_key", key)
+        self.cfg.setValue("sort_desc", 1 if desc else 0)
+        if getattr(self, "details", None) is not None:
+            self.details.update_indicator()
+        if self.current_dir:
+            self.load_folder(self.current_dir, select=self.selected_paths() or None)
+
+    def sort_files(self, files):
+        import details
+        key = getattr(self, "sort_key", "file")
+        if key == "file":
+            out = sorted(files, key=lambda f: os.path.basename(f).lower())
+        else:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                out = sorted(files, key=lambda f: (details.sort_value(self, f, key, tech_info), os.path.basename(f).lower()))
+            finally:
+                QApplication.restoreOverrideCursor()
+        return list(reversed(out)) if getattr(self, "sort_desc", False) else out
+
+    def add_view_menus(self, m):
+        vm = m.addMenu("👁 Ver como")
+        for mode, label in (("icons", "Iconos"), ("list", "Lista"), ("details", "Lista con detalles")):
+            a = vm.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(self.view_mode == mode)
+            a.triggered.connect(lambda _=False, m_=mode: self.set_view_mode(m_))
+        import details
+        sm = m.addMenu("↕ Ordenar por")
+        for key, label in details.SORTS:
+            a = sm.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(self.sort_key == key)
+            a.triggered.connect(lambda _=False, k=key: self.set_sort(k, self.sort_desc))
+        sm.addSeparator()
+        for desc, label in ((False, "Ascendente (A → Z, menor → mayor)"), (True, "Descendente (Z → A, mayor → menor)")):
+            a = sm.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(self.sort_desc == desc)
+            a.triggered.connect(lambda _=False, d=desc: self.set_sort(self.sort_key, d))
 
     def eventFilter(self, obj, ev):
         # botones laterales del ratón = atrás / adelante, como en el Explorador
         if obj is self.centralWidget() and ev.type() in (QEvent.Type.Resize, QEvent.Type.Show):
             self.layout_overlay()
-        if obj is self.list.viewport() and ev.type() == QEvent.Type.Wheel and (ev.modifiers() & Qt.KeyboardModifier.ControlModifier):
+        if obj is self.list.viewport() and ev.type() == QEvent.Type.Wheel and (ev.modifiers() & Qt.KeyboardModifier.ControlModifier) \
+                and getattr(self, "view_mode", "icons") != "details":
             d = ev.angleDelta().y()
             if d:
                 step = 12 if self.icons_mode else 4
@@ -3686,7 +3776,7 @@ class Main(QMainWindow):
                 else:
                     self.list_px = max(20, min(80, self.list_px + (step if d > 0 else -step)))
                     self.cfg.setValue("list_px", self.list_px)
-                self.set_view(self.icons_mode)
+                self.set_view_mode(self.view_mode)
                 self.statusBar().showMessage(f"Tamaño de los archivos: {self.icon_px if self.icons_mode else self.list_px} px (Ctrl + rueda)", 2500)
             return True
         if obj is self.btn_mute and ev.type() == QEvent.Type.Wheel:
@@ -3776,8 +3866,7 @@ class Main(QMainWindow):
                 files = [os.path.join(path, f) for f in os.listdir(path)]
             except OSError:
                 files = []
-        files = sorted((f for f in files if os.path.splitext(f)[1].lower() in AUDIO_EXT and os.path.isfile(f)),
-                       key=lambda f: f.lower())
+        files = self.sort_files([f for f in files if os.path.splitext(f)[1].lower() in AUDIO_EXT and os.path.isfile(f)])
         self.gen += 1
         self.thumb_queue = []
         self._loading_dir = True
@@ -5553,6 +5642,7 @@ class Main(QMainWindow):
             it.setSelected(True)
         m = TMenu(self)
         m.addAction("⟳ Actualizar (F5)", self.refresh_dir)
+        self.add_view_menus(m)
         m.addSeparator()
         if it is not None:
             if it.data(KIND_ROLE) == "dir":
@@ -6019,6 +6109,7 @@ class Main(QMainWindow):
         a.addAction(self.act("ℹ️ Acerca de Music Manager", self.show_about))
         mb.setCornerWidget(self._corner, Qt.Corner.TopRightCorner)
         i18n.set_lang(str(self.cfg.value("lang", "es")))
+        self.set_view_mode(str(self.cfg.value("view_mode", "icons") or "icons"), save=False)
         i18n.retranslate(self)
         self.update_lang_btn()
         QTimer.singleShot(5000, self.auto_check_updates)

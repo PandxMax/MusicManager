@@ -427,3 +427,8 @@ VERSIÓN 1.66
  - Spotify / Tidal: se abre el programa si está instalado; si no, la web.
  - Arrastrar varias canciones a la vez funciona.
  - La rueda del ratón desplaza los árboles mientras arrastras.
+
+VERSIÓN 1.67
+------------
+ - Nueva vista «Lista con detalles» con columnas ordenables (clic en el título), de ancho ajustable y ocultables.
+ - Botones de vista (iconos / lista / detalles) y clic derecho → «Ver como» y «Ordenar por».

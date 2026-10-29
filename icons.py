@@ -13,7 +13,7 @@ LEAD = {
     "🤖": "bot", "🎨": "palette", "🌍": "globe", "❓": "help", "ℹ": "info", "⬇": "download", "🎼": "note",
     "💿": "disc", "💬": "chat", "✔": "check", "🔳": "grid", "🆕": "sparkle", "🔊": "vol3", "🔉": "vol2",
     "🔈": "vol1", "🔇": "vol0", "⋯": "more", "✕": "close", "◀": "arrow_l", "▲": "arrow_u", "🎚": "fx",
-    "🔁": "loop", "🎵": "note", "⚙": "gear", "🌐": "globe", "🎧": "note", "📖": "lyrics", "🏷": "edit", "📤": "download",
+    "🔁": "loop", "🎵": "note", "⚙": "gear", "🌐": "globe", "▤": "table", "👁": "search", "↕": "swapv", "🎧": "note", "📖": "lyrics", "🏷": "edit", "📤": "download",
 }
 
 
@@ -256,6 +256,11 @@ def draw_glyph(p, kind, rect, col):
     elif k == "check":
         p.setPen(_pen(col, 2.3))
         p.drawPath(_line_path([(5, 12.5), (10, 17.5), (19, 7)]))
+    elif k == "table":   # vista detalles: filas con columnas
+        p.drawRoundedRect(QRectF(3.5, 4.5, 17, 15), 2, 2)
+        line((3.5, 9), (20.5, 9))
+        line((3.5, 14), (20.5, 14))
+        line((9.5, 4.5), (9.5, 19.5))
     elif k == "grid":
         for x in (4.5, 13.5):
             for y in (4.5, 13.5):

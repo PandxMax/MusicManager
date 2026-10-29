@@ -794,3 +794,18 @@ ROWS += [
      "Скачанный файл не тот, что ожидался (не установлен ради безопасности)."),
     ("cancelado", "cancelled", "отменено"),
 ]
+
+ROWS += [
+    ("Nombre de archivo", "File name", "Имя файла"), ("Disco", "Disc", "Диск"), ("Tasa de bits", "Bitrate", "Битрейт"),
+    ("Codificación", "Encoding", "Кодирование"), ("Modificado", "Modified", "Изменён"),
+    ("Columnas visibles", "Visible columns", "Видимые столбцы"), ("Restablecer columnas", "Reset columns", "Сбросить столбцы"),
+    ("Ver como iconos", "View as icons", "Значки"), ("Ver como lista", "View as list", "Список"),
+    ("Ver como lista con detalles (columnas que se pueden ordenar)", "View as detailed list (sortable columns)",
+     "Подробный список (сортируемые столбцы)"),
+    ("👁 Ver como", "👁 View as", "👁 Вид"), ("Iconos", "Icons", "Значки"), ("Lista", "List", "Список"),
+    ("Lista con detalles", "Detailed list", "Подробный список"), ("↕ Ordenar por", "↕ Sort by", "↕ Сортировать"),
+    ("Fecha de modificación", "Date modified", "Дата изменения"),
+    ("Ascendente (A → Z, menor → mayor)", "Ascending (A → Z, low → high)", "По возрастанию (А → Я)"),
+    ("Descendente (Z → A, mayor → menor)", "Descending (Z → A, high → low)", "По убыванию (Я → А)"),
+    ("▤ Detalles", "▤ Details", "▤ Подробно"),
+]
