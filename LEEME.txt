@@ -436,3 +436,7 @@ VERSIÓN 1.67
 VERSIÓN 1.68
 ------------
  - Nuevo: Géneros en lote (por álbum): MusicBrainz gratis + IA para lo que falte, revisión antes de aplicar, poner un género a muchas a la vez.
+
+VERSIÓN 1.69
+------------
+ - Con varias canciones seleccionadas, el género sugerido o escrito se pone a todas a la vez.

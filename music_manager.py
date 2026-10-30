@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.68"
+APP_VERSION = "1.69"
 
 
 class TMenu(QMenu):
@@ -844,6 +844,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.69', [
+        'Géneros con varias canciones seleccionadas: «Sugerir género» ya no te saca de la selección; las opciones de todas se juntan (con cuántas canciones la sugieren) y al pulsar una se pone a TODAS las seleccionadas.',
+        'Nuevo cuadro «Otro género» debajo de las sugerencias: escribe o elige un género de la lista y pulsa «Poner» para ponérselo a la canción o a todas las seleccionadas, sin necesidad de la IA.',
+    ]),
     ('1.68', [
         'Nuevo: Herramientas → «Géneros en lote» (también con clic derecho en canciones). Para la carpeta, la carpeta con subcarpetas o las canciones elegidas: agrupa por álbum, encuentra los géneros demasiado generales («Electronic», «Rock», «Pop»…) o vacíos y sugiere géneros específicos.',
         'Las sugerencias salen primero de MusicBrainz (gratis, géneros votados por la comunidad) y la IA solo rellena lo que falte, de 25 en 25 álbumes por consulta para no gastar el límite gratuito. Lo encontrado se guarda: puedes parar y seguir otro día.',
@@ -1303,7 +1307,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.68 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.69 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3217,10 +3221,29 @@ class Main(QMainWindow):
         self.sug_list = QListWidget()
         self.sug_list.setFixedHeight(130)
         self.sug_list.itemClicked.connect(self.pick_suggestion)
+        # poner a mano un género a la canción o a todas las seleccionadas
+        man = QHBoxLayout()
+        self.genre_pick = QComboBox()
+        self.genre_pick.setEditable(True)
+        try:
+            import genres as _g
+            self.genre_pick.addItems(_g.COMMON)
+        except Exception:
+            pass
+        self.genre_pick.setCurrentText("")
+        self.genre_pick.lineEdit().setPlaceholderText("Otro género (escribe o elige)…")
+        self.genre_pick.lineEdit().returnPressed.connect(self.put_manual_genre)
+        self.btn_put_genre = QPushButton("✔ Poner")
+        self.btn_put_genre.setToolTip("Pone este género a la canción o a todas las seleccionadas")
+        self.btn_put_genre.clicked.connect(self.put_manual_genre)
+        man.addWidget(self.genre_pick, 1)
+        man.addWidget(self.btn_put_genre)
         self.btn_chat = QPushButton("💬 Hablar con la IA sobre este género")
         self.btn_chat.clicked.connect(self.open_chat)
-        for w in (self.btn_ai, self.sug_label, self.sug_list, self.btn_chat):
+        for w in (self.btn_ai, self.sug_label, self.sug_list):
             av.addWidget(w)
+        av.addLayout(man)
+        av.addWidget(self.btn_chat)
         self.provider.setCurrentText(self.cfg.value("provider", "Claude"))
         self.on_provider(self.provider.currentText())
 
@@ -5269,13 +5292,16 @@ class Main(QMainWindow):
                 n += 1
         self.btn_ai.setEnabled(True)
         cur = self.current_path()
-        if n and cur not in self.suggestions:  # salta a la primera canción con opciones
+        if n and cur not in self.suggestions and len(self.cur_paths) <= 1:  # salta a la primera canción con opciones
             for r in range(self.list.count()):
                 if self.list.item(r).data(PATH_ROLE) in self.suggestions:
                     self.go_to_row(r)
                     break
         self.update_suggestions()
-        self.statusBar().showMessage(f"La IA dio opciones para {n} canciones. Elige el subgénero en el cuadro de la derecha.")
+        if len(self.cur_paths) > 1:
+            self.statusBar().showMessage(T(f"La IA dio opciones para {n} canciones. Pulsa un género para ponerlo a todas las seleccionadas."))
+        else:
+            self.statusBar().showMessage(f"La IA dio opciones para {n} canciones. Elige el subgénero en el cuadro de la derecha.")
 
     def ai_failed(self, msg):
         self.btn_ai.setEnabled(True)
@@ -6877,6 +6903,24 @@ class Main(QMainWindow):
 
     def update_suggestions(self):
         self.sug_list.clear()
+        sel = [p for p in self.cur_paths if p] if len(self.cur_paths) > 1 else []
+        if sel:   # varias canciones elegidas: opciones juntas, y el clic pone el género a TODAS
+            counts, labels = {}, {}
+            for p in sel:
+                for label, value in self.suggestions.get(p, []):
+                    counts[value] = counts.get(value, 0) + 1
+                    labels.setdefault(value, label)
+            if counts:
+                self.sug_label.setText(T(f"Elige un género para las {len(sel)} canciones seleccionadas (se pone a todas):"))
+                for value in sorted(counts, key=lambda v: -counts[v]):
+                    extra = f"   ·  {counts[value]}/{len(sel)}" if counts[value] < len(sel) else ""
+                    it = QListWidgetItem(labels[value] + extra)
+                    it.setData(PATH_ROLE, value)
+                    self.sug_list.addItem(it)
+            else:
+                self.sug_label.setText(T(f"{len(sel)} canciones seleccionadas: pulsa «Sugerir género» o escribe uno abajo "
+                                         f"y pulsa «Poner» para ponérselo a todas."))
+            return
         cur = self.current_path()
         if cur and cur in self.suggestions:
             left = len(self.unresolved_rows())
@@ -6891,7 +6935,29 @@ class Main(QMainWindow):
         else:
             self.sug_label.setText("Pulsa «Sugerir género» para ver opciones de esta canción.")
 
+    def put_genre_many(self, paths, genre):
+        genre = (genre or "").strip()
+        if not genre or not paths:
+            return
+        self.apply_form()
+        for p in paths:
+            self.pending.setdefault(p, {})["genre"] = genre
+            self.chosen.add(p)
+        self.mark_items()
+        self.on_select()
+        self.statusBar().showMessage(T(f"Género «{genre}» puesto en {len(paths)} canción(es) (pendiente de guardar)."))
+
+    def put_manual_genre(self):
+        paths = [p for p in self.cur_paths if p] or ([self.current_path()] if self.current_path() else [])
+        if not paths:
+            self.statusBar().showMessage("Selecciona una o varias canciones.")
+            return
+        self.put_genre_many(paths, self.genre_pick.currentText())
+
     def pick_suggestion(self, item):
+        if len(self.cur_paths) > 1:   # varias elegidas: el género va a todas
+            self.put_genre_many([p for p in self.cur_paths if p], item.data(PATH_ROLE))
+            return
         cur = self.current_path()
         if not cur:
             return

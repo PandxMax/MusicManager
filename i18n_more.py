@@ -847,3 +847,18 @@ ROWS += [
     ("✔ Género puesto en %s canción(es) (pendiente de guardar, en naranja).", "✔ Genre set on %s song(s) (not saved yet, in orange).",
      "✔ Жанр задан для песен: %s (не сохранено, оранжевым)."),
 ]
+
+ROWS += [
+    ("Otro género (escribe o elige)…", "Another genre (type or pick)…", "Другой жанр (введите или выберите)…"),
+    ("✔ Poner", "✔ Set", "✔ Задать"),
+    ("Pone este género a la canción o a todas las seleccionadas", "Sets this genre on the song or on all selected", "Задаёт жанр песне или всем выбранным"),
+    ("Elige un género para las %s canciones seleccionadas (se pone a todas):", "Pick a genre for the %s selected songs (applies to all):",
+     "Выберите жанр для выбранных песен (%s) — применится ко всем:"),
+    ("%s canciones seleccionadas: pulsa «Sugerir género» o escribe uno abajo y pulsa «Poner» para ponérselo a todas.",
+     "%s songs selected: press “Suggest genre” or type one below and press “Set” to apply it to all.",
+     "Выбрано песен: %s. Нажмите «Предложить жанр» или введите жанр ниже и нажмите «Задать»."),
+    ("Género «%s» puesto en %s canción(es) (pendiente de guardar).", "Genre “%s” set on %s song(s) (not saved yet).",
+     "Жанр «%s» задан для песен: %s (не сохранено)."),
+    ("La IA dio opciones para %s canciones. Pulsa un género para ponerlo a todas las seleccionadas.",
+     "The AI gave options for %s songs. Click a genre to set it on all selected.", "ИИ предложил варианты для песен: %s. Нажмите жанр, чтобы задать его всем выбранным."),
+]
