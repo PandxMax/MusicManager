@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.67"
+APP_VERSION = "1.68"
 
 
 class TMenu(QMenu):
@@ -844,6 +844,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.68', [
+        'Nuevo: Herramientas → «Géneros en lote» (también con clic derecho en canciones). Para la carpeta, la carpeta con subcarpetas o las canciones elegidas: agrupa por álbum, encuentra los géneros demasiado generales («Electronic», «Rock», «Pop»…) o vacíos y sugiere géneros específicos.',
+        'Las sugerencias salen primero de MusicBrainz (gratis, géneros votados por la comunidad) y la IA solo rellena lo que falte, de 25 en 25 álbumes por consulta para no gastar el límite gratuito. Lo encontrado se guarda: puedes parar y seguir otro día.',
+        'Puedes elegir varias filas y ponerles el mismo género de una vez (con una lista de géneros comunes), escribir uno a mano con doble clic, marcar o desmarcar cada álbum, y luego «Aplicar» (pendiente) o «Aplicar y guardar».',
+    ]),
     ('1.67', [
         'Nueva vista «Lista con detalles» (como Mp3tag o el Explorador): columnas con nombre de archivo, título, intérprete, álbum, género, año, pista, duración, tasa de bits, frecuencia, códec, etiqueta y tamaño. Clic en el título de una columna para ordenar (otra vez para invertir); arrastra los bordes para cambiar el ancho y clic derecho en la cabecera para elegir qué columnas se ven.',
         'Botones de vista junto a la ruta: iconos, lista y lista con detalles. También en clic derecho → «Ver como».',
@@ -1298,7 +1303,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.67 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.68 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5655,6 +5660,7 @@ class Main(QMainWindow):
                 m.addAction("▶️ Buscar en YouTube (abre el navegador)", lambda: self.open_youtube(it.data(PATH_ROLE)))
                 m.addAction("📊 Espectrograma / calidad (varias = comparar)", self.open_spectrum)
                 m.addAction("🔄 Convertir formato…", self.convert_selected)
+                m.addAction("🏷 Géneros en lote…", self.open_batch_genres)
                 self.add_person_actions(m, self.val(it.data(PATH_ROLE), "artist"))
                 m.addAction("✏️ Renombrar archivo (F2)", self.rename_selected)
             m.addSeparator()
@@ -6077,6 +6083,8 @@ class Main(QMainWindow):
                              "Saca artista, título, pista… del nombre de los archivos seleccionados"))
         t.addAction(self.act("🔊 Normalizar volumen…", self.open_normalize,
                              "Deja todas las canciones seleccionadas con el mismo volumen"))
+        t.addAction(self.act("🏷 Géneros en lote…", self.open_batch_genres,
+                             "Afina géneros generales («Electronic», «Rock»…) por álbum con MusicBrainz y la IA, o pon géneros a muchas a la vez"))
         t.addAction(self.act("🔁 Buscar canciones repetidas…", self.open_dupes,
                              "Encuentra canciones duplicadas y deja marcadas las copias de peor calidad"))
         t.addAction(self.act("🎚 Ajustes de la canción…", self.open_fx,
@@ -6167,6 +6175,17 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         dlg.show()
         self._tool = dlg
+
+    def open_batch_genres(self):
+        import genres
+        sel = [p for p in self.selected_paths() if p and os.path.isfile(p)]
+        folder = self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else None
+        if not sel and not folder:
+            self.statusBar().showMessage("Abre primero una carpeta de música.")
+            return
+        dlg = genres.BatchGenresDialog(self, folder=folder, paths=sel if len(sel) > 1 else None, audio_ext=AUDIO_EXT,
+                                       read_tags=read_tags, ai_base=AIBase)
+        self._show_tool(dlg)
 
     def open_report(self):
         import libtools

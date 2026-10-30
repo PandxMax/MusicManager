@@ -432,3 +432,7 @@ VERSIÓN 1.67
 ------------
  - Nueva vista «Lista con detalles» con columnas ordenables (clic en el título), de ancho ajustable y ocultables.
  - Botones de vista (iconos / lista / detalles) y clic derecho → «Ver como» y «Ordenar por».
+
+VERSIÓN 1.68
+------------
+ - Nuevo: Géneros en lote (por álbum): MusicBrainz gratis + IA para lo que falte, revisión antes de aplicar, poner un género a muchas a la vez.
