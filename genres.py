@@ -228,9 +228,14 @@ class BatchGenresDialog(QDialog):
         if paths:
             self.scope.addItem(T(f"Las {len(paths)} canciones seleccionadas"), "sel")
         if folder:
-            self.scope.addItem(T("Esta carpeta"), "folder")
-            self.scope.addItem(T("Esta carpeta y sus subcarpetas"), "rec")
+            name = os.path.basename(folder.rstrip("/\\")) or folder
+            self.scope.addItem(T(f"Carpeta «{name}»"), "folder")
+            self.scope.addItem(T(f"Carpeta «{name}» y sus subcarpetas"), "rec")
         top.addWidget(self.scope, 1)
+        pick = QPushButton("📂 Elegir carpeta…")
+        pick.setToolTip("Elige cualquier carpeta para revisar sus géneros")
+        pick.clicked.connect(self.pick_folder)
+        top.addWidget(pick)
         self.only_generic = QCheckBox("Solo géneros generales o vacíos")
         self.only_generic.setChecked(True)
         self.by_album = QCheckBox("Agrupar por álbum")
@@ -305,6 +310,21 @@ class BatchGenresDialog(QDialog):
         self.b_stop.setEnabled(False)
 
     # ------------------------------------------------------------ buscar
+    def pick_folder(self):
+        from PyQt6.QtWidgets import QFileDialog
+        d = QFileDialog.getExistingDirectory(self, T("Carpeta para revisar los géneros"), self.folder or "")
+        if not d:
+            return
+        self.folder = d
+        self.scope.clear()
+        name = os.path.basename(d.rstrip("/\\")) or d
+        self.scope.addItem(T(f"Carpeta «{name}»"), "folder")
+        self.scope.addItem(T(f"Carpeta «{name}» y sus subcarpetas"), "rec")
+        self.scope.setCurrentIndex(1)
+        self.tree.clear()
+        self.groups = []
+        self.status.setText(T("Pulsa «Buscar»."))
+
     def files(self):
         mode = self.scope.currentData()
         if mode == "sel":

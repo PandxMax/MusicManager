@@ -862,3 +862,25 @@ ROWS += [
     ("La IA dio opciones para %s canciones. Pulsa un género para ponerlo a todas las seleccionadas.",
      "The AI gave options for %s songs. Click a genre to set it on all selected.", "ИИ предложил варианты для песен: %s. Нажмите жанр, чтобы задать его всем выбранным."),
 ]
+
+ROWS += [
+    ("Herramientas", "Tools", "Инструменты"), ("Vista y orden", "View and sort", "Вид и сортировка"),
+    ("Ordenar por", "Sort by", "Сортировать по"), ("Al otro árbol (%s)", "To the other tree (%s)", "В другое дерево (%s)"),
+    ("➡ Enviar (mover)", "➡ Send (move)", "➡ Отправить (переместить)"),
+    ("✏️ Renombrar (F2)", "✏️ Rename (F2)", "✏️ Переименовать (F2)"), ("🗑 Eliminar (Supr)", "🗑 Delete (Del)", "🗑 Удалить (Del)"),
+    ("📥 Pegar aquí (Ctrl+V)", "📥 Paste here (Ctrl+V)", "📥 Вставить сюда (Ctrl+V)"),
+    ("📊 Espectrograma / calidad", "📊 Spectrogram / quality", "📊 Спектрограмма / качество"),
+    ("📊 Espectrograma / calidad (comparar)", "📊 Spectrogram / quality (compare)", "📊 Спектрограмма / качество (сравнить)"),
+    ("▶️ Buscar en YouTube", "▶️ Search on YouTube", "▶️ Искать на YouTube"),
+    ("📖 Historia del artista (Wikipedia)", "📖 Artist history (Wikipedia)", "📖 История исполнителя (Википедия)"),
+    ("▶️ Buscar artista en YouTube", "▶️ Search artist on YouTube", "▶️ Искать исполнителя на YouTube"),
+    ("🟢 Buscar artista en Spotify", "🟢 Search artist on Spotify", "🟢 Искать исполнителя в Spotify"),
+    ("🌊 Buscar artista en Tidal", "🌊 Search artist on Tidal", "🌊 Искать исполнителя в Tidal"),
+    ("🎧 Buscar artista en Qobuz", "🎧 Search artist on Qobuz", "🎧 Искать исполнителя в Qobuz"),
+    ("🏷 Géneros en lote de esta carpeta…", "🏷 Batch genres for this folder…", "🏷 Жанры пакетно для этой папки…"),
+    ("📂 Elegir carpeta…", "📂 Choose folder…", "📂 Выбрать папку…"),
+    ("Elige cualquier carpeta para revisar sus géneros", "Choose any folder to review its genres", "Выберите любую папку для проверки жанров"),
+    ("Carpeta para revisar los géneros", "Folder to review genres", "Папка для проверки жанров"),
+    ("Carpeta «%s»", "Folder “%s”", "Папка «%s»"), ("Carpeta «%s» y sus subcarpetas", "Folder “%s” and its subfolders", "Папка «%s» и подпапки"),
+    ("📂 Mostrar carpeta en el Explorador", "📂 Show folder in Explorer", "📂 Показать папку в Проводнике"),
+]

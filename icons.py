@@ -13,7 +13,7 @@ LEAD = {
     "🤖": "bot", "🎨": "palette", "🌍": "globe", "❓": "help", "ℹ": "info", "⬇": "download", "🎼": "note",
     "💿": "disc", "💬": "chat", "✔": "check", "🔳": "grid", "🆕": "sparkle", "🔊": "vol3", "🔉": "vol2",
     "🔈": "vol1", "🔇": "vol0", "⋯": "more", "✕": "close", "◀": "arrow_l", "▲": "arrow_u", "🎚": "fx",
-    "🔁": "loop", "🎵": "note", "⚙": "gear", "🌐": "globe", "▤": "table", "👁": "search", "↕": "swapv", "🎧": "note", "📖": "lyrics", "🏷": "edit", "📤": "download",
+    "🔁": "loop", "🎵": "note", "⚙": "gear", "🌐": "globe", "▤": "table", "👁": "eye", "↕": "sort", "👤": "person", "🛠": "tools", "🗃": "explorer", "🎧": "note", "📖": "book", "🏷": "tag", "📤": "download",
 }
 
 
@@ -25,8 +25,15 @@ def split(text):
     kind = LEAD.get(c)
     if kind is None:
         return None, text
-    rest = text[1:].lstrip("️‍")
-    return kind, rest.lstrip(" ")
+    rest = text[1:].lstrip("\ufe0f\u200d").lstrip(" ")
+    low = rest.lower()
+    if "youtube" in low:                       # iconos más claros según lo que hace cada opción
+        kind = "video"
+    elif kind == "plus" and ("lista" in low or "playlist" in low or "плейлист" in low):
+        kind = "listadd"
+    elif kind == "folder" and ("explorador" in low or "explorer" in low or "проводник" in low):
+        kind = "explorer"
+    return kind, rest
 
 
 def _pen(col, w=1.9):
@@ -256,6 +263,44 @@ def draw_glyph(p, kind, rect, col):
     elif k == "check":
         p.setPen(_pen(col, 2.3))
         p.drawPath(_line_path([(5, 12.5), (10, 17.5), (19, 7)]))
+    elif k == "eye":
+        p.drawPath(_line_path([(2.5, 12), (6, 7.5), (12, 5.5), (18, 7.5), (21.5, 12), (18, 16.5), (12, 18.5), (6, 16.5)], True))
+        p.drawEllipse(QPointF(12, 12), 3.3, 3.3)
+    elif k == "sort":
+        line((7, 19), (7, 5))
+        line((3.5, 8.5), (7, 5), (10.5, 8.5))
+        line((17, 5), (17, 19))
+        line((13.5, 15.5), (17, 19), (20.5, 15.5))
+    elif k == "tag":
+        p.drawPath(_line_path([(4, 4.5), (12, 4.5), (20, 12.5), (12.5, 20), (4, 12)], True))
+        p.drawEllipse(QPointF(8.5, 9), 1.6, 1.6)
+    elif k == "person":
+        p.drawEllipse(QPointF(12, 8), 3.8, 3.8)
+        path = QPainterPath(QPointF(4.5, 20))
+        path.cubicTo(5, 15, 8.5, 13.5, 12, 13.5)
+        path.cubicTo(15.5, 13.5, 19, 15, 19.5, 20)
+        p.drawPath(path)
+    elif k == "video":
+        p.drawRoundedRect(QRectF(3, 5.5, 18, 13), 3.5, 3.5)
+        solid()
+        p.drawPolygon(_poly([(10, 9), (10, 15), (15.5, 12)]))
+    elif k == "listadd":
+        for y, w in ((6.5, 12), (11, 12), (15.5, 7)):
+            line((4, y), (4 + w, y))
+        line((17.5, 13), (17.5, 20))
+        line((14, 16.5), (21, 16.5))
+    elif k == "book":
+        p.drawPath(_line_path([(12, 7), (12, 19.5)]))
+        p.drawPath(_line_path([(12, 7), (8, 5.5), (3.5, 5.5), (3.5, 18), (8, 18), (12, 19.5)]))
+        p.drawPath(_line_path([(12, 7), (16, 5.5), (20.5, 5.5), (20.5, 18), (16, 18), (12, 19.5)]))
+    elif k == "tools":
+        p.drawPath(_line_path([(14.5, 4.5), (19.5, 9.5)]))
+        p.drawEllipse(QPointF(15.5, 8.5), 3.6, 3.6)
+        line((12.8, 11.2), (5, 19))
+    elif k == "explorer":
+        p.drawPath(_line_path([(3.5, 7), (3.5, 18.5), (20.5, 18.5), (20.5, 9), (11.5, 9), (9.5, 6.5), (3.5, 6.5)], True))
+        line((13, 13), (17.5, 13))
+        line((15.5, 11), (17.5, 13), (15.5, 15))
     elif k == "table":   # vista detalles: filas con columnas
         p.drawRoundedRect(QRectF(3.5, 4.5, 17, 15), 2, 2)
         line((3.5, 9), (20.5, 9))

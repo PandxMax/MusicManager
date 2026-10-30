@@ -440,3 +440,9 @@ VERSIÓN 1.68
 VERSIÓN 1.69
 ------------
  - Con varias canciones seleccionadas, el género sugerido o escrito se pone a todas a la vez.
+
+VERSIÓN 1.70
+------------
+ - Corregido el recuadro de selección que se quedaba pintado tras arrastrar.
+ - Clic derecho más ordenado (submenús) e iconos más claros.
+ - Géneros en lote: elegir cualquier carpeta; también desde clic derecho en carpetas.

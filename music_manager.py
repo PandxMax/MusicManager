@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.69"
+APP_VERSION = "1.70"
 
 
 class TMenu(QMenu):
@@ -482,8 +482,10 @@ QSplitter::handle { background: @border; border-radius: 3px; margin: 2px; }
 QSplitter::handle:hover { background: @accent; }
 QSplitter::handle:disabled { background: transparent; }
 QStatusBar { background: @surface; border-top: 1px solid @border; color: @muted; }
-QMenu { background: @surface; border: 1px solid @border; border-radius: 10px; padding: 6px; }
-QMenu::item { padding: 7px 24px; border-radius: 6px; }
+QMenu { background: @surface; border: 1px solid @border; border-radius: 12px; padding: 6px; }
+QMenu::item { padding: 7px 28px 7px 12px; border-radius: 8px; margin: 1px 2px; min-width: 190px; }
+QMenu::icon { padding-left: 10px; }
+QMenu::right-arrow { width: 10px; height: 10px; margin-right: 8px; }
 QMenu::item:selected { background: @accent; color: white; }
 QMenu::item:disabled { color: @muted; }
 QMenu::separator { height: 1px; background: @border; margin: 4px 8px; }
@@ -844,6 +846,12 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.70', [
+        'Corregido: después de arrastrar canciones se quedaba pintado el recuadro morado de selección encima de la lista.',
+        'Clic derecho más ordenado: arriba lo de siempre (reproducir, cortar, copiar, pegar, renombrar, eliminar) y el resto agrupado en submenús: Herramientas, el artista, «Al otro árbol» y «Vista y orden».',
+        'Iconos más claros: ojo para la vista, flechas para ordenar, etiqueta para géneros, persona para el artista, video para YouTube, libro para Wikipedia, lista con + para añadir a la lista y carpeta con flecha para el Explorador.',
+        'Géneros en lote: puedes elegir cualquier carpeta (botón «Elegir carpeta…») y también abrirlo con clic derecho sobre una carpeta o en el árbol.',
+    ]),
     ('1.69', [
         'Géneros con varias canciones seleccionadas: «Sugerir género» ya no te saca de la selección; las opciones de todas se juntan (con cuántas canciones la sugieren) y al pulsar una se pone a TODAS las seleccionadas.',
         'Nuevo cuadro «Otro género» debajo de las sugerencias: escribe o elige un género de la lista y pulsa «Poner» para ponérselo a la canción o a todas las seleccionadas, sin necesidad de la IA.',
@@ -1307,7 +1315,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.69 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.70 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2636,6 +2644,23 @@ class SongList(QListWidget):
         md.setUrls([QUrl.fromLocalFile(i.data(PATH_ROLE)) for i in items])
         return md
 
+    def _clear_band(self):
+        """El arrastre se «come» el soltar del ratón y la lista se quedaba con el recuadro de selección pintado.
+        Se le envía un «soltar» de mentira para que lo borre."""
+        try:
+            lp = self.viewport().mapFromGlobal(QCursor.pos())
+            ev = QMouseEvent(QEvent.Type.MouseButtonRelease, QPointF(lp), QPointF(QCursor.pos()), Qt.MouseButton.LeftButton,
+                             Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+            sel = [self.item(r) for r in range(self.count()) if self.item(r).isSelected()]
+            self.blockSignals(True)
+            QListWidget.mouseReleaseEvent(self, ev)
+            for it in sel:   # que el «soltar» falso no cambie lo que estaba elegido
+                it.setSelected(True)
+            self.blockSignals(False)
+            self.viewport().update()
+        except Exception:
+            self.blockSignals(False)
+
     def reset_state(self):
         """Tras un arrastre propio, Qt puede quedarse «seleccionando» (recuadro fantasma y selección pegada). Lo limpia."""
         try:
@@ -2745,6 +2770,7 @@ class SongList(QListWidget):
             DRAG_ACTIVE[0] = False
             hover_timer.stop()
             self._selecting = False
+            self._clear_band()
             self._set_hover(None)
             self.reset_state()
             QTimer.singleShot(0, self.reset_state)   # y otra vez cuando termina el evento, por si Qt lo vuelve a activar
@@ -3769,22 +3795,23 @@ class Main(QMainWindow):
         return list(reversed(out)) if getattr(self, "sort_desc", False) else out
 
     def add_view_menus(self, m):
-        vm = m.addMenu("👁 Ver como")
+        vm = m.addMenu(icons.vicon("eye", ctx="menu"), T("Vista y orden"))
         for mode, label in (("icons", "Iconos"), ("list", "Lista"), ("details", "Lista con detalles")):
-            a = vm.addAction(label)
+            a = vm.addAction(T(label))
             a.setCheckable(True)
             a.setChecked(self.view_mode == mode)
             a.triggered.connect(lambda _=False, m_=mode: self.set_view_mode(m_))
+        vm.addSeparator()
         import details
-        sm = m.addMenu("↕ Ordenar por")
+        sm = vm.addMenu(icons.vicon("sort", ctx="menu"), T("Ordenar por"))
         for key, label in details.SORTS:
-            a = sm.addAction(label)
+            a = sm.addAction(T(label))
             a.setCheckable(True)
             a.setChecked(self.sort_key == key)
             a.triggered.connect(lambda _=False, k=key: self.set_sort(k, self.sort_desc))
         sm.addSeparator()
         for desc, label in ((False, "Ascendente (A → Z, menor → mayor)"), (True, "Descendente (Z → A, mayor → menor)")):
-            a = sm.addAction(label)
+            a = sm.addAction(T(label))
             a.setCheckable(True)
             a.setChecked(self.sort_desc == desc)
             a.triggered.connect(lambda _=False, d=desc: self.set_sort(self.sort_key, d))
@@ -5648,6 +5675,8 @@ class Main(QMainWindow):
             m.addAction("📋 Copiar", lambda: self.clip_set("copy"))
         m.addAction("📥 Pegar aquí", self.paste_here)
         m.addAction("➕ Nueva carpeta aquí", lambda: self.new_folder())
+        if it is not None and it.data(0, PATH_ROLE) and os.path.isdir(it.data(0, PATH_ROLE)):
+            m.addAction("🏷 Géneros en lote de esta carpeta…", lambda d=it.data(0, PATH_ROLE): self.open_batch_genres(folder=d))
         other = self.tree2 if tree is self.tree else self.tree
         oc = other.currentItem()
         if it is not None and self.tree2_box.isVisible() and oc is not None and oc.data(0, PATH_ROLE):
@@ -5666,45 +5695,63 @@ class Main(QMainWindow):
         m.exec(tree.viewport().mapToGlobal(pos))
 
     def list_menu(self, pos):
+        """Menú contextual ordenado: lo de siempre arriba, lo demás agrupado en submenús."""
         self.list.setFocus()
         it = self.list.itemAt(pos)
         if it is not None and not it.isSelected():
             self.list.clearSelection()
             it.setSelected(True)
         m = TMenu(self)
-        m.addAction("⟳ Actualizar (F5)", self.refresh_dir)
-        self.add_view_menus(m)
-        m.addSeparator()
-        if it is not None:
-            if it.data(KIND_ROLE) == "dir":
-                m.addAction("📂 Abrir carpeta", lambda: self.open_dir(it.data(PATH_ROLE)))
-                m.addAction("▶ Reproducir carpeta", lambda: self.play_folder(it.data(PATH_ROLE)))
-                m.addAction("➕ Añadir carpeta a la lista", lambda: self.pl_add([it.data(PATH_ROLE)]))
-            else:
-                m.addAction("▶ Reproducir", lambda: self.play_item(it))
-                m.addAction("➕ Añadir a la lista de reproducción", lambda: self.pl_add(self.selected_paths()))
-                m.addAction("▶️ Buscar en YouTube (abre el navegador)", lambda: self.open_youtube(it.data(PATH_ROLE)))
-                m.addAction("📊 Espectrograma / calidad (varias = comparar)", self.open_spectrum)
-                m.addAction("🔄 Convertir formato…", self.convert_selected)
-                m.addAction("🏷 Géneros en lote…", self.open_batch_genres)
-                self.add_person_actions(m, self.val(it.data(PATH_ROLE), "artist"))
-                m.addAction("✏️ Renombrar archivo (F2)", self.rename_selected)
+        if it is not None and it.data(KIND_ROLE) == "dir":
+            d = it.data(PATH_ROLE)
+            m.addAction("📂 Abrir carpeta", lambda: self.open_dir(d))
+            m.addAction("▶ Reproducir carpeta", lambda: self.play_folder(d))
+            m.addAction("➕ Añadir carpeta a la lista", lambda: self.pl_add([d]))
             m.addSeparator()
             m.addAction("✂️ Cortar (Ctrl+X)", lambda: self.clip_set("cut"))
             m.addAction("📋 Copiar (Ctrl+C)", lambda: self.clip_set("copy"))
-        m.addAction("📥 Pegar aquí (Ctrl+V)", self.paste_here)
-        m.addAction("➕ Nueva carpeta aquí", lambda: self.new_folder(self.current_dir))
-        if it is not None and self.tree2_box.isVisible():
-            _s, dst, _w = self.xfer_plan()
-            if dst:
-                dn = os.path.basename(dst.rstrip(os.sep)) or dst
-                m.addSeparator()
-                m.addAction(f"➡ Mover al otro árbol  ({dn})", lambda: self.xfer(True))
-                m.addAction(f"⧉ Copiar al otro árbol  ({dn})", lambda: self.xfer(False))
-        if it is not None:
-            m.addSeparator()
             m.addAction("🗑 Eliminar (Supr)", lambda: self.delete_paths(self.selected_all_paths()))
+            m.addSeparator()
+            m.addAction("🏷 Géneros en lote de esta carpeta…", lambda: self.open_batch_genres(folder=d))
+        elif it is not None:
+            p = it.data(PATH_ROLE)
+            n = len(self.selected_paths())
+            m.addAction("▶ Reproducir", lambda: self.play_item(it))
+            m.addAction("➕ Añadir a la lista de reproducción", lambda: self.pl_add(self.selected_paths()))
+            m.addSeparator()
+            m.addAction("✂️ Cortar (Ctrl+X)", lambda: self.clip_set("cut"))
+            m.addAction("📋 Copiar (Ctrl+C)", lambda: self.clip_set("copy"))
+            m.addAction("📥 Pegar aquí (Ctrl+V)", self.paste_here)
+            m.addAction("✏️ Renombrar (F2)", self.rename_selected)
+            m.addAction("🗑 Eliminar (Supr)", lambda: self.delete_paths(self.selected_all_paths()))
+            m.addSeparator()
+            tools = m.addMenu(icons.vicon("tools", ctx="menu"), T("Herramientas"))
+            for text, fn in (("📊 Espectrograma / calidad" + (" (comparar)" if n > 1 else ""), self.open_spectrum),
+                             ("🎚 Ajustes de la canción…", self.open_fx),
+                             ("🔄 Convertir formato…", self.convert_selected),
+                             ("🏷 Géneros en lote…", self.open_batch_genres),
+                             ("▶️ Buscar en YouTube", lambda: self.open_youtube(p))):
+                tools.addAction(T(text), fn)
+            artist = self.val(p, "artist")
+            if artist:
+                am = m.addMenu(icons.vicon("person", ctx="menu"), artist if len(artist) < 40 else artist[:38] + "…")
+                for text, kind in (("📖 Historia del artista (Wikipedia)", "wiki"), ("▶️ Buscar artista en YouTube", "youtube"),
+                                   ("🟢 Buscar artista en Spotify", "spotify"), ("🌊 Buscar artista en Tidal", "tidal"),
+                                   ("🎧 Buscar artista en Qobuz", "qobuz")):
+                    am.addAction(T(text), lambda _=False, k=kind: self.web_artist(k, artist))
+            if self.tree2_box.isVisible():
+                _s, dst, _w = self.xfer_plan()
+                if dst:
+                    dn = os.path.basename(dst.rstrip(os.sep)) or dst
+                    om = m.addMenu(icons.vicon("swap", ctx="menu"), T(f"Al otro árbol ({dn})"))
+                    om.addAction(T("➡ Enviar (mover)"), lambda: self.xfer(True))
+                    om.addAction(T("📋 Copiar"), lambda: self.xfer(False))
+        else:
+            m.addAction("📥 Pegar aquí (Ctrl+V)", self.paste_here)
+            m.addAction("➕ Nueva carpeta aquí", lambda: self.new_folder(self.current_dir))
         m.addSeparator()
+        self.add_view_menus(m)
+        m.addAction("⟳ Actualizar (F5)", self.refresh_dir)
         m.addAction("📂 Mostrar carpeta en el Explorador",
                     lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(self.current_dir)))
         m.exec(self.list.viewport().mapToGlobal(pos))
@@ -6202,10 +6249,10 @@ class Main(QMainWindow):
         dlg.show()
         self._tool = dlg
 
-    def open_batch_genres(self):
+    def open_batch_genres(self, folder=None):
         import genres
-        sel = [p for p in self.selected_paths() if p and os.path.isfile(p)]
-        folder = self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else None
+        sel = [] if folder else [p for p in self.selected_paths() if p and os.path.isfile(p)]
+        folder = folder or (self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else None)
         if not sel and not folder:
             self.statusBar().showMessage("Abre primero una carpeta de música.")
             return
