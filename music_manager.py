@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.80"
+APP_VERSION = "1.81"
 
 
 class TMenu(QMenu):
@@ -877,6 +877,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.81', [
+        'Nuevo: clic derecho en varias canciones → Herramientas → «Crear carpetas por…» (también en el menú Herramientas). Reparte las canciones elegidas en carpetas por intérprete, intérprete principal, álbum, año - álbum, género, año, década, compositor, primera letra o formato, con hasta tres niveles (por ejemplo Género → Intérprete → Álbum). Vista previa en árbol, mover o copiar, elegir dónde crearlas, qué hacer si falta el dato y juntar las carpetas de una sola canción en «Varios». Funciona en segundo plano con barra de progreso, también para miles de canciones.',
+        'Vista detalles: al activar una columna con clic derecho en los títulos, ahora aparece de verdad (la lista se ensancha y se desplaza hasta ella).',
+    ]),
     ('1.80', [
         'Modo lista y detalles: ahora puedes sombrear varias canciones arrastrando hacia arriba o abajo (como en el Explorador). Para mover archivos, arrastra una canción ya elegida o hacia un lado.',
         'Letras: si la conexión falla, se reintenta solo. Si LRCLIB no la tiene, se busca también en NetEase (sincronizada) y en lyrics.ovh, y se limpia el título («feat.», «Official Video», «Remastered»…) para encontrarla mejor.',
@@ -1386,7 +1390,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.80 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.81 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -6222,6 +6226,7 @@ class Main(QMainWindow):
                              ("🎚 Ajustes de la canción…", self.open_fx),
                              ("🔄 Convertir formato…", self.convert_selected),
                              ("🏷 Géneros en lote…", self.open_batch_genres),
+                             ("📁 Crear carpetas por… (intérprete, álbum, género…)", self.open_folders_by),
                              ("▶️ Buscar en YouTube", lambda: self.open_youtube(p))):
                 tools.addAction(T(text), fn)
             artist = self.val(p, "artist")
@@ -6700,6 +6705,8 @@ class Main(QMainWindow):
                              "Cuántas canciones no tienen portada, letra, género, año… y acceso directo a cada una"))
         t.addAction(self.act("🗂 Organizar en carpetas (Artista / Álbum)…", self.open_organize,
                              "Mueve las canciones a carpetas según sus etiquetas"))
+        t.addAction(self.act("📁 Crear carpetas por… (canciones elegidas)", self.open_folders_by,
+                             "Reparte las canciones seleccionadas en carpetas por intérprete, álbum, género, año…"))
         t.addAction(self.act("🏷 Etiquetas desde el nombre del archivo…", self.open_tags_from_name,
                              "Saca artista, título, pista… del nombre de los archivos seleccionados"))
         t.addAction(self.act("🔊 Normalizar volumen…", self.open_normalize,
@@ -6819,6 +6826,12 @@ class Main(QMainWindow):
         f = self._lib_folder()
         if f:
             self._show_tool(libtools.OrganizeDialog(self, f, AUDIO_EXT))
+
+    def open_folders_by(self):
+        import folders_by
+        paths = self._lib_paths()
+        if paths:
+            self._show_tool(folders_by.FoldersByDialog(self, paths, tech_info))
 
     def open_tags_from_name(self):
         import libtools

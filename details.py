@@ -230,10 +230,31 @@ class DetailsView(QObject):
         self.header.raise_()
         self.header.setOffset(self.list.horizontalScrollBar().value())
 
+    def set_column(self, i, on):
+        """Muestra u oculta una columna; si la muestras, la lista se desplaza para que la veas."""
+        h = self.header
+        h.setSectionHidden(i, not on)
+        if on and h.sectionSize(i) < 40:
+            h.resizeSection(i, COLUMNS[i][2])
+        self.relayout()
+        if on:
+            def reveal():
+                sb = self.list.horizontalScrollBar()
+                x, w, vw = h.sectionPosition(i), h.sectionSize(i), self.list.viewport().width()
+                if x < sb.value() or x + w > sb.value() + vw:
+                    sb.setValue(max(0, min(sb.maximum(), x + w - vw + 20)))
+                self.place()
+            QTimer.singleShot(0, reveal)
+
     def relayout(self):
         if self.enabled:
+            # con «tamaños iguales» la lista guarda el ancho de la fila: hay que olvidarlo para que el nuevo ancho
+            # (más o menos columnas) llegue a la barra de desplazamiento horizontal
+            self.list.setUniformItemSizes(False)
+            self.list.setUniformItemSizes(True)
             self.list.doItemsLayout()
             self.list.viewport().update()
+            self.place()
         self.save()
 
     def save(self):
@@ -268,7 +289,7 @@ class DetailsView(QObject):
             a.setCheckable(True)
             a.setChecked(not self.header.isSectionHidden(i))
             a.setEnabled(k != "file")
-            a.toggled.connect(lambda on, i=i: (self.header.setSectionHidden(i, not on), self.relayout()))
+            a.toggled.connect(lambda on, i=i: self.set_column(i, on))
         m.addSeparator()
         m.addAction(T("Restablecer columnas"), self.reset_columns)
         m.exec(self.header.mapToGlobal(pos))
