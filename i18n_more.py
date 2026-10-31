@@ -894,3 +894,5 @@ ROWS += [
      "Fields with a colored border have several options: open them to choose. Only non-empty fields are applied.",
      "Поля с цветной рамкой содержат несколько вариантов: откройте и выберите. Применяются только заполненные поля."),
 ]
+
+ROWS += [("%s · %s canciones", "%s · %s songs", "%s · песен: %s")]

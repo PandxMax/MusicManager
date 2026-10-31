@@ -450,3 +450,7 @@ VERSIÓN 1.70
 VERSIÓN 1.71
 ------------
  - Rellenar con IA: busca también en MusicBrainz y Discogs; cada campo es un desplegable con las opciones de cada fuente.
+
+VERSIÓN 1.72
+------------
+ - Mensaje de la barra de abajo más discreto y corto (carpeta · número de canciones).

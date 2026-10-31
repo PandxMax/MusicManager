@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.71"
+APP_VERSION = "1.72"
 
 
 class TMenu(QMenu):
@@ -846,6 +846,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.72', [
+        'Barra de abajo (estilo celular): el mensaje ya no sale en un recuadro negro con toda la ruta. Ahora es una pastilla discreta con los colores del tema y solo dice la carpeta y cuántas canciones tiene («Armonía 10 · 37 canciones»); si un texto es largo se recorta por el medio.',
+    ]),
     ('1.71', [
         '«Rellenar con IA» ahora busca en iTunes, Deezer, MusicBrainz (gratis) y Discogs (si pusiste tu token en Ajustes), además de la IA.',
         'En el resultado, cada campo es un desplegable con las opciones que dio cada fuente (por ejemplo, el álbum según iTunes, Deezer o MusicBrainz): eliges la que prefieras o escribes otra. Los campos con varias opciones se marcan con un borde de color y, al pasar el ratón por cada opción, se ve de qué fuente viene.',
@@ -1319,7 +1322,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.71 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.72 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1813,15 +1816,26 @@ class WideViz(QWidget):
                 p.setBrush(QColor(255, 255, 255, 170))
                 p.drawRoundedRect(QRectF(x, bottom - (r + 1) * cell + self.GAP + self.SQ - 2, self.SQ, 2), 1, 1)
         msg = self.sb.currentMessage()
-        if msg:   # el mensaje de la barra de estado, legible encima de los cuadritos
-            f = p.font()
+        if msg:   # el mensaje, en una «pastilla» discreta con los colores del tema (rutas largas se recortan por el medio)
+            f = QFont(p.font())
+            f.setPointSizeF(max(8.0, f.pointSizeF() - 0.5))
+            p.setFont(f)
             fm = QFontMetrics(f)
-            text = fm.elidedText(msg, Qt.TextElideMode.ElideRight, max(50, int(self.width() * 0.6)))
-            w = fm.horizontalAdvance(text) + 20
-            p.setBrush(QColor(0, 0, 0, 150))
-            p.drawRoundedRect(QRectF(8, (self.height() - fm.height() - 8) / 2, w, fm.height() + 8), 8, 8)
-            p.setPen(QColor(235, 235, 245))
-            p.drawText(QRectF(18, 0, w, self.height()), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
+            text = fm.elidedText(msg, Qt.TextElideMode.ElideMiddle, max(80, int(self.width() * 0.45)))
+            w = fm.horizontalAdvance(text) + 34
+            h = fm.height() + 10
+            r = QRectF(10, (self.height() - h) / 2, w, h)
+            pal = self.palette()
+            bg = QColor(pal.color(QPalette.ColorRole.Window))
+            bg.setAlpha(225)
+            p.setPen(QPen(QColor(base.red(), base.green(), base.blue(), 110), 1))
+            p.setBrush(bg)
+            p.drawRoundedRect(r, h / 2, h / 2)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(base)
+            p.drawEllipse(QPointF(r.x() + 13, r.center().y()), 3, 3)
+            p.setPen(pal.color(QPalette.ColorRole.WindowText))
+            p.drawText(QRectF(r.x() + 23, r.y(), w - 28, h), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
 
 
 class PlaylistList(QListWidget):
@@ -4037,7 +4051,7 @@ class Main(QMainWindow):
         self.list.overlay.setGeometry(self.list.viewport().rect())
         self.list.overlay.setVisible(self.list.count() == 0)
         self.thumbs.request(self.gen, self.thumb_queue)
-        self.statusBar().showMessage(f"{path} — {len(files)} canciones")
+        self.statusBar().showMessage(f"{os.path.basename(os.path.normpath(path)) or path} · {len(files)} canciones")
 
     def on_thumb(self, gen, f, img, lyrics, tags):
         """Llega una miniatura generada (o leída de la caché) en segundo plano."""
