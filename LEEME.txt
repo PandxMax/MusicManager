@@ -485,3 +485,9 @@ VERSIÓN 1.79
 ------------
  - Más rápido y fluido: datos técnicos en segundo plano y en caché, selección de muchas canciones sin trabarse,
    vista detalles más ligera, visualizador de abajo más liviano, carpetas grandes sin congelar la ventana.
+
+VERSIÓN 1.80
+------------
+ - Modo lista/detalles: sombrear varias canciones arrastrando hacia arriba o abajo.
+ - Letras: reintento automático, búsqueda también en NetEase y lyrics.ovh, y opciones si no aparece
+   (Reintentar, Buscar en Google, Cargar .lrc, Escribirla).

@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.79"
+APP_VERSION = "1.80"
 
 
 class TMenu(QMenu):
@@ -877,6 +877,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.80', [
+        'Modo lista y detalles: ahora puedes sombrear varias canciones arrastrando hacia arriba o abajo (como en el Explorador). Para mover archivos, arrastra una canción ya elegida o hacia un lado.',
+        'Letras: si la conexión falla, se reintenta solo. Si LRCLIB no la tiene, se busca también en NetEase (sincronizada) y en lyrics.ovh, y se limpia el título («feat.», «Official Video», «Remastered»…) para encontrarla mejor.',
+        'Si aun así no aparece, sale una ventana con opciones: Reintentar, Buscar en Google, Cargar archivo .lrc… o Escribirla / pegarla.',
+    ]),
     ('1.79', [
         'Más rápido al seleccionar muchas canciones: los datos técnicos (formato, bitrate, frecuencia…) ahora se leen en segundo plano junto con las miniaturas y se guardan en la caché, así no se vuelve a abrir cada archivo al seleccionar.',
         'Si seleccionas muchas canciones que todavía no se han leído, el programa ya no se traba leyéndolas todas: muestra lo que tiene y se completa solo en un momento.',
@@ -1381,7 +1386,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.79 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.80 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1954,8 +1959,28 @@ class PlaylistList(QListWidget):
             e.acceptProposedAction()
 
 
+def _clean_title(t):
+    """Quita adornos que hacen fallar la búsqueda: (feat. …), [Official Video], - Remastered 2011, (Letra)…"""
+    t = re.sub(r"\s*[\(\[][^\)\]]*(feat|ft\.|official|video|audio|lyric|letra|remaster|live|en vivo|version|versión|hd|hq)[^\)\]]*[\)\]]",
+               "", t or "", flags=re.I)
+    t = re.sub(r"\s+-\s+(remaster(ed)?|live|en vivo|radio edit|single version)\b.*$", "", t, flags=re.I)
+    t = re.sub(r"\s+(feat\.?|ft\.?)\s+.*$", "", t, flags=re.I)
+    return t.strip(" -_")
+
+
+def _main_artist(a):
+    return re.split(r"\s*(?:,|&|;|/| feat\.? | ft\.? | x | y )\s*", a or "", maxsplit=1, flags=re.I)[0].strip()
+
+
+def _norm(t):
+    import unicodedata
+    t = unicodedata.normalize("NFKD", (t or "").lower())
+    return re.sub(r"[^a-z0-9]+", "", "".join(c for c in t if not unicodedata.combining(c)))
+
+
 class LrclibWorker(QThread):
-    """Busca letras en LRCLIB (https://lrclib.net), gratis y sin clave. Prefiere la letra sincronizada."""
+    """Busca letras: primero en LRCLIB (https://lrclib.net); si no está o el servicio falla, en NetEase (también
+    sincronizada) y en lyrics.ovh (normal). Reintenta solo cuando hay errores de conexión."""
     got = pyqtSignal(str, str)  # ruta, letra ("" si no hubo)
     finished_all = pyqtSignal()
     failed = pyqtSignal(str)
@@ -1964,25 +1989,30 @@ class LrclibWorker(QThread):
     def __init__(self, jobs, prefer_synced=True):
         super().__init__()
         self.jobs, self.prefer_synced = jobs, prefer_synced  # jobs: [(ruta, artista, título, álbum, segundos)]
+        self.sources = {}      # de dónde salió cada letra (para el mensaje final)
+        self.errored = []      # rutas que fallaron por conexión incluso tras reintentar
+        self.not_found = []    # rutas que ningún servicio tiene
 
-    def fetch(self, url):
-        """Pide una dirección con reintentos (LRCLIB a veces responde 503 / 429 por saturación)."""
-        req = urllib.request.Request(url, headers={"User-Agent": self.UA})
+    def fetch(self, url, name="LRCLIB", headers=None, tries=3):
+        """Pide una dirección con reintentos (los servicios a veces responden 503 / 429 por saturación)."""
+        h = {"User-Agent": self.UA}
+        h.update(headers or {})
+        req = urllib.request.Request(url, headers=h)
         last = ""
-        for attempt in range(4):
+        for attempt in range(tries):
             try:
-                with urllib.request.urlopen(req, timeout=20) as r:
+                with urllib.request.urlopen(req, timeout=12) as r:
                     return json.loads(r.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
                 if e.code == 404:
                     return None
-                last = f"LRCLIB respondió «{e.reason}» ({e.code})"
+                last = f"{name} respondió «{e.reason}» ({e.code})"
                 if e.code not in (429, 500, 502, 503, 504):
                     break
-            except (urllib.error.URLError, TimeoutError, OSError) as e:
-                last = f"No hay conexión con LRCLIB ({getattr(e, 'reason', e)})"
-            time.sleep(1.5 * (attempt + 1))
-        raise RuntimeError(last + ". El servicio puede estar saturado: inténtalo de nuevo en unos minutos.")
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:
+                last = f"No hay conexión con {name} ({getattr(e, 'reason', e)})"
+            time.sleep(1.2 * (attempt + 1))
+        raise RuntimeError(last)
 
     def pick(self, d):
         if not d or d.get("instrumental"):
@@ -1990,7 +2020,7 @@ class LrclibWorker(QThread):
         synced, plain = d.get("syncedLyrics") or "", d.get("plainLyrics") or ""
         return (synced or plain) if self.prefer_synced else (plain or synced)
 
-    def find(self, artist, title, album, dur):
+    def lrclib(self, artist, title, album, dur):
         q = {"track_name": title}
         if artist:
             q["artist_name"] = artist
@@ -2006,6 +2036,8 @@ class LrclibWorker(QThread):
             sq["artist_name"] = artist
         res = self.fetch("https://lrclib.net/api/search?" + urllib.parse.urlencode(sq)) or []
         res = [r for r in res if not r.get("instrumental")]
+        if dur:   # la versión con la duración más parecida primero
+            res.sort(key=lambda r: abs((r.get("duration") or 0) - dur))
         if self.prefer_synced:
             res.sort(key=lambda r: not r.get("syncedLyrics"))
         for r in res:
@@ -2014,17 +2046,92 @@ class LrclibWorker(QThread):
                 return text
         return ""
 
-    def run(self):
-        errors, last = 0, ""
-        for path, artist, title, album, dur in self.jobs:
+    def netease(self, artist, title, dur):
+        h = {"Referer": "https://music.163.com/", "User-Agent": "Mozilla/5.0"}
+        q = urllib.parse.urlencode({"s": f"{title} {artist}".strip(), "type": 1, "limit": 8})
+        d = self.fetch("https://music.163.com/api/search/get/web?" + q, "NetEase", h, tries=2) or {}
+        songs = ((d.get("result") or {}).get("songs")) or []
+        nt, na = _norm(title), _norm(artist)
+        best = None
+        for sg in songs:
+            arts = " ".join(a.get("name", "") for a in sg.get("artists") or [])
+            if nt and nt not in _norm(sg.get("name")) and _norm(sg.get("name")) not in nt:
+                continue
+            if na and na not in _norm(arts) and _norm(arts) not in na:
+                continue   # sin coincidir el artista podría ser otra canción: mejor nada que una letra equivocada
+            if dur and sg.get("duration") and abs(sg["duration"] / 1000 - dur) > 8:
+                continue
+            best = sg
+            break
+        if not best:
+            return ""
+        d = self.fetch(f"https://music.163.com/api/song/lyric?id={best['id']}&lv=1&kv=1&tv=-1", "NetEase", h, tries=2) or {}
+        text = ((d.get("lrc") or {}).get("lyric") or "").strip()
+        # quita las líneas de créditos de NetEase («作词 : …», «作曲 : …»)
+        text = "\n".join(l for l in text.splitlines() if not re.search(r"\]\s*(作词|作曲|编曲|制作人|混音|母带)", l))
+        if not self.prefer_synced and is_lrc(text):
+            text = "\n".join(t for t, _ in parse_lrc(text))
+        return text if len(text.strip()) > 20 else ""
+
+    def lyrics_ovh(self, artist, title):
+        if not artist:
+            return ""
+        d = self.fetch(f"https://api.lyrics.ovh/v1/{urllib.parse.quote(artist)}/{urllib.parse.quote(title)}",
+                       "lyrics.ovh", tries=2) or {}
+        text = (d.get("lyrics") or "").strip()
+        return text if len(text) > 20 else ""
+
+    def find(self, artist, title, album, dur):
+        """Devuelve (letra, fuente). Lanza error solo si NINGÚN servicio respondió."""
+        ca, ct = _main_artist(artist), _clean_title(title)
+        tries = [("LRCLIB", lambda: self.lrclib(artist, title, album, dur))]
+        if (ca, ct) != (artist, title):
+            tries.append(("LRCLIB", lambda: self.lrclib(ca, ct, "", dur)))
+        tries += [("NetEase", lambda: self.netease(ca, ct, dur)), ("lyrics.ovh", lambda: self.lyrics_ovh(ca, ct))]
+        answered, last, plain = False, None, None
+        for name, fn in tries:
             try:
-                self.got.emit(path, self.find(artist, title, album, dur))
-            except Exception as e:  # una canción que falla no cancela las demás
-                errors += 1
-                last = str(e)
-                self.got.emit(path, "")
-        if errors and errors == len(self.jobs):
-            self.failed.emit(last)
+                text = fn()
+                answered = True
+            except Exception as e:
+                last = e
+                continue
+            if text and self.prefer_synced and not is_lrc(text):
+                plain = plain or (text, name)   # hay letra normal: se sigue buscando una sincronizada
+                continue
+            if text:
+                return text, name
+        if plain:
+            return plain
+        if not answered and last is not None:
+            raise last
+        return "", ""
+
+    def run(self):
+        pending, last = list(self.jobs), ""
+        for round_ in range(2):   # si hubo errores de conexión, se reintentan solos una vez más tras una pausa
+            if round_:
+                time.sleep(4)
+            failed = []
+            for job in pending:
+                path, artist, title, album, dur = job
+                try:
+                    text, src = self.find(artist, title, album, dur)
+                except Exception as e:
+                    failed.append(job)
+                    last = str(e)
+                    continue
+                if text:
+                    self.sources[src] = self.sources.get(src, 0) + 1
+                else:
+                    self.not_found.append(path)
+                self.got.emit(path, text)
+            pending = failed
+            if not pending:
+                break
+        self.errored = [j[0] for j in pending]
+        if pending and len(pending) == len(self.jobs):
+            self.failed.emit(last + ". Se reintentó automáticamente sin éxito.")
         else:
             self.finished_all.emit()
 
@@ -2867,6 +2974,7 @@ class SongList(QListWidget):
         if e.button() == Qt.MouseButton.LeftButton:
             self._press = e.position().toPoint()
             self._press_item = self.itemAt(self._press)
+            self._press_unsel = self._press_item is not None and not self._press_item.isSelected()
             self._selecting = True
             it = self._press_item
             if (it is not None and it.isSelected() and len(self.selectedItems()) > 1
@@ -2883,6 +2991,14 @@ class SongList(QListWidget):
         if (self._press is not None and self._press_item is not None
                 and e.buttons() & Qt.MouseButton.LeftButton
                 and (e.position().toPoint() - self._press).manhattanLength() >= QApplication.startDragDistance()):
+            d = e.position().toPoint() - self._press
+            if (self.viewMode() == QListView.ViewMode.ListMode and getattr(self, "_press_unsel", False)
+                    and abs(d.y()) >= abs(d.x())):
+                # modo lista/detalles: arrastrar hacia arriba/abajo desde una canción no elegida = sombrear varias
+                # (para mover archivos: arrastra una ya elegida, o hacia un lado)
+                self._press, self._press_item = None, None
+                super().mouseMoveEvent(e)
+                return
             item, self._press, self._press_item = self._press_item, None, None
             self._keep_multi = None
             self.begin_drag(item)
@@ -3283,7 +3399,8 @@ class Main(QMainWindow):
         self.lyrics.textChanged.connect(self.on_lyrics_edit)
         lv.addWidget(self.lyr_status)
         lv.addWidget(self.lyrics)
-        self.btn_lyr = QPushButton("🔎 Buscar letra en LRCLIB (sincronizada)")
+        self.btn_lyr = QPushButton("🔎 Buscar letra (sincronizada)")
+        self.btn_lyr.setToolTip("Busca en LRCLIB; si no está, en NetEase y lyrics.ovh. Reintenta solo si falla la conexión.")
         self.btn_lyr.clicked.connect(self.run_lyrics)
         lv.addWidget(self.btn_lyr)
 
@@ -5678,8 +5795,8 @@ class Main(QMainWindow):
         self.cfg.setValue(f"model_{prov}", model)
         return prov, model, key
 
-    def run_lyrics(self):
-        paths = list(self.cur_paths)
+    def run_lyrics(self, paths=None):
+        paths = list(paths or self.cur_paths)
         if not paths:
             QMessageBox.information(self, "LRCLIB", "Selecciona una o varias canciones primero.")
             return
@@ -5729,14 +5846,80 @@ class Main(QMainWindow):
 
     def lyrics_done(self):
         self.btn_lyr.setEnabled(True)
-        self.statusBar().showMessage(
-            f"Letra puesta en {self.lyr_ok} de {self.lyr_total} canciones (en naranja). "
-            "Revísalas y pulsa «Guardar». En las demás, LRCLIB no tiene la letra.")
+        w = self.lyr_worker
+        src = ", ".join(f"{k}: {v}" for k, v in w.sources.items())
+        msg = T(f"Letra puesta en {self.lyr_ok} de {self.lyr_total} canciones (en naranja). Revísalas y pulsa «Guardar».")
+        if src:
+            msg += f"  ({src})"
+        if w.errored:
+            msg += " " + T(f"{len(w.errored)} no se pudieron consultar (sin conexión).")
+        self.statusBar().showMessage(msg)
+        if self.lyr_total == 1 and self.lyr_ok == 0:   # una sola canción y no apareció: ofrece otras opciones
+            self.lyrics_options(w.jobs[0][0], T("Ningún servicio (LRCLIB, NetEase, lyrics.ovh) tiene la letra de esta canción."))
+        elif w.errored:
+            self.lyrics_options(None, T(f"{len(w.errored)} canción(es) no se pudieron consultar por problemas de conexión."),
+                                retry=w.errored)
 
     def lyrics_failed(self, msg):
         self.btn_lyr.setEnabled(True)
-        self.statusBar().showMessage("Falló la consulta de letras.")
-        QMessageBox.warning(self, "Error de LRCLIB", msg)
+        self.statusBar().showMessage(T("Falló la consulta de letras."))
+        w = self.lyr_worker
+        self.lyrics_options(w.jobs[0][0] if len(w.jobs) == 1 else None,
+                            T("No se pudo conectar con los servicios de letras.") + "\n\n" + msg,
+                            retry=[j[0] for j in w.jobs])
+
+    def lyrics_options(self, path, msg, retry=None):
+        """Si la letra no aparece (o falla la conexión): reintentar, buscarla en Google, cargar un .lrc o escribirla."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle(T("Letra"))
+        box.setText(msg)
+        box.setInformativeText(T("¿Qué quieres hacer?"))
+        b_retry = box.addButton(T("Reintentar"), QMessageBox.ButtonRole.AcceptRole) if retry else None
+        b_web = b_lrc = b_hand = None
+        if path:
+            b_web = box.addButton(T("Buscar en Google"), QMessageBox.ButtonRole.ActionRole)
+            b_lrc = box.addButton(T("Cargar archivo .lrc…"), QMessageBox.ButtonRole.ActionRole)
+            b_hand = box.addButton(T("Escribirla / pegarla"), QMessageBox.ButtonRole.ActionRole)
+        box.addButton(T("Cerrar"), QMessageBox.ButtonRole.RejectRole)
+        i18n.retranslate(box)
+        box.exec()
+        c = box.clickedButton()
+        if c is None:
+            return
+        if c is b_retry:
+            self.run_lyrics([p for p in retry if p])
+        elif c is b_web:
+            q = f"{self.val(path, 'artist')} {self.val(path, 'title') or os.path.splitext(os.path.basename(path))[0]} lrc letra"
+            QDesktopServices.openUrl(QUrl("https://www.google.com/search?q=" + urllib.parse.quote(q.strip())))
+        elif c is b_lrc:
+            self.load_lrc_file(path)
+        elif c is b_hand:
+            self.show_right_tab(1)
+            self.lyrics.setFocus()
+
+    def load_lrc_file(self, path):
+        fn, _ = QFileDialog.getOpenFileName(self, T("Cargar letra"), os.path.dirname(path),
+                                            T("Letras") + " (*.lrc *.txt);;" + T("Todos") + " (*.*)")
+        if not fn:
+            return
+        text = ""
+        for enc in ("utf-8-sig", "cp1252", "latin-1"):
+            try:
+                with open(fn, "r", encoding=enc) as fh:
+                    text = fh.read()
+                break
+            except (UnicodeDecodeError, OSError):
+                continue
+        if not text.strip():
+            QMessageBox.warning(self, T("Letra"), T("El archivo está vacío o no se pudo leer."))
+            return
+        self.pending.setdefault(path, {})["lyrics"] = text.strip()
+        self.mark_items()
+        if self.current_path() == path:
+            self.show_current(path, len(self.cur_paths))
+        self.show_right_tab(1)
+        self.statusBar().showMessage(T("Letra cargada (pendiente de guardar)."))
 
     def open_meta_ai(self):
         path = self.current_path()
