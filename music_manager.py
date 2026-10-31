@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.72"
+APP_VERSION = "1.73"
 
 
 class TMenu(QMenu):
@@ -846,6 +846,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.73', [
+        'Rellenar metadatos: cada opción del desplegable dice de dónde salió («Tusa ← iTunes, Deezer», «Reggaeton ← MusicBrainz», «Latin Trap ← IA»). Si varias fuentes dan lo mismo, aparece una vez con todas sus fuentes. Al elegir una, en el campo queda solo el valor.',
+    ]),
     ('1.72', [
         'Barra de abajo (estilo celular): el mensaje ya no sale en un recuadro negro con toda la ruta. Ahora es una pastilla discreta con los colores del tema y solo dice la carpeta y cuántas canciones tiene («Armonía 10 · 37 canciones»); si un texto es largo se recorta por el medio.',
     ]),
@@ -1322,7 +1325,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.72 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.73 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2375,21 +2378,26 @@ class MetaAIWorker(AIBase):
             return
         t, a = self._norm(self.title), self._norm(self.artist)
         try:
-            for r in tagsource.musicbrainz(self.artist, self.title, ""):
+            hits = 0
+            for r in tagsource.musicbrainz(self.artist, self.title, ""):   # varios lanzamientos = varias opciones
                 if self._norm(r.get("title")) == t and (not a or a in self._norm(r.get("artist")) or self._norm(r.get("artist")) in a):
-                    self.sources.append(("MusicBrainz", {k: v for k, v in r.items()
-                                                         if k in EASY_KEYS and v}))
-                    break
+                    self.sources.append(("MusicBrainz", {k: v for k, v in r.items() if k in EASY_KEYS and v}))
+                    hits += 1
+                    if hits >= 4:
+                        break
         except Exception:
             pass
         if self.discogs_token:
             try:
+                hits = 0
                 for r in tagsource.discogs(self.artist, self.title, found.get("album", ""), self.discogs_token):
                     if not a or a in self._norm(r.get("artist")) or self._norm(r.get("artist")) in a:
                         d = {k: v for k, v in r.items() if k in EASY_KEYS and v}
                         d.pop("title", None)
                         self.sources.append(("Discogs", d))
-                        break
+                        hits += 1
+                        if hits >= 3:
+                            break
             except Exception:
                 pass
 
@@ -2453,14 +2461,19 @@ class MetaAIWorker(AIBase):
         if ai:
             self.sources.append(("IA", ai))
         opts = {}
-        for src, d in self.sources:   # todas las respuestas, campo por campo, sin repetir
+        for src, d in self.sources:   # todas las respuestas, campo por campo; si coinciden, se juntan sus fuentes
             for k, v in d.items():
                 v = str(v).strip()
                 if k not in EASY_KEYS or not v:
                     continue
                 lst = opts.setdefault(k, [])
-                if all(v.lower() != x.lower() for x, _ in lst):
-                    lst.append((v, src))
+                for entry in lst:
+                    if entry[0].lower() == v.lower():
+                        if src not in entry[1]:
+                            entry[1].append(src)
+                        break
+                else:
+                    lst.append([v, [src]])
         if not data and err:
             self.failed.emit(err)
         else:
@@ -2545,22 +2558,25 @@ class MetaAIDialog(QDialog):
             return
         opts = data.pop("_options", {})
         for k, cb in self.res.items():
+            try:
+                cb.activated.disconnect()
+            except TypeError:
+                pass
             cb.clear()
             best = data.get(k, "")
-            choices = list(opts.get(k, []))
-            if best and all(best.lower() != v.lower() for v, _ in choices):
-                choices.insert(0, (best, "IA"))
-            for v_, src in choices:
-                cb.addItem(f"{v_}", v_)
-                cb.setItemData(cb.count() - 1, T(f"Fuente: {src}"), Qt.ItemDataRole.ToolTipRole)
-            cb.setCurrentText(best)
+            choices = [(v_, list(srcs_)) for v_, srcs_ in opts.get(k, [])]
+            if best and all(best.lower() != v_.lower() for v_, _ in choices):
+                choices.insert(0, (best, ["IA"]))
+            for v_, srcs_ in choices:   # cada opción dice de dónde salió
+                cb.addItem(f"{v_}     ←  {', '.join(T(x) for x in srcs_)}", v_)
+                cb.setItemData(cb.count() - 1, T("Fuente: ") + ", ".join(T(x) for x in srcs_), Qt.ItemDataRole.ToolTipRole)
+            # al elegir una opción, en el cuadro queda solo el valor (sin el nombre de la fuente)
+            cb.activated.connect(lambda i, cb=cb: cb.setEditText(str(cb.itemData(i) or "")))
+            cb.setEditText(best)
             n_ = len(choices)
-            cb.setToolTip(T(f"{n_} opciones: ") + " · ".join(f"{v_} ({src})" for v_, src in choices) if n_ > 1 else "")
-            if n_ > 1:   # se nota qué campos tienen varias opciones
-                cb.setStyleSheet("QComboBox { border: 1px solid palette(highlight); }")
-            else:
-                cb.setStyleSheet("")
-        srcs = sorted({src for lst in opts.values() for _, src in lst})
+            cb.setToolTip(T(f"{n_} opciones: ") + " · ".join(f"{v_} ({', '.join(srcs_)})" for v_, srcs_ in choices) if n_ else "")
+            cb.setStyleSheet("QComboBox { border: 1px solid palette(highlight); }" if n_ > 1 else "")
+        srcs = sorted({src for lst in opts.values() for _, srcs_ in lst for src in srcs_})
         self.res_box.setEnabled(True)
         self.apply_btn.setEnabled(True)
         self.status.setText(T("Fuentes: ") + (", ".join(srcs) or "IA") + ". " +

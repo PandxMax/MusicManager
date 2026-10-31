@@ -896,3 +896,5 @@ ROWS += [
 ]
 
 ROWS += [("%s · %s canciones", "%s · %s songs", "%s · песен: %s")]
+
+ROWS += [("Fuente: ", "Source: ", "Источник: ")]

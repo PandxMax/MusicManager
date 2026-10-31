@@ -454,3 +454,7 @@ VERSIÓN 1.71
 VERSIÓN 1.72
 ------------
  - Mensaje de la barra de abajo más discreto y corto (carpeta · número de canciones).
+
+VERSIÓN 1.73
+------------
+ - Rellenar metadatos: cada opción indica su fuente (iTunes, Deezer, MusicBrainz, Discogs, IA).
