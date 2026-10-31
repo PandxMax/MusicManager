@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.77"
+APP_VERSION = "1.78"
 
 
 class TMenu(QMenu):
@@ -848,6 +848,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.78', [
+        'Vista detalles: la fila de títulos de las columnas (Nombre, Título, Intérprete, Álbum, Género, Año…) a veces se quedaba cortada a la mitad al cambiar el tamaño de la lista; ahora ocupa siempre todo el ancho.',
+    ]),
     ('1.77', [
         'La barrita ahora oculta SOLO los metadatos: la lista de canciones baja hasta abajo, y la portada y Géneros/Letra se quedan a la derecha como siempre. «Mostrar metadatos» (debajo de la lista) los vuelve a sacar.',
     ]),
@@ -1341,7 +1344,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.77 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.78 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()

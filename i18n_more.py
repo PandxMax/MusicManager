@@ -929,3 +929,8 @@ ROWS += [
      "The bar now hides ONLY the tags: the song list extends to the bottom, and the cover and Genres/Lyrics stay on the right as always. “Show tags” (below the list) brings them back.",
      "Полоска теперь скрывает ТОЛЬКО метаданные: список песен тянется до низа, а обложка и Жанры/Текст остаются справа. «Показать метаданные» (под списком) возвращает их."),
 ]
+ROWS += [
+    ("Vista detalles: la fila de títulos de las columnas (Nombre, Título, Intérprete, Álbum, Género, Año…) a veces se quedaba cortada a la mitad al cambiar el tamaño de la lista; ahora ocupa siempre todo el ancho.",
+     "Details view: the column title row (Name, Title, Artist, Album, Genre, Year…) was sometimes cut in half when the list changed size; it now always spans the full width.",
+     "Режим «Подробно»: строка заголовков столбцов (Имя, Название, Исполнитель, Альбом, Жанр, Год…) иногда обрезалась при изменении размера списка; теперь она всегда на всю ширину."),
+]

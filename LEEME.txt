@@ -476,3 +476,7 @@ VERSIÓN 1.76
 VERSIÓN 1.77
 ------------
  - La barrita oculta solo los metadatos; la letra y los géneros se quedan a la derecha.
+
+VERSIÓN 1.78
+------------
+ - Vista detalles: la cabecera de columnas ya no se queda cortada.

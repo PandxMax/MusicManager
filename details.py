@@ -2,7 +2,7 @@
 bitrate, frecuencia, códec… que se pueden ordenar con un clic, cambiar de ancho y ocultar.
 Se dibuja sobre la misma lista de siempre, así la selección, el arrastre y todo lo demás siguen funcionando igual."""
 import os, re
-from PyQt6.QtCore import Qt, QSize, QRect, QObject, QEvent
+from PyQt6.QtCore import Qt, QSize, QRect, QObject, QEvent, QTimer
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from PyQt6.QtWidgets import (QHeaderView, QStyledItemDelegate, QStyle, QStyleOptionViewItem, QApplication, QMenu,
                              QAbstractItemView)
@@ -185,6 +185,7 @@ class DetailsView(QObject):
                 pass
         lst.horizontalScrollBar().valueChanged.connect(self.header.setOffset)
         lst.installEventFilter(self)
+        lst.viewport().installEventFilter(self)   # el viewport cambia de tamaño DESPUÉS que la lista
         self.update_indicator()
 
     # ------------------------------------------------------------ activar / desactivar
@@ -205,8 +206,11 @@ class DetailsView(QObject):
         self.relayout()
 
     def eventFilter(self, obj, ev):
-        if obj is self.list and ev.type() in (QEvent.Type.Resize, QEvent.Type.Show):
+        if ev.type() in (QEvent.Type.Resize, QEvent.Type.Show) and (
+                obj is self.list or obj is self.list.viewport()):
             self.place()
+            if obj is self.list:   # la geometría del viewport aún es la vieja: se vuelve a colocar enseguida
+                QTimer.singleShot(0, self.place)
         return False
 
     def place(self):
@@ -215,6 +219,7 @@ class DetailsView(QObject):
         vp = self.list.viewport().geometry()
         h = self.header.sizeHint().height()
         self.header.setGeometry(vp.x(), vp.y() - h, vp.width(), h)
+        self.header.raise_()
         self.header.setOffset(self.list.horizontalScrollBar().value())
 
     def relayout(self):
