@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.70"
+APP_VERSION = "1.71"
 
 
 class TMenu(QMenu):
@@ -846,6 +846,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.71', [
+        '«Rellenar con IA» ahora busca en iTunes, Deezer, MusicBrainz (gratis) y Discogs (si pusiste tu token en Ajustes), además de la IA.',
+        'En el resultado, cada campo es un desplegable con las opciones que dio cada fuente (por ejemplo, el álbum según iTunes, Deezer o MusicBrainz): eliges la que prefieras o escribes otra. Los campos con varias opciones se marcan con un borde de color y, al pasar el ratón por cada opción, se ve de qué fuente viene.',
+    ]),
     ('1.70', [
         'Corregido: después de arrastrar canciones se quedaba pintado el recuadro morado de selección encima de la lista.',
         'Clic derecho más ordenado: arriba lo de siempre (reproducir, cortar, copiar, pegar, renombrar, eliminar) y el resto agrupado en submenús: Herramientas, el artista, «Al otro árbol» y «Vista y orden».',
@@ -1315,7 +1319,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.70 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.71 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2280,9 +2284,11 @@ class MetaAIWorker(AIBase):
     """Pide a la IA los metadatos de una canción a partir del título y el artista."""
     result = pyqtSignal(dict)
 
-    def __init__(self, provider, model, key, title, artist):
+    def __init__(self, provider, model, key, title, artist, discogs_token=""):
         super().__init__(provider, model, key)
         self.title, self.artist = title, artist
+        self.discogs_token = discogs_token or ""
+        self.sources = []
 
     @staticmethod
     def _norm(t):
@@ -2319,28 +2325,68 @@ class MetaAIWorker(AIBase):
                        "album": coll, "albumartist": best.get("collectionArtistName") or best.get("artistName", ""),
                        "genre": best.get("primaryGenreName", ""), "date": min(years) if years else (best.get("releaseDate") or "")[:4],
                        "tracknumber": str(best.get("trackNumber") or ""), "discnumber": str(best.get("discNumber") or "")}
+                self.sources.append(("iTunes", dict(out)))
         except Exception:
             pass
-        if not out.get("album"):
+        if True:   # Deezer siempre: aporta otra opción para elegir
             try:
                 q = quote_plus(f'artist:"{self.artist}" track:"{self.title}"' if self.artist else self.title)
                 d = self._get(f"https://api.deezer.com/search?q={q}&limit=5")
-                hit = (d.get("data") or [None])[0]
+                hit = None
+                for h in d.get("data") or []:   # solo si de verdad es la misma canción
+                    ht, ha = self._norm(h.get("title")), self._norm((h.get("artist") or {}).get("name"))
+                    if (ht == t or (t and (t in ht or ht in t))) and (not a or a in ha or ha in a):
+                        hit = h
+                        break
                 if hit:
                     tr = self._get(f"https://api.deezer.com/track/{hit['id']}")
-                    out.update({k: v for k, v in {
-                        "title": tr.get("title", ""), "artist": (tr.get("artist") or {}).get("name", ""),
-                        "album": (tr.get("album") or {}).get("title", ""),
-                        "albumartist": (tr.get("artist") or {}).get("name", ""),
-                        "date": (tr.get("release_date") or "")[:4],
-                        "tracknumber": str(tr.get("track_position") or ""),
-                        "discnumber": str(tr.get("disk_number") or "")}.items() if v and not out.get(k)})
+                    dz = {"title": tr.get("title", ""), "artist": (tr.get("artist") or {}).get("name", ""),
+                          "album": (tr.get("album") or {}).get("title", ""),
+                          "albumartist": (tr.get("artist") or {}).get("name", ""),
+                          "date": (tr.get("release_date") or "")[:4],
+                          "tracknumber": str(tr.get("track_position") or ""),
+                          "discnumber": str(tr.get("disk_number") or "")}
+                    dz = {k: v for k, v in dz.items() if v}
+                    self.sources.append(("Deezer", dz))
+                    out.update({k: v for k, v in dz.items() if not out.get(k)})
             except Exception:
                 pass
         return {k: v for k, v in out.items() if v}
 
+    def more_sources(self, found):
+        """MusicBrainz (gratis) y Discogs (si tienes token): más opciones para elegir campo por campo."""
+        try:
+            import tagsource
+        except Exception:
+            return
+        t, a = self._norm(self.title), self._norm(self.artist)
+        try:
+            for r in tagsource.musicbrainz(self.artist, self.title, ""):
+                if self._norm(r.get("title")) == t and (not a or a in self._norm(r.get("artist")) or self._norm(r.get("artist")) in a):
+                    self.sources.append(("MusicBrainz", {k: v for k, v in r.items()
+                                                         if k in EASY_KEYS and v}))
+                    break
+        except Exception:
+            pass
+        if self.discogs_token:
+            try:
+                for r in tagsource.discogs(self.artist, self.title, found.get("album", ""), self.discogs_token):
+                    if not a or a in self._norm(r.get("artist")) or self._norm(r.get("artist")) in a:
+                        d = {k: v for k, v in r.items() if k in EASY_KEYS and v}
+                        d.pop("title", None)
+                        self.sources.append(("Discogs", d))
+                        break
+            except Exception:
+                pass
+
     def run(self):
+        self.sources = []
         found = self.catalog()
+        self.more_sources(found)
+        for _src, d in self.sources:   # lo que falte en iTunes/Deezer se completa con MusicBrainz o Discogs
+            for k, v in d.items():
+                if v and not found.get(k):
+                    found[k] = v
         system = ("Eres un asistente experto en metadatos musicales. Respondes SOLO con un objeto JSON válido, sin texto "
                   "extra ni bloques de código. Tu trabajo es RELLENAR TODOS LOS CAMPOS con los datos oficiales de la "
                   "canción. Solo deja un campo vacío si ese dato de verdad no existe o no lo conoces en absoluto.")
@@ -2390,9 +2436,21 @@ class MetaAIWorker(AIBase):
             if data.get(k):
                 data[k] = m.group(0) if m else ""
         data = {k: v for k, v in data.items() if v}
+        if ai:
+            self.sources.append(("IA", ai))
+        opts = {}
+        for src, d in self.sources:   # todas las respuestas, campo por campo, sin repetir
+            for k, v in d.items():
+                v = str(v).strip()
+                if k not in EASY_KEYS or not v:
+                    continue
+                lst = opts.setdefault(k, [])
+                if all(v.lower() != x.lower() for x, _ in lst):
+                    lst.append((v, src))
         if not data and err:
             self.failed.emit(err)
         else:
+            data["_options"] = opts
             self.result.emit(data)
 
 
@@ -2428,9 +2486,12 @@ class MetaAIDialog(QDialog):
         rf = QFormLayout(self.res_box)
         self.res = {}
         for k, n in FIELDS:
-            le = QLineEdit()
-            self.res[k] = le
-            rf.addRow(n, le)
+            cb = QComboBox()
+            cb.setEditable(True)            # se puede elegir una opción o escribir otra
+            cb.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+            cb.setMinimumContentsLength(18)
+            self.res[k] = cb
+            rf.addRow(n, cb)
         self.res_box.setEnabled(False)
         v.addWidget(self.res_box, 1)
         row = QHBoxLayout()
@@ -2451,9 +2512,10 @@ class MetaAIDialog(QDialog):
             self.status.setText("Escribe el nombre de la canción.")
             return
         self.go.setEnabled(False)
-        self.status.setText("Buscando en iTunes/Deezer y con la IA…")
+        self.status.setText("Buscando en iTunes, Deezer, MusicBrainz, Discogs y con la IA…")
         prov, model, key = self.settings
-        self.worker = MetaAIWorker(prov, model, key, t, a)
+        tok = str(self.main.cfg.value("discogs_token", "") or "").strip()
+        self.worker = MetaAIWorker(prov, model, key, t, a, tok)
         self.worker.result.connect(self.on_result)
         self.worker.failed.connect(self.on_fail)
         self.worker.start()
@@ -2467,14 +2529,31 @@ class MetaAIDialog(QDialog):
         if not data:
             self.status.setText("La IA no encontró datos fiables de esa canción. Prueba a escribir mejor el título o el artista.")
             return
-        for k, le in self.res.items():
-            le.setText(data.get(k, ""))
+        opts = data.pop("_options", {})
+        for k, cb in self.res.items():
+            cb.clear()
+            best = data.get(k, "")
+            choices = list(opts.get(k, []))
+            if best and all(best.lower() != v.lower() for v, _ in choices):
+                choices.insert(0, (best, "IA"))
+            for v_, src in choices:
+                cb.addItem(f"{v_}", v_)
+                cb.setItemData(cb.count() - 1, T(f"Fuente: {src}"), Qt.ItemDataRole.ToolTipRole)
+            cb.setCurrentText(best)
+            n_ = len(choices)
+            cb.setToolTip(T(f"{n_} opciones: ") + " · ".join(f"{v_} ({src})" for v_, src in choices) if n_ > 1 else "")
+            if n_ > 1:   # se nota qué campos tienen varias opciones
+                cb.setStyleSheet("QComboBox { border: 1px solid palette(highlight); }")
+            else:
+                cb.setStyleSheet("")
+        srcs = sorted({src for lst in opts.values() for _, src in lst})
         self.res_box.setEnabled(True)
         self.apply_btn.setEnabled(True)
-        self.status.setText("Revisa los datos. Solo se aplican los campos que no estén vacíos.")
+        self.status.setText(T("Fuentes: ") + (", ".join(srcs) or "IA") + ". " +
+                            T("Los campos con borde de color tienen varias opciones: ábrelos para elegir. Solo se aplican los campos que no estén vacíos."))
 
     def apply(self):
-        vals = {k: le.text().strip() for k, le in self.res.items() if le.text().strip()}
+        vals = {k: cb.currentText().strip() for k, cb in self.res.items() if cb.currentText().strip()}
         self.main.apply_ai_meta(self.path, vals)
         self.accept()
 

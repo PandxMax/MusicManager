@@ -446,3 +446,7 @@ VERSIÓN 1.70
  - Corregido el recuadro de selección que se quedaba pintado tras arrastrar.
  - Clic derecho más ordenado (submenús) e iconos más claros.
  - Géneros en lote: elegir cualquier carpeta; también desde clic derecho en carpetas.
+
+VERSIÓN 1.71
+------------
+ - Rellenar con IA: busca también en MusicBrainz y Discogs; cada campo es un desplegable con las opciones de cada fuente.

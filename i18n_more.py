@@ -884,3 +884,13 @@ ROWS += [
     ("Carpeta «%s»", "Folder “%s”", "Папка «%s»"), ("Carpeta «%s» y sus subcarpetas", "Folder “%s” and its subfolders", "Папка «%s» и подпапки"),
     ("📂 Mostrar carpeta en el Explorador", "📂 Show folder in Explorer", "📂 Показать папку в Проводнике"),
 ]
+
+ROWS += [
+    ("Buscando en iTunes, Deezer, MusicBrainz, Discogs y con la IA…", "Searching iTunes, Deezer, MusicBrainz, Discogs and the AI…",
+     "Поиск в iTunes, Deezer, MusicBrainz, Discogs и через ИИ…"),
+    ("Fuente: %s", "Source: %s", "Источник: %s"), ("%s opciones: ", "%s options: ", "Вариантов: %s: "),
+    ("Fuentes: ", "Sources: ", "Источники: "),
+    ("Los campos con borde de color tienen varias opciones: ábrelos para elegir. Solo se aplican los campos que no estén vacíos.",
+     "Fields with a colored border have several options: open them to choose. Only non-empty fields are applied.",
+     "Поля с цветной рамкой содержат несколько вариантов: откройте и выберите. Применяются только заполненные поля."),
+]
