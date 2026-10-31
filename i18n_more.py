@@ -898,3 +898,8 @@ ROWS += [
 ROWS += [("%s · %s canciones", "%s · %s songs", "%s · песен: %s")]
 
 ROWS += [("Fuente: ", "Source: ", "Источник: ")]
+ROWS += [
+    ("Renombrar una canción (F2 o clic derecho → Renombrar) ahora se hace ahí mismo, sobre el nombre en la lista, como en el Explorador de Windows: escribes y pulsas Enter (Esc cancela). Ya no sale la ventanita.",
+     "Renaming a song (F2 or right-click → Rename) now happens right there, on the name in the list, like in Windows Explorer: type and press Enter (Esc cancels). No more little dialog.",
+     "Переименование песни (F2 или правый клик → Переименовать) теперь происходит прямо в списке, как в Проводнике Windows: введите имя и нажмите Enter (Esc — отмена). Окошко больше не появляется."),
+]

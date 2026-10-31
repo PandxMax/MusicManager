@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.74"
+APP_VERSION = "1.75"
 
 
 class TMenu(QMenu):
@@ -846,6 +846,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.75', [
+        'Renombrar una canción (F2 o clic derecho → Renombrar) ahora se hace ahí mismo, sobre el nombre en la lista, como en el Explorador de Windows: escribes y pulsas Enter (Esc cancela). Ya no sale la ventanita.',
+    ]),
     ('1.74', [
         'Botones en la miniatura de la barra de tareas: al pasar el ratón por el icono de Music Manager en la barra de Windows aparecen «Anterior», «Reproducir / Pausa» y «Siguiente», como en los reproductores de música.',
         'Solo una ventana del programa: si lo vuelves a abrir estando ya abierto, el anterior se cierra y se abre de nuevo (si tenías cambios sin guardar, te pregunta antes).',
@@ -1329,7 +1332,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.74 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.75 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4796,6 +4799,10 @@ class Main(QMainWindow):
             return
         if len(paths) == 1:
             p = paths[0]
+            r = self.row_index.get(p)
+            if r is not None:   # se edita el nombre ahí mismo, como en el Explorador
+                self.start_inline_rename(self.list.item(r), p)
+                return
             base, ext = os.path.splitext(os.path.basename(p))
             new, ok = QInputDialog.getText(self, "Renombrar archivo", f"Nuevo nombre (sin «{ext}»):", text=base)
             if not ok:
@@ -4808,6 +4815,42 @@ class Main(QMainWindow):
                 return
             res = [(p, self.pattern_name(p, pat)) for p in paths]
         self.do_renames(res)
+
+    def start_inline_rename(self, it, path):
+        if not getattr(self, "_inline_hooked", False):
+            self._inline_hooked = True
+            self.list.itemChanged.connect(self.inline_changed)
+            for d in {self.list.itemDelegate(), getattr(getattr(self, "details", None), "delegate", None),
+                      getattr(getattr(self, "details", None), "normal_delegate", None)}:
+                if d is not None:
+                    d.closeEditor.connect(lambda *_: QTimer.singleShot(0, self.inline_end))
+        self._inline = (it, path, it.text())
+        it.setFlags(it.flags() | Qt.ItemFlag.ItemIsEditable)
+        self.list.scrollToItem(it)
+        self.list.setCurrentItem(it)
+        self.list.editItem(it)
+
+    def inline_changed(self, it):
+        info = getattr(self, "_inline", None)
+        if not info or it is not info[0] or it.text() == info[2]:
+            return
+        self._inline = None
+        it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        new = safe_filename(it.text().strip())
+        old_path = info[1]
+        if not new:
+            it.setText(info[2])
+            return
+        QTimer.singleShot(0, lambda: self.do_renames([(old_path, new)]))
+
+    def inline_end(self):
+        info = getattr(self, "_inline", None)
+        if info:   # se canceló (Esc) o no cambió nada
+            self._inline = None
+            try:
+                info[0].setFlags(info[0].flags() & ~Qt.ItemFlag.ItemIsEditable)
+            except RuntimeError:
+                pass
 
     def do_renames(self, res):
         done, errors, newpaths = 0, [], []

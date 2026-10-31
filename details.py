@@ -90,6 +90,13 @@ class DetailsDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index):
         return QSize(max(200, self.ctl.header.length()), ROW_H)
 
+    def updateEditorGeometry(self, editor, option, index):
+        """Al renombrar en la vista detalles, el cuadro de edición va solo en la columna del nombre."""
+        h = self.ctl.header
+        x = option.rect.x() + h.sectionPosition(0) + 28
+        w = max(120, h.sectionSize(0) - 30)
+        editor.setGeometry(QRect(x, option.rect.y() + 1, w, option.rect.height() - 2))
+
     def paint(self, p, option, index):
         opt = QStyleOptionViewItem(option)
         self.initStyleOption(opt, index)

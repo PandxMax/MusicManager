@@ -463,3 +463,7 @@ VERSIÓN 1.74
 ------------
  - Botones Anterior / Play / Siguiente en la miniatura de la barra de tareas.
  - Solo una ventana del programa: al volver a abrirlo, el anterior se cierra.
+
+VERSIÓN 1.75
+------------
+ - Renombrar se hace directamente sobre el nombre en la lista (como en el Explorador).
