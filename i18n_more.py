@@ -918,3 +918,14 @@ ROWS += [
      "Settings → General: “Bar to collapse and expand the tags and lyrics”, to turn it on or off whenever you want.",
      "Настройки → Общие: «Полоска для сворачивания и разворачивания метаданных и текста» — включайте или отключайте когда угодно."),
 ]
+ROWS += [
+    ("Ocultar metadatos", "Hide tags", "Скрыть метаданные"),
+    ("Mostrar metadatos", "Show tags", "Показать метаданные"),
+    ("Ocultar o mostrar los metadatos (se puede desactivar en Ajustes → General)",
+     "Hide or show the tags (can be turned off in Settings → General)",
+     "Скрыть или показать метаданные (можно отключить в Настройки → Общие)"),
+    ("Barrita para ocultar y mostrar los metadatos", "Bar to hide and show the tags", "Полоска для скрытия и показа метаданных"),
+    ("La barrita ahora oculta SOLO los metadatos: la lista de canciones baja hasta abajo, y la portada y Géneros/Letra se quedan a la derecha como siempre. «Mostrar metadatos» (debajo de la lista) los vuelve a sacar.",
+     "The bar now hides ONLY the tags: the song list extends to the bottom, and the cover and Genres/Lyrics stay on the right as always. “Show tags” (below the list) brings them back.",
+     "Полоска теперь скрывает ТОЛЬКО метаданные: список песен тянется до низа, а обложка и Жанры/Текст остаются справа. «Показать метаданные» (под списком) возвращает их."),
+]

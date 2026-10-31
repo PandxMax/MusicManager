@@ -472,3 +472,7 @@ VERSIÓN 1.76
 ------------
  - Los metadatos y la letra se pliegan/despliegan con una barrita encima (la lista y la portada ganan espacio).
  - Ajustes → General: activar o quitar esa barrita.
+
+VERSIÓN 1.77
+------------
+ - La barrita oculta solo los metadatos; la letra y los géneros se quedan a la derecha.

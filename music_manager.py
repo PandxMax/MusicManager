@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.76"
+APP_VERSION = "1.77"
 
 
 class TMenu(QMenu):
@@ -848,6 +848,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.77', [
+        'La barrita ahora oculta SOLO los metadatos: la lista de canciones baja hasta abajo, y la portada y Géneros/Letra se quedan a la derecha como siempre. «Mostrar metadatos» (debajo de la lista) los vuelve a sacar.',
+    ]),
     ('1.76', [
         'Los metadatos y la letra se pueden plegar y desplegar con la barrita que tienen encima: al plegarlos, la lista y la portada ocupan todo el espacio. El programa recuerda cómo lo dejaste.',
         'Ajustes → General: «Barrita para plegar y desplegar los metadatos y la letra», para activarla o quitarla cuando quieras.',
@@ -1338,7 +1341,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.76 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.77 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3215,6 +3218,18 @@ class Main(QMainWindow):
         self.btn_lyr.clicked.connect(self.run_lyrics)
         lv.addWidget(self.btn_lyr)
 
+        def make_fold_btn():
+            fb = QToolButton()
+            fb.setObjectName("foldbar")
+            fb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            fb.setCursor(Qt.CursorShape.PointingHandCursor)
+            fb.setIconSize(QSize(14, 14))
+            fb.setFixedHeight(24)
+            fb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            fb.clicked.connect(lambda: self.set_meta_open(not self.meta_open))
+            return fb
+        self.fold_btn = make_fold_btn()    # encima de los metadatos: «Ocultar metadatos»
+        self.fold_btn2 = make_fold_btn()   # debajo de la lista cuando están ocultos: «Mostrar metadatos»
         bottom = QWidget()
         self.bottom_w = bottom
         bl = QHBoxLayout(bottom)
@@ -3462,8 +3477,15 @@ class Main(QMainWindow):
         top_split.addWidget(self.list_pane)
         top_split.addWidget(coverw)
         bottom_split = QSplitter(Qt.Orientation.Horizontal)    # fila de abajo: metadatos | géneros/letra
-        bottom_split.addWidget(bottom)
+        meta_col = QWidget()
+        mc_l = QVBoxLayout(meta_col)
+        mc_l.setContentsMargins(0, 0, 0, 0)
+        mc_l.setSpacing(0)
+        mc_l.addWidget(self.fold_btn)
+        mc_l.addWidget(bottom, 1)
+        bottom_split.addWidget(meta_col)
         bottom_split.addWidget(rightlow)
+        self.rightlow, self.cover_w = rightlow, coverw
         for sp in (top_split, bottom_split):
             sp.setStretchFactor(0, 1)
             sp.setStretchFactor(1, 0)
@@ -3482,25 +3504,10 @@ class Main(QMainWindow):
         self.top_split, self.bottom_split = top_split, bottom_split
         self.bottom_stack = QStackedWidget()                   # página 0: metadatos…; página 1: espectrograma a todo el ancho
         self.bottom_stack.addWidget(bottom_split)
-        # barra para plegar / desplegar la fila de los metadatos (se activa o desactiva en Ajustes → General)
-        self.meta_wrap = QWidget()
-        mw_l = QVBoxLayout(self.meta_wrap)
-        mw_l.setContentsMargins(0, 0, 0, 0)
-        mw_l.setSpacing(0)
-        self.fold_btn = QToolButton()
-        self.fold_btn.setObjectName("foldbar")
-        self.fold_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.fold_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.fold_btn.setIconSize(QSize(14, 14))
-        self.fold_btn.setFixedHeight(24)
-        self.fold_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.fold_btn.clicked.connect(lambda: self.set_meta_open(not self.meta_open))
-        mw_l.addWidget(self.fold_btn)
-        mw_l.addWidget(self.bottom_stack, 1)
         self.meta_open = True
         middle = QSplitter(Qt.Orientation.Vertical)
         middle.addWidget(top_split)
-        middle.addWidget(self.meta_wrap)
+        middle.addWidget(self.bottom_stack)
         middle.setCollapsible(0, False)
         middle.setCollapsible(1, False)
         middle.setStretchFactor(0, 1)
@@ -3516,18 +3523,39 @@ class Main(QMainWindow):
         lb_l.addWidget(self.build_xfer_bar())
         main.addWidget(left_box)
         self.left_box = left_box
-        main.addWidget(middle)
+        # metadatos plegados: la lista llega hasta abajo; la portada y Géneros/Letra siguen a la derecha
+        self.fold_split = QSplitter(Qt.Orientation.Horizontal)
+        self.fold_left = QWidget()
+        fl_l = QVBoxLayout(self.fold_left)
+        fl_l.setContentsMargins(0, 0, 0, 0)
+        fl_l.setSpacing(0)
+        fl_l.addWidget(self.fold_btn2)
+        self.fold_right = QWidget()
+        fr_l = QVBoxLayout(self.fold_right)
+        fr_l.setContentsMargins(0, 0, 0, 0)
+        fr_l.setSpacing(0)
+        self.fold_split.addWidget(self.fold_left)
+        self.fold_split.addWidget(self.fold_right)
+        self.fold_split.setStretchFactor(0, 1)
+        self.fold_split.setStretchFactor(1, 0)
+        self.fold_split.setCollapsible(0, False)
+        self.fold_split.setCollapsible(1, False)
+        self.center_stack = QStackedWidget()
+        self.center_stack.addWidget(middle)
+        self.center_stack.addWidget(self.fold_split)
+        main.addWidget(self.center_stack)
         main.setStretchFactor(1, 1)
         self.left_split.setMinimumWidth(210)
         for i in range(2):
             main.setCollapsible(i, False)
         main.setSizes([280, 1230])
         self.main_split, self.mid_split = main, middle
-        for sp in (main, middle, top_split, bottom_split, self.left_split):
+        for sp in (main, middle, top_split, bottom_split, self.left_split, self.fold_split):
             self.style_splitter(sp)
         self.set_rows_locked(True)
         self.meta_fold = bool(int(self.cfg.value("meta_fold", 1) or 0))
-        self.set_meta_open(bool(int(self.cfg.value("meta_open", 1) or 0)), animate=False)
+        self.set_meta_open(True)   # textos/iconos de las barritas
+        QTimer.singleShot(0, lambda: self.set_meta_open(bool(int(self.cfg.value("meta_open", 1) or 0))))
         central = QWidget()
         cl = QVBoxLayout(central)
         cl.setContentsMargins(0, 0, 0, 0)
@@ -5997,74 +6025,65 @@ class Main(QMainWindow):
             h.setEnabled(not locked)
             h.setCursor(Qt.CursorShape.ArrowCursor if locked else Qt.CursorShape.SplitVCursor)
         if locked:   # la fila de abajo mide siempre lo mismo: al volver de espectrograma queda exactamente en el mismo sitio
-            hgt = max(self.bottom_w.sizeHint().height() + 6, 290)
+            hgt = self.bottom_row_h()
             self.bottom_stack.setFixedHeight(hgt)
         else:
             self.bottom_stack.setMinimumHeight(0)
             self.bottom_stack.setMaximumHeight(16777215)
-        w = getattr(self, "meta_wrap", None)
-        if w is not None and getattr(self, "meta_open", True):
-            bar = 24 if getattr(self, "meta_fold", True) else 0
-            w.setMaximumHeight(self.bottom_stack.maximumHeight() + bar if locked else 16777215)
+
+    def bottom_row_h(self):
+        bar = 24 if getattr(self, "meta_fold", True) else 0
+        return max(self.bottom_w.sizeHint().height() + 6, 290) + bar
 
     def set_meta_fold(self, on):
-        """Ajustes → General: permitir (o no) plegar la fila de los metadatos con la barrita."""
+        """Ajustes → General: permitir (o no) ocultar los metadatos con la barrita."""
         self.meta_fold = bool(on)
         self.cfg.setValue("meta_fold", 1 if on else 0)
         if not on:
-            self.set_meta_open(True, animate=False)
+            self.set_meta_open(True)
         self.fold_btn.setVisible(self.meta_fold)
-        self.set_rows_locked(getattr(self, "spec_pane", None) is None)
+        if getattr(self, "spec_pane", None) is None:
+            self.set_rows_locked(True)
 
     def set_meta_open(self, on, animate=True):
-        """Pliega / despliega los metadatos y la letra; al plegar, la lista y la portada ocupan ese espacio."""
+        """Oculta / muestra SOLO los metadatos: la lista baja hasta abajo y la portada y Géneros/Letra se quedan."""
         on = bool(on) or not getattr(self, "meta_fold", True)
+        self.fold_btn.setVisible(getattr(self, "meta_fold", True))
+        for b in (self.fold_btn, self.fold_btn2):
+            b.setIcon(icons.vicon("chevron_d" if on else "chevron_u"))
+            b.setToolTip(T("Ocultar o mostrar los metadatos (se puede desactivar en Ajustes → General)"))
+        self.fold_btn.setText(T("Ocultar metadatos"))
+        self.fold_btn2.setText(T("Mostrar metadatos"))
+        if on == self.meta_open and self.center_stack.currentIndex() == (0 if on else 1):
+            return
         self.meta_open = on
         self.cfg.setValue("meta_open", 1 if on else 0)
-        self.fold_btn.setVisible(getattr(self, "meta_fold", True))
-        self.fold_btn.setIcon(icons.vicon("chevron_d" if on else "chevron_u"))
-        self.fold_btn.setText(T("Ocultar metadatos y letra") if on else T("Mostrar metadatos y letra"))
-        self.fold_btn.setToolTip(T("Plegar o desplegar el panel de metadatos (se puede desactivar en Ajustes → General)"))
-        bar = 24 if getattr(self, "meta_fold", True) else 0
-        locked = getattr(self, "spec_pane", None) is None
-        full = (max(self.bottom_w.sizeHint().height() + 6, 290) if locked else max(self.bottom_stack.height(), 300)) + bar
-        old_anim = getattr(self, "_fold_anim", None)
-        if old_anim is not None:
-            old_anim.stop()
-        w, sp = self.meta_wrap, self.mid_split
-
-        def put(v):
-            v = int(v)
-            w.setMaximumHeight(v)
-            total = sum(sp.sizes())
-            if total > v:
-                sp.setSizes([total - v, v])
-
-        def done():
-            if on:
-                self.bottom_stack.show()
-                put(full)
-                self.set_rows_locked(locked)   # deja la altura justa (o libre con el espectrograma)
-            else:
-                self.bottom_stack.hide()
-                put(bar)
-            self.layout_overlay()
-        self.bottom_stack.setMinimumHeight(0)   # durante la animación la fila puede encogerse
-        if on:
-            self.bottom_stack.show()
-        if not animate or not self.isVisible():
-            done()
-            return
-        from PyQt6.QtCore import QVariantAnimation
-        a = QVariantAnimation(self)
-        a.setDuration(220)
-        a.setEasingCurve(QEasingCurve.Type.OutCubic)
-        a.setStartValue(max(w.height(), bar))
-        a.setEndValue(full if on else bar)
-        a.valueChanged.connect(put)
-        a.finished.connect(done)
-        self._fold_anim = a
-        a.start()
+        cols = self.top_split.sizes()
+        if on:   # todo vuelve a su sitio de filas
+            self.top_split.insertWidget(0, self.list_pane)
+            self.top_split.insertWidget(1, self.cover_w)
+            self.bottom_split.insertWidget(1, self.rightlow)
+            self.rightlow.setMinimumHeight(0)
+            self.rightlow.setMaximumHeight(16777215)
+            self.center_stack.setCurrentIndex(0)
+            fs = self.fold_split.sizes()
+            if sum(fs) > 0:
+                self.top_split.setSizes(fs)
+                self.bottom_split.setSizes(fs)
+            self.set_rows_locked(getattr(self, "spec_pane", None) is None)
+        else:
+            self.fold_left.layout().insertWidget(0, self.list_pane, 1)
+            fr = self.fold_right.layout()
+            fr.addWidget(self.cover_w, 1)
+            fr.addWidget(self.rightlow)
+            self.rightlow.setFixedHeight(self.bottom_row_h())   # Géneros/Letra con el mismo alto de siempre
+            self.center_stack.setCurrentIndex(1)
+            if sum(cols) > 0:
+                self.fold_split.setSizes(cols)
+        self.list_pane.show()
+        self.cover_w.show()
+        self.rightlow.show()
+        QTimer.singleShot(0, self.layout_overlay)
 
     def style_splitter(self, sp):
         sp.setHandleWidth(9)
@@ -6092,7 +6111,7 @@ class Main(QMainWindow):
         self.cfg.setValue("geometry", self.saveGeometry())
         self.cfg.setValue("split_main2", self.main_split.saveState())
         self.cfg.setValue("split_rows2", self.mid_split.saveState())
-        self.cfg.setValue("split_cols2", self.top_split.saveState())
+        self.cfg.setValue("split_cols2", (self.top_split if self.meta_open else self.fold_split).saveState())
         if self.player is not None:
             self.player.stop()
         try:
@@ -6772,7 +6791,7 @@ class Main(QMainWindow):
         (r_td if snap_trees == "drawer" else r_tn).setChecked(True)
         r_tn.toggled.connect(lambda on: on and self.set_trees_mode("normal"))
         r_td.toggled.connect(lambda on: on and self.set_trees_mode("drawer"))
-        fold_chk = QCheckBox("Barrita para plegar y desplegar los metadatos y la letra")
+        fold_chk = QCheckBox("Barrita para ocultar y mostrar los metadatos")
         fold_chk.setChecked(self.meta_fold)
         apply_fns.append(lambda: self.set_meta_fold(fold_chk.isChecked()))
         add_page("general", "General", page(
