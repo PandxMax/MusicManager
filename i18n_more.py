@@ -1020,3 +1020,8 @@ ROWS += [
      "Details view: turning on a column by right-clicking the headers now really shows it (the list widens and scrolls to it).",
      "Режим «Подробно»: включённый через правый клик столбец теперь действительно появляется (список расширяется и прокручивается к нему)."),
 ]
+ROWS += [
+    ("Arreglo: con la barrita «Ocultar metadatos» la fila de abajo crecía y en pantallas pequeñas se cortaba la última fila (Directorio y «Rellenar con IA»). Ahora el botón para ocultar es una flechita al lado de las etiquetas técnicas y no ocupa altura.",
+     "Fix: the “Hide tags” bar made the bottom row taller and on small screens the last row (Directory and “Fill with AI”) was cut off. The hide button is now a small arrow next to the technical chips and takes no height.",
+     "Исправлено: полоска «Скрыть метаданные» увеличивала нижнюю строку, и на маленьких экранах последняя строка обрезалась. Теперь это стрелка рядом с техническими метками."),
+]

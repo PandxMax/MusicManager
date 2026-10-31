@@ -497,3 +497,7 @@ VERSIÓN 1.81
  - Nuevo «Crear carpetas por…» (clic derecho → Herramientas): reparte las canciones elegidas en carpetas por
    intérprete, álbum, género, año, década… hasta 3 niveles, con vista previa, mover o copiar, lotes grandes.
  - Vista detalles: las columnas que activas con clic derecho ya aparecen.
+
+VERSIÓN 1.82
+------------
+ - Arreglo: ya no se corta la fila «Directorio / Rellenar con IA»; el botón de ocultar metadatos es una flechita.

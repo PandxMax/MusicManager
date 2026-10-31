@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.81"
+APP_VERSION = "1.82"
 
 
 class TMenu(QMenu):
@@ -444,6 +444,8 @@ QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 1
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
+QToolButton#foldmini { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 0px; }
+QToolButton#foldmini:hover { background: @accent_soft; border-color: @accent; }
 QToolButton#foldbar { background: transparent; border: none; border-top: 1px solid @border; color: @muted; padding: 2px 8px; font-size: 12px; }
 QToolButton#foldbar:hover { background: @accent_soft; color: @text; }
 QLabel#techchip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 8px; font-size: 12px; }
@@ -877,6 +879,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.82', [
+        'Arreglo: con la barrita «Ocultar metadatos» la fila de abajo crecía y en pantallas pequeñas se cortaba la última fila (Directorio y «Rellenar con IA»). Ahora el botón para ocultar es una flechita al lado de las etiquetas técnicas y no ocupa altura.',
+    ]),
     ('1.81', [
         'Nuevo: clic derecho en varias canciones → Herramientas → «Crear carpetas por…» (también en el menú Herramientas). Reparte las canciones elegidas en carpetas por intérprete, intérprete principal, álbum, año - álbum, género, año, década, compositor, primera letra o formato, con hasta tres niveles (por ejemplo Género → Intérprete → Álbum). Vista previa en árbol, mover o copiar, elegir dónde crearlas, qué hacer si falta el dato y juntar las carpetas de una sola canción en «Varios». Funciona en segundo plano con barra de progreso, también para miles de canciones.',
         'Vista detalles: al activar una columna con clic derecho en los títulos, ahora aparece de verdad (la lista se ensancha y se desplaza hasta ella).',
@@ -1390,7 +1395,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.81 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.82 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3671,8 +3676,13 @@ class Main(QMainWindow):
         mc_l = QVBoxLayout(meta_col)
         mc_l.setContentsMargins(0, 0, 0, 0)
         mc_l.setSpacing(0)
-        mc_l.addWidget(self.fold_btn)
         mc_l.addWidget(bottom, 1)
+        # el botón de ocultar va dentro de la fila de etiquetas técnicas: no quita altura a los campos
+        self.fold_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.fold_btn.setObjectName("foldmini")
+        self.fold_btn.setFixedSize(26, 62)
+        self.fold_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.tech_bar.layout().insertWidget(0, self.fold_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         bottom_split.addWidget(meta_col)
         bottom_split.addWidget(rightlow)
         self.rightlow, self.cover_w = rightlow, coverw
@@ -6319,8 +6329,7 @@ class Main(QMainWindow):
             self.bottom_stack.setMaximumHeight(16777215)
 
     def bottom_row_h(self):
-        bar = 24 if getattr(self, "meta_fold", True) else 0
-        return max(self.bottom_w.sizeHint().height() + 6, 290) + bar
+        return max(self.bottom_w.sizeHint().height() + 6, 290)
 
     def set_meta_fold(self, on):
         """Ajustes → General: permitir (o no) ocultar los metadatos con la barrita."""
