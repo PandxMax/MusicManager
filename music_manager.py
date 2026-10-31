@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.73"
+APP_VERSION = "1.74"
 
 
 class TMenu(QMenu):
@@ -846,6 +846,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.74', [
+        'Botones en la miniatura de la barra de tareas: al pasar el ratón por el icono de Music Manager en la barra de Windows aparecen «Anterior», «Reproducir / Pausa» y «Siguiente», como en los reproductores de música.',
+        'Solo una ventana del programa: si lo vuelves a abrir estando ya abierto, el anterior se cierra y se abre de nuevo (si tenías cambios sin guardar, te pregunta antes).',
+    ]),
     ('1.73', [
         'Rellenar metadatos: cada opción del desplegable dice de dónde salió («Tusa ← iTunes, Deezer», «Reggaeton ← MusicBrainz», «Latin Trap ← IA»). Si varias fuentes dan lo mismo, aparece una vez con todas sus fuentes. Al elegir una, en el campo queda solo el valor.',
     ]),
@@ -1325,7 +1329,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.73 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.74 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4743,6 +4747,8 @@ class Main(QMainWindow):
         self.btn_mute.setToolTip(T("Quitar silencio") if muted else T("Silenciar"))
 
     def on_state(self, st):
+        if getattr(self, "taskbar", None) is not None:
+            self.taskbar.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
         self.btn_play.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
         self.disc.set_playing(st == QMediaPlayer.PlaybackState.PlayingState)
         if getattr(self, "wide_viz", None) is not None and self.wide_viz.isVisible():
@@ -7149,6 +7155,49 @@ if __name__ == "__main__":
     app.installNativeEventFilter(_wheel)
     _deco = icons.IconDeco(app)
     app.installEventFilter(_deco)
+    # una sola ventana del programa: si ya estaba abierto, aquel se cierra y se abre este de nuevo
+    _server = None
+    try:
+        from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+        _name = "MusicManager-unica-" + (os.environ.get("USERNAME") or os.environ.get("USER") or "yo")
+        _old = QLocalSocket()
+        _old.connectToServer(_name)
+        if _old.waitForConnected(400):
+            _old.write(b"cerrar")
+            _old.flush()
+            _old.waitForBytesWritten(1000)
+            _old.disconnectFromServer()
+            _t0 = time.time()
+            while time.time() - _t0 < 20:   # espera a que el anterior termine de cerrarse (por si pregunta si guardar)
+                _chk = QLocalSocket()
+                _chk.connectToServer(_name)
+                if not _chk.waitForConnected(200):
+                    break
+                _chk.disconnectFromServer()
+                app.processEvents()
+                time.sleep(0.3)
+        QLocalServer.removeServer(_name)
+        _server = QLocalServer()
+        _server.listen(_name)
+    except Exception:
+        _server = None
     w = Main()
+
+    def _other_instance():
+        c = _server.nextPendingConnection()
+        if c is None:
+            return
+        c.waitForReadyRead(500)
+        if bytes(c.readAll()).startswith(b"cerrar"):
+            QTimer.singleShot(0, w.close)
+
+    if _server is not None:
+        _server.newConnection.connect(_other_instance)
+    try:   # botones anterior / play / siguiente en la miniatura de la barra de tareas
+        import taskbar
+        w.taskbar = taskbar.TaskbarButtons(w, icons.draw_glyph)
+        app.installNativeEventFilter(w.taskbar)
+    except Exception:
+        w.taskbar = None
     w.show()
     sys.exit(app.exec())

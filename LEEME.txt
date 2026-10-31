@@ -458,3 +458,8 @@ VERSIÓN 1.72
 VERSIÓN 1.73
 ------------
  - Rellenar metadatos: cada opción indica su fuente (iTunes, Deezer, MusicBrainz, Discogs, IA).
+
+VERSIÓN 1.74
+------------
+ - Botones Anterior / Play / Siguiente en la miniatura de la barra de tareas.
+ - Solo una ventana del programa: al volver a abrirlo, el anterior se cierra.
