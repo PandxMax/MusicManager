@@ -501,3 +501,8 @@ VERSIÓN 1.81
 VERSIÓN 1.82
 ------------
  - Arreglo: ya no se corta la fila «Directorio / Rellenar con IA»; el botón de ocultar metadatos es una flechita.
+
+VERSIÓN 1.83
+------------
+ - Carpetas grandes sin trabarse (lista de una vez, miniaturas por tandas, orden diferido).
+ - Árboles y lista se actualizan solos al crear/borrar/renombrar carpetas (también desde el Explorador).

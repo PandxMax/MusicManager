@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.82"
+APP_VERSION = "1.83"
 
 
 class TMenu(QMenu):
@@ -879,6 +879,12 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.83', [
+        'Abrir carpetas con muchas canciones ya no traba el programa: la lista se llena de una vez, las miniaturas se ponen por tandas (antes se repintaba cientos de veces por segundo), la carpeta se lee más rápido y la búsqueda vacía no recorre la lista.',
+        'Si ordenas por una columna (artista, álbum, bitrate…) en una carpeta grande que aún no se ha leído, se muestra ya ordenada por nombre y se reordena sola cuando termina de leerse, en vez de congelarse.',
+        'Los árboles de carpetas se actualizan solos: al crear, borrar o renombrar carpetas (aquí o desde el Explorador de Windows) aparecen enseguida. La carpeta nueva se abre y queda marcada en el árbol.',
+        'La lista de canciones también se actualiza sola si se agregan o quitan canciones de la carpeta desde fuera del programa.',
+    ]),
     ('1.82', [
         'Arreglo: con la barrita «Ocultar metadatos» la fila de abajo crecía y en pantallas pequeñas se cortaba la última fila (Directorio y «Rellenar con IA»). Ahora el botón para ocultar es una flechita al lado de las etiquetas técnicas y no ocupa altura.',
     ]),
@@ -1395,7 +1401,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.82 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.83 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3765,6 +3771,7 @@ class Main(QMainWindow):
         import drawer
         self.tree_drawer = drawer.TreeDrawer(self, central, self.left_box, main)
         QTimer.singleShot(0, lambda: self.set_trees_mode(str(self.cfg.value("trees_mode", "normal"))))
+        self.setup_watch()
         self.setCentralWidget(central)
         self.build_pl_panel(central)
         self.shuffle = bool(int(self.cfg.value("shuffle", 0) or 0))
@@ -3835,6 +3842,92 @@ class Main(QMainWindow):
     def refresh_trees(self):
         self.tree.refresh()
         self.tree2.refresh()
+        self.update_watch()
+
+    @staticmethod
+    def dir_signature(path):
+        """Qué hay en una carpeta (subcarpetas y canciones): para saber si de verdad cambió algo."""
+        try:
+            with os.scandir(path) as it:
+                return frozenset((e.name, e.is_dir(follow_symlinks=False)) for e in it
+                                 if e.is_dir(follow_symlinks=False) or os.path.splitext(e.name)[1].lower() in AUDIO_EXT)
+        except OSError:
+            return None
+
+    def setup_watch(self):
+        """Vigila las carpetas abiertas en los árboles y la carpeta actual: si se crea, borra o renombra algo
+        (aquí o desde el Explorador de Windows), los árboles y la lista se actualizan solos."""
+        from PyQt6.QtCore import QFileSystemWatcher
+        self.watcher = QFileSystemWatcher(self)
+        self.watcher.directoryChanged.connect(self.on_dir_changed)
+        self._watch_changed = set()
+        self._watch_timer = QTimer(self)
+        self._watch_timer.setSingleShot(True)
+        self._watch_timer.setInterval(450)
+        self._watch_timer.timeout.connect(self.apply_dir_changes)
+        self._tree_sigs = {}
+        for t in (self.tree, self.tree2):
+            t.itemExpanded.connect(lambda *_: QTimer.singleShot(0, self.update_watch))
+            t.itemCollapsed.connect(lambda *_: QTimer.singleShot(0, self.update_watch))
+        QTimer.singleShot(500, self.update_watch)
+
+    def update_watch(self):
+        w = getattr(self, "watcher", None)
+        if w is None:
+            return
+        want = set()
+        for t in (self.tree, self.tree2):
+            for i in range(t.topLevelItemCount()):
+                p = t.topLevelItem(i).data(0, PATH_ROLE)
+                if p:
+                    want.add(p)
+            for it in t.all_items():
+                p = it.data(0, PATH_ROLE)
+                if p and it.isExpanded():
+                    want.add(p)
+                    for j in range(min(it.childCount(), 200)):   # las carpetas visibles también (para su flechita)
+                        cp = it.child(j).data(0, PATH_ROLE)
+                        if cp:
+                            want.add(cp)
+        want = set(sorted(want, key=len)[:400])
+        if self.current_dir:
+            want.add(self.current_dir)
+        want = {p for p in want if os.path.isdir(p)}
+        have = set(w.directories())
+        if have - want:
+            w.removePaths(list(have - want))
+        if want - have:
+            w.addPaths(list(want - have))
+        for p in want:
+            if p not in self._tree_sigs:
+                self._tree_sigs[p] = self.dir_signature(p)
+
+    def on_dir_changed(self, path):
+        self._watch_changed.add(path)
+        self._watch_timer.start()
+
+    def apply_dir_changes(self):
+        if DRAG_ACTIVE[0] or QApplication.mouseButtons() != Qt.MouseButton.NoButton or QApplication.activeModalWidget():
+            self._watch_timer.start()   # estás arrastrando o en una ventana: se actualiza en cuanto termines
+            return
+        changed, self._watch_changed = self._watch_changed, set()
+        trees_dirty = False
+        for p in changed:
+            sig = self.dir_signature(p)
+            if sig != self._tree_sigs.get(p):   # solo si cambiaron carpetas o canciones (no al guardar etiquetas)
+                old = self._tree_sigs.get(p) or frozenset()
+                self._tree_sigs[p] = sig
+                if {n for n, d in (sig or ()) if d} != {n for n, d in old if d}:
+                    trees_dirty = True
+        if trees_dirty:
+            self.refresh_trees()
+        cd = self.current_dir
+        if cd and any(os.path.normcase(os.path.normpath(p)) == os.path.normcase(os.path.normpath(cd)) for p in changed):
+            snap = getattr(self, "dir_snapshot", None)
+            if snap and snap[0] == cd and self.dir_signature(cd) != snap[1] and not self.list.selecting \
+                    and QApplication.mouseButtons() == Qt.MouseButton.NoButton and not DRAG_ACTIVE[0]:
+                self.load_folder(cd, select=self.selected_paths() or None)
+        self.update_watch()
 
     # ---------------------------------------------- pasar entre árboles sin arrastrar (como Kodi)
     def build_xfer_bar(self):
@@ -4002,12 +4095,21 @@ class Main(QMainWindow):
             return
         name, ok = QInputDialog.getText(self, "Nueva carpeta", f"Nombre (dentro de {os.path.basename(base) or base}):")
         if ok and name.strip():
+            new = os.path.join(base, safe_filename(name.strip()) or name.strip())
             try:
-                os.makedirs(os.path.join(base, name.strip()), exist_ok=False)
+                os.makedirs(new, exist_ok=False)
             except Exception as e:
                 QMessageBox.warning(self, "Error", str(e))
                 return
             self.refresh_trees()
+            for t in (self.tree, self.tree2):   # se ve enseguida: se abre la carpeta de arriba y se marca la nueva
+                if t.isVisible():
+                    t.blockSignals(True)
+                    t.reveal(new)
+                    t.blockSignals(False)
+            if self.current_dir and os.path.normcase(os.path.normpath(base)) == os.path.normcase(os.path.normpath(self.current_dir)):
+                self.load_folder(self.current_dir, select=self.selected_paths() or None)
+            self.update_watch()
 
     def rename_folder(self, path):
         if self.is_protected(path):
@@ -4156,11 +4258,23 @@ class Main(QMainWindow):
         if key == "file":
             out = sorted(files, key=lambda f: os.path.basename(f).lower())
         else:
-            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-            try:
-                out = sorted(files, key=lambda f: (details.sort_value(self, f, key, tech_info), os.path.basename(f).lower()))
-            finally:
-                QApplication.restoreOverrideCursor()
+            need_tags = key in details.TAG_KEYS or key in ("date", "tracknumber", "discnumber")
+            if key == "mtime":
+                missing = 0
+            elif need_tags:
+                missing = sum(1 for f in files if f not in self.tags_cache)
+            else:
+                missing = sum(1 for f in files if tech_cached(f) is None)
+            if missing > 150:
+                # carpeta grande sin leer: se ordena por nombre ya y se reordena sola cuando terminen de leerse
+                self._resort_pending = True
+                out = sorted(files, key=lambda f: os.path.basename(f).lower())
+            else:
+                QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+                try:
+                    out = sorted(files, key=lambda f: (details.sort_value(self, f, key, tech_info), os.path.basename(f).lower()))
+                finally:
+                    QApplication.restoreOverrideCursor()
         return list(reversed(out)) if getattr(self, "sort_desc", False) else out
 
     def add_view_menus(self, m):
@@ -4283,17 +4397,25 @@ class Main(QMainWindow):
         keep_paths = set(select) if select else (
             set(self.selected_paths()) if keep and path == self.current_dir else set())
         self.current_dir = path
+        self._resort_pending = False
         if self.chk_sub.isChecked():
-            files = [os.path.join(dp, f) for dp, _, fn in os.walk(path) for f in fn]
+            files = [os.path.join(dp, f) for dp, _, fn in os.walk(path) for f in fn
+                     if os.path.splitext(f)[1].lower() in AUDIO_EXT]
         else:
-            try:
-                files = [os.path.join(path, f) for f in os.listdir(path)]
+            files = []
+            try:   # scandir ya sabe si es archivo (sin preguntar al disco por cada uno: mucho más rápido en Windows)
+                with os.scandir(path) as it_:
+                    for e in it_:
+                        if os.path.splitext(e.name)[1].lower() in AUDIO_EXT and e.is_file():
+                            files.append(e.path)
             except OSError:
                 files = []
-        files = self.sort_files([f for f in files if os.path.splitext(f)[1].lower() in AUDIO_EXT and os.path.isfile(f)])
+        self.dir_snapshot = (path, self.dir_signature(path))
+        files = self.sort_files(files)
         self.gen += 1
         self.thumb_queue = []
         self._loading_dir = True
+        self.list.setUpdatesEnabled(False)   # se llena de una vez y se pinta al final (no canción por canción)
         self.list.clear()
         if not self.chk_sub.isChecked():
             for name, dp in subdirs(path):
@@ -4313,6 +4435,8 @@ class Main(QMainWindow):
                 self.thumb_queue.append(f)
         self.row_index = {self.list.item(r).data(PATH_ROLE): r for r in range(self.list.count())}
         self._loading_dir = False
+        self.list.setUpdatesEnabled(True)
+        self._thumb_left = len(self.thumb_queue)
         self.update_nav()
         if keep_paths:
             self.list.blockSignals(True)
@@ -4328,9 +4452,42 @@ class Main(QMainWindow):
         self.list.overlay.setVisible(self.list.count() == 0)
         self.thumbs.request(self.gen, self.thumb_queue)
         self.statusBar().showMessage(f"{os.path.basename(os.path.normpath(path)) or path} · {len(files)} canciones")
+        if self._resort_pending and not self._thumb_left:
+            self._resort_pending = False
+        self.update_watch()
 
     def on_thumb(self, gen, f, img, lyrics, tags):
+        """Las miniaturas llegan muy seguidas (cientos por segundo desde la caché): se juntan y se ponen por tandas,
+        así la lista no se repinta cientos de veces."""
+        buf = getattr(self, "_thumb_buf", None)
+        if buf is None:
+            buf = self._thumb_buf = []
+            self._thumb_flush = QTimer(self)
+            self._thumb_flush.setSingleShot(True)
+            self._thumb_flush.setInterval(120)
+            self._thumb_flush.timeout.connect(self.flush_thumbs)
+        buf.append((gen, f, img, lyrics, tags))
+        if not self._thumb_flush.isActive():
+            self._thumb_flush.start()
+
+    def flush_thumbs(self):
+        buf, self._thumb_buf = self._thumb_buf, []
+        if not buf:
+            return
+        self.list.setUpdatesEnabled(False)
+        try:
+            for args in buf:
+                self.apply_thumb(*args)
+        finally:
+            self.list.setUpdatesEnabled(True)
+        if getattr(self, "_resort_pending", False) and getattr(self, "_thumb_left", 1) <= 0 and self.current_dir:
+            self._resort_pending = False   # ya se leyó todo: ahora sí se ordena por la columna elegida
+            self.load_folder(self.current_dir, select=self.selected_paths() or None)
+
+    def apply_thumb(self, gen, f, img, lyrics, tags):
         """Llega una miniatura generada (o leída de la caché) en segundo plano."""
+        if gen == self.gen:
+            self._thumb_left = getattr(self, "_thumb_left", 1) - 1
         icon = QIcon(QPixmap.fromImage(img)) if img is not None and not img.isNull() else None
         self.meta[f] = {"icon": icon, "has_lyrics": bool(lyrics)}
         if tags and "_tech" in tags:
@@ -6300,6 +6457,9 @@ class Main(QMainWindow):
 
     def apply_filter(self, text=""):
         t = (text or "").strip().lower()
+        if not t and not getattr(self, "_filtered", False):
+            return   # sin búsqueda y nada oculto: no hay que recorrer la lista
+        self._filtered = bool(t)
         for r in range(self.list.count()):
             it = self.list.item(r)
             if it.data(KIND_ROLE) == "dir":

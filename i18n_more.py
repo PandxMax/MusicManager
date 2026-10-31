@@ -1025,3 +1025,17 @@ ROWS += [
      "Fix: the “Hide tags” bar made the bottom row taller and on small screens the last row (Directory and “Fill with AI”) was cut off. The hide button is now a small arrow next to the technical chips and takes no height.",
      "Исправлено: полоска «Скрыть метаданные» увеличивала нижнюю строку, и на маленьких экранах последняя строка обрезалась. Теперь это стрелка рядом с техническими метками."),
 ]
+ROWS += [
+    ("Abrir carpetas con muchas canciones ya no traba el programa: la lista se llena de una vez, las miniaturas se ponen por tandas (antes se repintaba cientos de veces por segundo), la carpeta se lee más rápido y la búsqueda vacía no recorre la lista.",
+     "Opening folders with many songs no longer freezes the program: the list fills in one go, thumbnails are applied in batches (before it repainted hundreds of times per second), the folder is read faster and an empty search doesn't walk the list.",
+     "Открытие папок с большим количеством песен больше не тормозит: список заполняется сразу, миниатюры добавляются пачками, папка читается быстрее."),
+    ("Si ordenas por una columna (artista, álbum, bitrate…) en una carpeta grande que aún no se ha leído, se muestra ya ordenada por nombre y se reordena sola cuando termina de leerse, en vez de congelarse.",
+     "If you sort by a column (artist, album, bitrate…) in a large folder that hasn't been read yet, it shows sorted by name right away and re-sorts itself when reading finishes, instead of freezing.",
+     "При сортировке большой непрочитанной папки по столбцу список сразу показывается по имени и пересортировывается сам после чтения."),
+    ("Los árboles de carpetas se actualizan solos: al crear, borrar o renombrar carpetas (aquí o desde el Explorador de Windows) aparecen enseguida. La carpeta nueva se abre y queda marcada en el árbol.",
+     "Folder trees update by themselves: creating, deleting or renaming folders (here or in Windows Explorer) shows up right away. A new folder is opened and highlighted in the tree.",
+     "Деревья папок обновляются сами: созданные, удалённые или переименованные папки (здесь или в Проводнике) появляются сразу. Новая папка открывается и выделяется."),
+    ("La lista de canciones también se actualiza sola si se agregan o quitan canciones de la carpeta desde fuera del programa.",
+     "The song list also updates by itself if songs are added to or removed from the folder outside the program.",
+     "Список песен тоже обновляется сам, если песни добавлены или удалены вне программы."),
+]
