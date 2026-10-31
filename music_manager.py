@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.83"
+APP_VERSION = "1.84"
 
 
 class TMenu(QMenu):
@@ -879,6 +879,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.84', [
+        'Letra: nuevos botones «🌐 Buscar en musica.com» (abre la letra de la canción en musica.com) y «📋 Pegar letra» (pone lo que copiaste como letra, limpiando espacios y líneas de sobra). También en la ventana que sale cuando no se encuentra la letra.',
+    ]),
     ('1.83', [
         'Abrir carpetas con muchas canciones ya no traba el programa: la lista se llena de una vez, las miniaturas se ponen por tandas (antes se repintaba cientos de veces por segundo), la carpeta se lee más rápido y la búsqueda vacía no recorre la lista.',
         'Si ordenas por una columna (artista, álbum, bitrate…) en una carpeta grande que aún no se ha leído, se muestra ya ordenada por nombre y se reordena sola cuando termina de leerse, en vez de congelarse.',
@@ -1401,7 +1404,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.83 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.84 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3418,6 +3421,18 @@ class Main(QMainWindow):
         self.btn_lyr.setToolTip("Busca en LRCLIB; si no está, en NetEase y lyrics.ovh. Reintenta solo si falla la conexión.")
         self.btn_lyr.clicked.connect(self.run_lyrics)
         lv.addWidget(self.btn_lyr)
+        lyr_row = QHBoxLayout()
+        lyr_row.setSpacing(6)
+        self.btn_lyr_web = QPushButton("🌐 Buscar en musica.com")
+        self.btn_lyr_web.setToolTip("Abre la letra de esta canción en musica.com (copia la letra y pulsa «Pegar letra»)")
+        self.btn_lyr_web.clicked.connect(lambda: self.lyrics_web("musica"))
+        self.btn_lyr_paste = QPushButton("📋 Pegar letra")
+        self.btn_lyr_paste.setToolTip("Pone como letra lo que copiaste (limpia espacios y líneas sobrantes)")
+        self.btn_lyr_paste.clicked.connect(self.paste_lyrics)
+        for b_ in (self.btn_lyr_web, self.btn_lyr_paste):
+            b_.setCursor(Qt.CursorShape.PointingHandCursor)
+            lyr_row.addWidget(b_, 1)
+        lv.addLayout(lyr_row)
 
         def make_fold_btn():
             fb = QToolButton()
@@ -6047,8 +6062,9 @@ class Main(QMainWindow):
         box.setText(msg)
         box.setInformativeText(T("¿Qué quieres hacer?"))
         b_retry = box.addButton(T("Reintentar"), QMessageBox.ButtonRole.AcceptRole) if retry else None
-        b_web = b_lrc = b_hand = None
+        b_web = b_lrc = b_hand = b_musica = None
         if path:
+            b_musica = box.addButton(T("Buscar en musica.com"), QMessageBox.ButtonRole.ActionRole)
             b_web = box.addButton(T("Buscar en Google"), QMessageBox.ButtonRole.ActionRole)
             b_lrc = box.addButton(T("Cargar archivo .lrc…"), QMessageBox.ButtonRole.ActionRole)
             b_hand = box.addButton(T("Escribirla / pegarla"), QMessageBox.ButtonRole.ActionRole)
@@ -6060,6 +6076,8 @@ class Main(QMainWindow):
             return
         if c is b_retry:
             self.run_lyrics([p for p in retry if p])
+        elif c is b_musica:
+            self.lyrics_web("musica", path)
         elif c is b_web:
             q = f"{self.val(path, 'artist')} {self.val(path, 'title') or os.path.splitext(os.path.basename(path))[0]} lrc letra"
             QDesktopServices.openUrl(QUrl("https://www.google.com/search?q=" + urllib.parse.quote(q.strip())))
@@ -6068,6 +6086,45 @@ class Main(QMainWindow):
         elif c is b_hand:
             self.show_right_tab(1)
             self.lyrics.setFocus()
+
+    def lyrics_web(self, site, path=None):
+        """Busca la letra de la canción en una web de letras (se abre en el navegador)."""
+        path = path or self.current_path()
+        if not path:
+            self.statusBar().showMessage(T("Selecciona una canción primero."))
+            return
+        artist = _main_artist(self.val(path, "artist"))
+        title = _clean_title(self.val(path, "title") or os.path.splitext(os.path.basename(path))[0])
+        q = f"site:musica.com {artist} {title} letra" if site == "musica" else f"{artist} {title} lrc letra"
+        QDesktopServices.openUrl(QUrl("https://www.google.com/search?q=" + urllib.parse.quote(q.strip())))
+        self.statusBar().showMessage(T("Copia la letra en el navegador y pulsa «📋 Pegar letra»."))
+
+    def paste_lyrics(self):
+        path = self.current_path()
+        if not path or len(self.cur_paths) != 1:
+            self.statusBar().showMessage(T("Selecciona una sola canción para pegarle la letra."))
+            return
+        text = QApplication.clipboard().text() or ""
+        lines = [l.rstrip() for l in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+        out, blank = [], False
+        for l in lines:   # quita líneas vacías repetidas (deja una entre estrofas)
+            if not l.strip():
+                if out and not blank:
+                    out.append("")
+                blank = True
+                continue
+            blank = False
+            out.append(l.strip())
+        text = "\n".join(out).strip()
+        if len(text) < 10:
+            QMessageBox.information(self, T("Letra"), T("No hay ninguna letra copiada. Selecciona la letra en el navegador, cópiala (Ctrl+C) y vuelve a pulsar «Pegar letra»."))
+            return
+        self.pending.setdefault(path, {})["lyrics"] = text
+        self.mark_items()
+        self.show_current(path, 1)
+        self.show_right_tab(1)
+        self.update_dirty()
+        self.statusBar().showMessage(T("Letra pegada (pendiente de guardar)."))
 
     def load_lrc_file(self, path):
         fn, _ = QFileDialog.getOpenFileName(self, T("Cargar letra"), os.path.dirname(path),

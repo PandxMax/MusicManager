@@ -506,3 +506,7 @@ VERSIÓN 1.83
 ------------
  - Carpetas grandes sin trabarse (lista de una vez, miniaturas por tandas, orden diferido).
  - Árboles y lista se actualizan solos al crear/borrar/renombrar carpetas (también desde el Explorador).
+
+VERSIÓN 1.84
+------------
+ - Letra: botones «Buscar en musica.com» y «Pegar letra».
