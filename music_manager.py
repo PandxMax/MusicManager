@@ -70,7 +70,7 @@ PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.75"
+APP_VERSION = "1.76"
 
 
 class TMenu(QMenu):
@@ -415,6 +415,8 @@ QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 1
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
+QToolButton#foldbar { background: transparent; border: none; border-top: 1px solid @border; color: @muted; padding: 2px 8px; font-size: 12px; }
+QToolButton#foldbar:hover { background: @accent_soft; color: @text; }
 QLabel#techchip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 8px; font-size: 12px; }
 QLabel#chip { background: @surface2; border: 1px solid @border; border-radius: 10px; padding: 2px 7px; font-size: 11px; }
 QPushButton#tabbtn { border-radius: 10px; padding: 7px 10px; }
@@ -846,6 +848,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.76', [
+        'Los metadatos y la letra se pueden plegar y desplegar con la barrita que tienen encima: al plegarlos, la lista y la portada ocupan todo el espacio. El programa recuerda cómo lo dejaste.',
+        'Ajustes → General: «Barrita para plegar y desplegar los metadatos y la letra», para activarla o quitarla cuando quieras.',
+    ]),
     ('1.75', [
         'Renombrar una canción (F2 o clic derecho → Renombrar) ahora se hace ahí mismo, sobre el nombre en la lista, como en el Explorador de Windows: escribes y pulsas Enter (Esc cancela). Ya no sale la ventanita.',
     ]),
@@ -1332,7 +1338,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.75 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.76 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3476,9 +3482,25 @@ class Main(QMainWindow):
         self.top_split, self.bottom_split = top_split, bottom_split
         self.bottom_stack = QStackedWidget()                   # página 0: metadatos…; página 1: espectrograma a todo el ancho
         self.bottom_stack.addWidget(bottom_split)
+        # barra para plegar / desplegar la fila de los metadatos (se activa o desactiva en Ajustes → General)
+        self.meta_wrap = QWidget()
+        mw_l = QVBoxLayout(self.meta_wrap)
+        mw_l.setContentsMargins(0, 0, 0, 0)
+        mw_l.setSpacing(0)
+        self.fold_btn = QToolButton()
+        self.fold_btn.setObjectName("foldbar")
+        self.fold_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.fold_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.fold_btn.setIconSize(QSize(14, 14))
+        self.fold_btn.setFixedHeight(24)
+        self.fold_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.fold_btn.clicked.connect(lambda: self.set_meta_open(not self.meta_open))
+        mw_l.addWidget(self.fold_btn)
+        mw_l.addWidget(self.bottom_stack, 1)
+        self.meta_open = True
         middle = QSplitter(Qt.Orientation.Vertical)
         middle.addWidget(top_split)
-        middle.addWidget(self.bottom_stack)
+        middle.addWidget(self.meta_wrap)
         middle.setCollapsible(0, False)
         middle.setCollapsible(1, False)
         middle.setStretchFactor(0, 1)
@@ -3504,6 +3526,8 @@ class Main(QMainWindow):
         for sp in (main, middle, top_split, bottom_split, self.left_split):
             self.style_splitter(sp)
         self.set_rows_locked(True)
+        self.meta_fold = bool(int(self.cfg.value("meta_fold", 1) or 0))
+        self.set_meta_open(bool(int(self.cfg.value("meta_open", 1) or 0)), animate=False)
         central = QWidget()
         cl = QVBoxLayout(central)
         cl.setContentsMargins(0, 0, 0, 0)
@@ -5978,6 +6002,69 @@ class Main(QMainWindow):
         else:
             self.bottom_stack.setMinimumHeight(0)
             self.bottom_stack.setMaximumHeight(16777215)
+        w = getattr(self, "meta_wrap", None)
+        if w is not None and getattr(self, "meta_open", True):
+            bar = 24 if getattr(self, "meta_fold", True) else 0
+            w.setMaximumHeight(self.bottom_stack.maximumHeight() + bar if locked else 16777215)
+
+    def set_meta_fold(self, on):
+        """Ajustes → General: permitir (o no) plegar la fila de los metadatos con la barrita."""
+        self.meta_fold = bool(on)
+        self.cfg.setValue("meta_fold", 1 if on else 0)
+        if not on:
+            self.set_meta_open(True, animate=False)
+        self.fold_btn.setVisible(self.meta_fold)
+        self.set_rows_locked(getattr(self, "spec_pane", None) is None)
+
+    def set_meta_open(self, on, animate=True):
+        """Pliega / despliega los metadatos y la letra; al plegar, la lista y la portada ocupan ese espacio."""
+        on = bool(on) or not getattr(self, "meta_fold", True)
+        self.meta_open = on
+        self.cfg.setValue("meta_open", 1 if on else 0)
+        self.fold_btn.setVisible(getattr(self, "meta_fold", True))
+        self.fold_btn.setIcon(icons.vicon("chevron_d" if on else "chevron_u"))
+        self.fold_btn.setText(T("Ocultar metadatos y letra") if on else T("Mostrar metadatos y letra"))
+        self.fold_btn.setToolTip(T("Plegar o desplegar el panel de metadatos (se puede desactivar en Ajustes → General)"))
+        bar = 24 if getattr(self, "meta_fold", True) else 0
+        locked = getattr(self, "spec_pane", None) is None
+        full = (max(self.bottom_w.sizeHint().height() + 6, 290) if locked else max(self.bottom_stack.height(), 300)) + bar
+        old_anim = getattr(self, "_fold_anim", None)
+        if old_anim is not None:
+            old_anim.stop()
+        w, sp = self.meta_wrap, self.mid_split
+
+        def put(v):
+            v = int(v)
+            w.setMaximumHeight(v)
+            total = sum(sp.sizes())
+            if total > v:
+                sp.setSizes([total - v, v])
+
+        def done():
+            if on:
+                self.bottom_stack.show()
+                put(full)
+                self.set_rows_locked(locked)   # deja la altura justa (o libre con el espectrograma)
+            else:
+                self.bottom_stack.hide()
+                put(bar)
+            self.layout_overlay()
+        self.bottom_stack.setMinimumHeight(0)   # durante la animación la fila puede encogerse
+        if on:
+            self.bottom_stack.show()
+        if not animate or not self.isVisible():
+            done()
+            return
+        from PyQt6.QtCore import QVariantAnimation
+        a = QVariantAnimation(self)
+        a.setDuration(220)
+        a.setEasingCurve(QEasingCurve.Type.OutCubic)
+        a.setStartValue(max(w.height(), bar))
+        a.setEndValue(full if on else bar)
+        a.valueChanged.connect(put)
+        a.finished.connect(done)
+        self._fold_anim = a
+        a.start()
 
     def style_splitter(self, sp):
         sp.setHandleWidth(9)
@@ -6211,6 +6298,8 @@ class Main(QMainWindow):
         pane.setMinimumHeight(260)
         self.spec_pane, self.spec_widget = pane, sw
         self._spec_sizes = self.mid_split.sizes()
+        if not self.meta_open:
+            self.set_meta_open(True, animate=False)
         self.bottom_stack.addWidget(pane)
         self.bottom_stack.setCurrentWidget(pane)   # reemplaza metadatos + géneros/letra; la portada se queda arriba
         self.set_rows_locked(False)                # con el espectrograma sí se puede estirar
@@ -6683,10 +6772,14 @@ class Main(QMainWindow):
         (r_td if snap_trees == "drawer" else r_tn).setChecked(True)
         r_tn.toggled.connect(lambda on: on and self.set_trees_mode("normal"))
         r_td.toggled.connect(lambda on: on and self.set_trees_mode("drawer"))
+        fold_chk = QCheckBox("Barrita para plegar y desplegar los metadatos y la letra")
+        fold_chk.setChecked(self.meta_fold)
+        apply_fns.append(lambda: self.set_meta_fold(fold_chk.isChecked()))
         add_page("general", "General", page(
             chk("Abrir la última carpeta al iniciar", "open_last", 1),
             chk("Confirmar antes de eliminar (con papelera)", "confirm_delete", 1),
             chk("Mostrar la guía rápida cada vez que se inicia", "guide_every", 0),
+            fold_chk,
             QLabel(" "), QLabel("<b>Árboles de carpetas</b>"), r_tn, r_td))
         # Reproductor: barra clásica o estilo celular (solo uno a la vez)
         snap_style = getattr(self, "player_style", "classic")

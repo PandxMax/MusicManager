@@ -903,3 +903,18 @@ ROWS += [
      "Renaming a song (F2 or right-click → Rename) now happens right there, on the name in the list, like in Windows Explorer: type and press Enter (Esc cancels). No more little dialog.",
      "Переименование песни (F2 или правый клик → Переименовать) теперь происходит прямо в списке, как в Проводнике Windows: введите имя и нажмите Enter (Esc — отмена). Окошко больше не появляется."),
 ]
+ROWS += [
+    ("Ocultar metadatos y letra", "Hide tags and lyrics", "Скрыть метаданные и текст"),
+    ("Mostrar metadatos y letra", "Show tags and lyrics", "Показать метаданные и текст"),
+    ("Plegar o desplegar el panel de metadatos (se puede desactivar en Ajustes → General)",
+     "Collapse or expand the tags panel (can be turned off in Settings → General)",
+     "Свернуть или развернуть панель метаданных (можно отключить в Настройки → Общие)"),
+    ("Barrita para plegar y desplegar los metadatos y la letra", "Bar to collapse and expand the tags and lyrics",
+     "Полоска для сворачивания и разворачивания метаданных и текста"),
+    ("Los metadatos y la letra se pueden plegar y desplegar con la barrita que tienen encima: al plegarlos, la lista y la portada ocupan todo el espacio. El programa recuerda cómo lo dejaste.",
+     "Tags and lyrics can be collapsed and expanded with the bar above them: when collapsed, the list and the cover use all the space. The program remembers how you left it.",
+     "Метаданные и текст можно сворачивать и разворачивать полоской над ними: в свёрнутом виде список и обложка занимают всё место. Программа запоминает ваш выбор."),
+    ("Ajustes → General: «Barrita para plegar y desplegar los metadatos y la letra», para activarla o quitarla cuando quieras.",
+     "Settings → General: “Bar to collapse and expand the tags and lyrics”, to turn it on or off whenever you want.",
+     "Настройки → Общие: «Полоска для сворачивания и разворачивания метаданных и текста» — включайте или отключайте когда угодно."),
+]

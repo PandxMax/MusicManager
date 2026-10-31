@@ -351,6 +351,9 @@ def draw_glyph(p, kind, rect, col):
         p.drawPath(_line_path([(12.6, 10.4), (15, 7), (19.5, 7)]))
         line((17, 4.5), (19.5, 7), (17, 9.5))
         line((17, 14.5), (19.5, 17), (17, 19.5))
+    elif k in ("chevron_u", "chevron_d"):
+        p.setPen(_pen(col, 2.6))
+        p.drawPath(_line_path([(5, 15), (12, 8), (19, 15)] if k == "chevron_u" else [(5, 9), (12, 16), (19, 9)]))
     elif k in ("loop1", "chevron_l", "chevron_r"):
         if k == "loop1":
             line((6, 10), (6, 8.5), (8, 6.5), (17, 6.5))

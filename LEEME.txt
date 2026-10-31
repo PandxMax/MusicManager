@@ -467,3 +467,8 @@ VERSIÓN 1.74
 VERSIÓN 1.75
 ------------
  - Renombrar se hace directamente sobre el nombre en la lista (como en el Explorador).
+
+VERSIÓN 1.76
+------------
+ - Los metadatos y la letra se pliegan/despliegan con una barrita encima (la lista y la portada ganan espacio).
+ - Ajustes → General: activar o quitar esa barrita.
