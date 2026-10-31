@@ -68,9 +68,10 @@ FIELDS = [("title", "Título"), ("artist", "Intérprete"), ("album", "Álbum"),
 EASY_KEYS = {k for k, _ in FIELDS}
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
+MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.78"
+APP_VERSION = "1.79"
 
 
 class TMenu(QMenu):
@@ -265,12 +266,40 @@ def _tech(path, mtime):
     return out
 
 
+TECH_MEM = {}   # ruta -> (fecha del archivo, datos, última comprobación): evita releer el archivo en cada repintado
+
+
 def tech_info(path):
+    """Datos técnicos de la canción. Se guardan en memoria y la fecha del archivo se comprueba como mucho cada 5 s."""
+    now = time.monotonic()
+    e = TECH_MEM.get(path)
+    if e is not None and now - e[2] < 5:
+        return e[1]
     try:
         m = os.path.getmtime(path)
     except OSError:
         m = 0
-    return _tech(path, m)
+    if e is not None and e[0] == m:
+        TECH_MEM[path] = (m, e[1], now)
+        return e[1]
+    info = _tech(path, m)
+    TECH_MEM[path] = (m, info, now)
+    return info
+
+
+def tech_cached(path):
+    """Solo lo que ya está en memoria (no lee el archivo)."""
+    e = TECH_MEM.get(path)
+    return e[1] if e is not None else None
+
+
+def tech_compute(path):
+    """Para el hilo de miniaturas: calcula los datos técnicos (sin tocar TECH_MEM). Devuelve [fecha, datos]."""
+    try:
+        m = os.path.getmtime(path)
+    except OSError:
+        m = 0
+    return [m, _tech(path, m)]
 
 
 def inspect_file(path):
@@ -848,6 +877,14 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.79', [
+        'Más rápido al seleccionar muchas canciones: los datos técnicos (formato, bitrate, frecuencia…) ahora se leen en segundo plano junto con las miniaturas y se guardan en la caché, así no se vuelve a abrir cada archivo al seleccionar.',
+        'Si seleccionas muchas canciones que todavía no se han leído, el programa ya no se traba leyéndolas todas: muestra lo que tiene y se completa solo en un momento.',
+        'Vista detalles más fluida al desplazarte: ya no se pregunta al disco por cada celda cada vez que se repinta.',
+        'Marcar canciones como pendientes/sonando solo toca las que cambian (antes se repintaba la lista entera).',
+        'El visualizador de la barra de abajo consume mucho menos (la «pantalla» apagada se dibuja una sola vez) y no trabaja con la ventana minimizada.',
+        'Las carpetas con muchas canciones se colocan por partes, sin congelar la ventana.',
+    ]),
     ('1.78', [
         'Vista detalles: la fila de títulos de las columnas (Nombre, Título, Intérprete, Álbum, Género, Año…) a veces se quedaba cortada a la mitad al cambiar el tamaño de la lista; ahora ocupa siempre todo el ancho.',
     ]),
@@ -1344,7 +1381,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.78 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.79 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1807,6 +1844,9 @@ class WideViz(QWidget):
             self.peak[c] = self.lvl[c] if self.lvl[c] > self.peak[c] else max(0.0, self.peak[c] - 3.2 * dt)
         if not playing and max(self.peak or [0]) <= 0.01:
             self.timer.stop()
+        w = self.window()
+        if w.isMinimized() or not self.isVisible():
+            return   # con la ventana minimizada no se pinta nada
         self.update()
 
     def paintEvent(self, _):
@@ -1819,18 +1859,37 @@ class WideViz(QWidget):
         x0 = (self.width() - n * cell + self.GAP) / 2
         bottom = self.height() - 4
         p.setPen(Qt.PenStyle.NoPen)
+        # «pantalla LED» apagada: se dibuja una sola vez en una imagen y luego solo se copia (mucho más ligero)
+        bkey = (self.width(), self.height(), n, rows, base.rgba(), self.devicePixelRatioF())
+        if getattr(self, "_bg_key", None) != bkey:
+            dpr = self.devicePixelRatioF()
+            bg = QPixmap(int(self.width() * dpr), int(self.height() * dpr))
+            bg.setDevicePixelRatio(dpr)
+            bg.fill(Qt.GlobalColor.transparent)
+            bp = QPainter(bg)
+            bp.setRenderHint(QPainter.RenderHint.Antialiasing)
+            bp.setPen(Qt.PenStyle.NoPen)
+            bp.setBrush(QColor(base.red(), base.green(), base.blue(), 18))
+            for c in range(n):
+                for r in range(rows):
+                    bp.drawRoundedRect(QRectF(x0 + c * cell, bottom - (r + 1) * cell + self.GAP, self.SQ, self.SQ), 2, 2)
+            bp.end()
+            self._bg, self._bg_key = bg, bkey
+            self._cols_cache = {}
+        p.drawPixmap(0, 0, self._bg)
+        ccache = getattr(self, "_cols_cache", {})
         for c in range(n):
             v = self.lvl[c] if c < len(self.lvl) else 0.0
             pk = self.peak[c] if c < len(self.peak) else 0.0
             x = x0 + c * cell
-            for r in range(rows):
+            for r in range(min(rows, int(v + 0.5))):
                 y = bottom - (r + 1) * cell + self.GAP
-                if r < int(v + 0.5):
+                col = ccache.get(r)
+                if col is None:
                     t = r / max(1, rows - 1)
                     col = QColor(int(base.red() + (hi.red() - base.red()) * t), int(base.green() + (hi.green() - base.green()) * t),
                                  int(base.blue() + (hi.blue() - base.blue()) * t), 150 + int(80 * t))
-                else:
-                    col = QColor(base.red(), base.green(), base.blue(), 18)   # «pantalla LED» apagada
+                    ccache[r] = col
                 p.setBrush(col)
                 p.drawRoundedRect(QRectF(x, y, self.SQ, self.SQ), 2, 2)
             if pk > 0.6:   # tapita que cae despacio
@@ -2974,7 +3033,7 @@ class Main(QMainWindow):
         self.gen, self.thumb_queue = 0, []
         self.meta, self.tags_cache = {}, {}
         # miniaturas en segundo plano + caché en disco (se limpia cada hora)
-        self.thumbs = thumbs.ThumbWorker(THUMB_GEN, inspect_file, read_tags, find_folder_image)
+        self.thumbs = thumbs.ThumbWorker(THUMB_GEN, inspect_file, read_tags, find_folder_image, tech_compute)
         self.thumbs.ready.connect(self.on_thumb)
         self.thumbs.start()
         self.thumb_clean = QTimer(self)
@@ -3107,9 +3166,16 @@ class Main(QMainWindow):
         self.list.setMovement(QListView.Movement.Static)
         self.list.setResizeMode(QListView.ResizeMode.Adjust)
         self.list.setUniformItemSizes(True)
+        self.list.setLayoutMode(QListView.LayoutMode.Batched)   # carpetas grandes: se coloca por partes, sin trabarse
+        self.list.setBatchSize(200)
         self.sel_timer = QTimer(self)
         self.sel_timer.setSingleShot(True)
         self.sel_timer.setInterval(150)
+        self._sel_retry = QTimer(self)
+        self._sel_retry.setSingleShot(True)
+        self._sel_retry.setInterval(1500)
+        self._sel_retry.timeout.connect(lambda: self.cur_paths and self.selected_paths() == self.cur_paths
+                                        and not (self.edited or self.lyrics_edited) and self.on_select())
         self.sel_timer.timeout.connect(self.on_select)
         self.list.itemSelectionChanged.connect(self.schedule_select)
         self.list.itemSelectionChanged.connect(lambda: getattr(self, "xfer_timer", None) and self.xfer_timer.start())
@@ -3903,6 +3969,7 @@ class Main(QMainWindow):
         find_folder_image.cache_clear()
         self.meta.clear()
         self.tags_cache.clear()
+        TECH_MEM.clear()
         self.refresh_trees()
         self.load_folder(self.current_dir)
 
@@ -4135,6 +4202,11 @@ class Main(QMainWindow):
         """Llega una miniatura generada (o leída de la caché) en segundo plano."""
         icon = QIcon(QPixmap.fromImage(img)) if img is not None and not img.isNull() else None
         self.meta[f] = {"icon": icon, "has_lyrics": bool(lyrics)}
+        if tags and "_tech" in tags:
+            tags = dict(tags)
+            tech = tags.pop("_tech")
+            if isinstance(tech, (list, tuple)) and len(tech) == 2 and isinstance(tech[1], dict) and f not in TECH_MEM:
+                TECH_MEM[f] = (tech[0], tech[1], 0)   # la primera vez que se use solo se comprueba la fecha
         if tags and f not in self.tags_cache:
             self.tags_cache[f] = tags
         if gen != self.gen:
@@ -4163,6 +4235,10 @@ class Main(QMainWindow):
         for r in range(self.list.count()):
             it = self.list.item(r)
             p = it.data(PATH_ROLE)
+            st = (bool(self.pending.get(p)), p == self.playing_path)
+            if it.data(MARK_ROLE) == st or (it.data(MARK_ROLE) is None and st == (False, False)):
+                continue   # nada cambió: no se repinta ni se recoloca la lista
+            it.setData(MARK_ROLE, st)
             f = it.font()
             if self.pending.get(p):
                 it.setForeground(QBrush(QColor("#e67e00")))
@@ -5014,7 +5090,14 @@ class Main(QMainWindow):
         self.cur_paths = paths
         self.edited.clear()
         self.lyrics_edited = False
-        big = len(paths) > 60 and any(p not in self.tags_cache for p in paths)  # selección enorme: no leas todo
+        uncached = sum(1 for p in paths if p not in self.tags_cache and not self.pending.get(p))
+        big = len(paths) > 1 and uncached > 12   # muchas sin leer todavía: no se traba leyendo todas
+        key = tuple(paths)
+        if key != getattr(self, "_sel_key", None):
+            self._sel_key, self._sel_tries = key, 0
+        if big and self._sel_tries < 6:
+            self._sel_tries += 1
+            self._sel_retry.start()   # se vuelve a intentar cuando las miniaturas hayan leído las etiquetas
         for k, le in self.inputs.items():
             if big:
                 le.setText("")
@@ -5042,7 +5125,18 @@ class Main(QMainWindow):
             for k, chip in self.tech.items():
                 chip.set_full(f"{icons_[k]} —", T(names[k]))
             return
-        infos = [tech_info(p) for p in paths[:150]]
+        if len(paths) == 1:
+            infos = [tech_info(paths[0])]
+        else:   # varias: usa lo que ya está en memoria y lee como mucho unas pocas más (no traba la ventana)
+            infos, budget = [], 12
+            for p in paths[:400]:
+                i = tech_cached(p)
+                if i is None and budget > 0:
+                    budget -= 1
+                    i = tech_info(p)
+                if i is not None:
+                    infos.append(i)
+            infos = infos or [tech_info(paths[0])]
         for k, chip in self.tech.items():
             if k == "key":
                 continue
@@ -5415,6 +5509,7 @@ class Main(QMainWindow):
                 del self.pending[path]
                 self.meta.pop(path, None)
                 self.tags_cache.pop(path, None)
+                TECH_MEM.pop(path, None)
                 self.suggestions.pop(path, None)
                 self.chosen.discard(path)
             except Exception as e:
@@ -5477,6 +5572,7 @@ class Main(QMainWindow):
         for old in mapping:
             self.meta.pop(old, None)
             self.tags_cache.pop(old, None)
+            TECH_MEM.pop(old, None)
         self.refresh_shell(list(mapping.values()))
 
     # -------------------------------------------------------------- IA

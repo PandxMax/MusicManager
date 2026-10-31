@@ -480,3 +480,8 @@ VERSIÓN 1.77
 VERSIÓN 1.78
 ------------
  - Vista detalles: la cabecera de columnas ya no se queda cortada.
+
+VERSIÓN 1.79
+------------
+ - Más rápido y fluido: datos técnicos en segundo plano y en caché, selección de muchas canciones sin trabarse,
+   vista detalles más ligera, visualizador de abajo más liviano, carpetas grandes sin congelar la ventana.

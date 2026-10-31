@@ -56,8 +56,9 @@ class ThumbWorker(QThread):
     """Recibe listas de canciones y devuelve (gen, ruta, imagen o None, tiene_letra, etiquetas)."""
     ready = pyqtSignal(int, str, object, bool, object)
 
-    def __init__(self, side, inspect_file, read_tags, find_folder_image):
+    def __init__(self, side, inspect_file, read_tags, find_folder_image, tech_fn=None):
         super().__init__()
+        self.tech_fn = tech_fn   # datos técnicos (formato, bitrate…) también en segundo plano
         self.side = side
         self.inspect_file, self.read_tags, self.find_folder_image = inspect_file, read_tags, find_folder_image
         self.lock = threading.Condition()
@@ -93,7 +94,10 @@ class ThumbWorker(QThread):
                     return None
                 os.utime(png, None)   # marca de «usada ahora» para la limpieza de cada hora
             os.utime(js, None)
-            return img, bool(meta.get("lyrics")), meta.get("tags") or {}
+            tags = dict(meta.get("tags") or {})
+            if isinstance(meta.get("tech"), list) and len(meta["tech"]) == 2:
+                tags["_tech"] = meta["tech"]
+            return img, bool(meta.get("lyrics")), tags
         except (OSError, ValueError):
             return None
 
@@ -101,8 +105,10 @@ class ThumbWorker(QThread):
         try:
             if img is not None:
                 img.save(os.path.join(self.dir, k + ".png"), "PNG")
+            tags = dict(tags or {})
+            tech = tags.pop("_tech", None)
             with open(os.path.join(self.dir, k + ".json"), "w", encoding="utf-8") as fh:
-                json.dump({"thumb": img is not None, "lyrics": lyrics, "tags": tags}, fh, ensure_ascii=False)
+                json.dump({"thumb": img is not None, "lyrics": lyrics, "tags": tags, "tech": tech}, fh, ensure_ascii=False)
         except OSError:
             pass
 
@@ -139,11 +145,19 @@ class ThumbWorker(QThread):
             try:
                 k = key_of(path)
                 got = self.load_cached(k) if k else None
-                if got is None:
+                fresh = got is None
+                if fresh:
                     got = self.build(path)
-                    if k:
-                        self.save_cached(k, *got)
                 img, lyrics, tags = got
+                tags = dict(tags or {})
+                if self.tech_fn is not None and "_tech" not in tags:
+                    try:
+                        tags["_tech"] = self.tech_fn(path)
+                        fresh = True
+                    except Exception:
+                        pass
+                if fresh and k:
+                    self.save_cached(k, img, lyrics, tags)
                 self.ready.emit(gen, path, img, lyrics, tags)
             except Exception:
                 self.ready.emit(gen, path, None, False, None)

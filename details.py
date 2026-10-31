@@ -67,17 +67,25 @@ def sort_value(main, path, key, tech_info):
     return (0, (t.get(key) or "").lower())
 
 
+_MTIME = {}
+
+
 def cell_text(main, path, key, tech_info):
     if key == "file":
         return os.path.basename(path)
     if key in TAG_KEYS:
         return main.val(path, key)
     if key == "mtime":
-        try:
-            import time
-            return time.strftime("%d/%m/%Y %H:%M", time.localtime(os.path.getmtime(path)))
-        except OSError:
-            return ""
+        import time
+        now = time.monotonic()
+        e = _MTIME.get(path)
+        if e is None or now - e[1] > 5:   # no se pregunta al disco en cada repintado
+            try:
+                e = (time.strftime("%d/%m/%Y %H:%M", time.localtime(os.path.getmtime(path))), now)
+            except OSError:
+                e = ("", now)
+            _MTIME[path] = e
+        return e[0]
     v = tech_info(path).get(key, "")
     return "" if v in ("—", "-") else T(v)
 

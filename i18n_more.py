@@ -934,3 +934,23 @@ ROWS += [
      "Details view: the column title row (Name, Title, Artist, Album, Genre, Year…) was sometimes cut in half when the list changed size; it now always spans the full width.",
      "Режим «Подробно»: строка заголовков столбцов (Имя, Название, Исполнитель, Альбом, Жанр, Год…) иногда обрезалась при изменении размера списка; теперь она всегда на всю ширину."),
 ]
+ROWS += [
+    ("Más rápido al seleccionar muchas canciones: los datos técnicos (formato, bitrate, frecuencia…) ahora se leen en segundo plano junto con las miniaturas y se guardan en la caché, así no se vuelve a abrir cada archivo al seleccionar.",
+     "Faster when selecting many songs: technical data (format, bitrate, sample rate…) is now read in the background together with the thumbnails and cached, so files aren't reopened on every selection.",
+     "Быстрее при выборе многих песен: технические данные (формат, битрейт, частота…) теперь читаются в фоне вместе с миниатюрами и кэшируются."),
+    ("Si seleccionas muchas canciones que todavía no se han leído, el programa ya no se traba leyéndolas todas: muestra lo que tiene y se completa solo en un momento.",
+     "If you select many songs that haven't been read yet, the program no longer freezes reading them all: it shows what it has and fills in the rest shortly.",
+     "Если выбрать много ещё не прочитанных песен, программа больше не зависает: показывает то, что есть, и вскоре дополняет."),
+    ("Vista detalles más fluida al desplazarte: ya no se pregunta al disco por cada celda cada vez que se repinta.",
+     "Smoother scrolling in Details view: the disk is no longer queried for every cell on every repaint.",
+     "Более плавная прокрутка в режиме «Подробно»: диск больше не опрашивается для каждой ячейки при перерисовке."),
+    ("Marcar canciones como pendientes/sonando solo toca las que cambian (antes se repintaba la lista entera).",
+     "Marking songs as pending/playing only touches the ones that change (before, the whole list was repainted).",
+     "Отметка песен (несохранённые/играет) затрагивает только изменившиеся (раньше перерисовывался весь список)."),
+    ("El visualizador de la barra de abajo consume mucho menos (la «pantalla» apagada se dibuja una sola vez) y no trabaja con la ventana minimizada.",
+     "The bottom bar visualizer uses much less CPU (the unlit “screen” is drawn only once) and stops working while the window is minimized.",
+     "Визуализатор в нижней панели потребляет гораздо меньше (выключенный «экран» рисуется один раз) и не работает при свёрнутом окне."),
+    ("Las carpetas con muchas canciones se colocan por partes, sin congelar la ventana.",
+     "Folders with many songs are laid out in parts, without freezing the window.",
+     "Папки с большим количеством песен раскладываются по частям, не замораживая окно."),
+]
