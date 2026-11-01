@@ -27,9 +27,8 @@ def close_unexpected():
         if m is not None and not getattr(m, "_expected", False):
             _n[0] += 1
             m.grab().save(os.path.join(OUT, f"inesperado_{_n[0]}.png"))
-            txt = getattr(m, "text", lambda: "")()
-            print("modal inesperado:", type(m).__name__, m.windowTitle(), txt, flush=True)
             m.close()
+            print("modal inesperado:", type(m).__name__, ascii(m.windowTitle()), flush=True)
     except Exception as e:
         print("guardia:", e, flush=True)
 
@@ -49,7 +48,7 @@ def wait(ms):
 def shot(widget, name):
     wait(300)
     widget.grab().save(os.path.join(OUT, name + ".png"))
-    print("captura", name, flush=True)
+    print("captura", ascii(name), flush=True)
 
 
 def cover(c1, c2, text):
@@ -105,7 +104,7 @@ for artist, album, year, genre, c1, c2, songs in albums:
 cfg = QSettings("MusicManager", "MusicManager")
 cfg.clear()
 for k, v in {"welcomed": 1, "auto_update": 0, "last_dir": first, "open_last": 1, "pinned": json.dumps([root]),
-             "theme": "dark"}.items():
+             "theme": "dark", "last_version": mm.APP_VERSION}.items():
     cfg.setValue(k, v)
 cfg.sync()
 
@@ -138,7 +137,7 @@ def grab_modal(name):
         m = QApplication.activeModalWidget()
         if m is not None:
             m.grab().save(os.path.join(OUT, name + ".png"))
-            print("captura", name, flush=True)
+            print("captura", ascii(name), flush=True)
             m.reject()
     QTimer.singleShot(1500, go)
 

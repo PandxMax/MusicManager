@@ -12,6 +12,7 @@ jobs:
         with: { python-version: '3.12' }
       - run: pip install -r requirements.txt
       - run: python -u .github/capturas.py
+        env: { PYTHONIOENCODING: utf-8 }
         timeout-minutes: 8
       - name: Subir capturas a la rama «capturas»
         if: always()
