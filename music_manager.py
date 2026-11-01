@@ -66,12 +66,14 @@ FIELDS = [("title", "Título"), ("artist", "Intérprete"), ("album", "Álbum"),
           ("genre", "Género"), ("date", "Año"), ("tracknumber", "Pista"),
           ("discnumber", "Número de disco"), ("comment", "Comentario")]
 EASY_KEYS = {k for k, _ in FIELDS}
+MB_KEYS = {"musicbrainz_trackid", "musicbrainz_releasetrackid", "musicbrainz_albumid", "musicbrainz_releasegroupid",
+           "musicbrainz_artistid", "musicbrainz_albumartistid", "acoustid_id"}   # IDs de MusicBrainz / AcoustID
 PATH_ROLE = Qt.ItemDataRole.UserRole
 KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.88"
+APP_VERSION = "1.89"
 
 
 class TMenu(QMenu):
@@ -880,6 +882,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.89', [
+        'Nuevo (idea de Picard): Herramientas → «Identificar por sonido (AcoustID)». Reconoce las canciones escuchando el audio, aunque se llamen «track01.mp3» y no tengan etiquetas. Muestra los resultados con su porcentaje de seguridad y eliges el correcto. Necesita una clave gratuita de AcoustID (botón «Conseguir clave gratis»); el analizador fpcalc (1,5 MB) se descarga solo la primera vez.',
+        'Nuevo (idea de Picard): Herramientas → «Emparejar álbum con MusicBrainz». Busca el álbum, eliges el lanzamiento (fecha, país, formato, sello, nº de pistas) y coloca cada archivo en su pista según título, duración y número. Corrige de una vez título, intérprete, pista, disco, año e intérprete del álbum, pone la portada del Cover Art Archive y guarda los IDs de MusicBrainz.',
+        'Los IDs de MusicBrainz y AcoustID se guardan en las etiquetas: Navidrome, Plex, Jellyfin y otros agrupan los álbumes sin errores.',
+    ]),
     ('1.88', [
         'Nuevo: Herramientas → «Navidrome (servidor de música)». Conecta con tu Navidrome (dirección, usuario y contraseña; la contraseña no se guarda, solo un código de acceso) y: actualiza la biblioteca al momento (o automáticamente cada vez que guardas), revisa tus carpetas y te dice lo que se verá mal en Navidrome (álbumes partidos, años distintos, sin pista, sin portada o pequeña, discos sin número, géneros generales…) y muestra tus canciones más escuchadas, favoritas y álbumes más escuchados.',
     ]),
@@ -1420,7 +1427,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.88 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.89 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5910,7 +5917,7 @@ class Main(QMainWindow):
         saved_paths = []
         for path, ch in list(self.pending.items()):
             try:
-                easy = {k: v for k, v in ch.items() if k in EASY_KEYS}
+                easy = {k: v for k, v in ch.items() if k in EASY_KEYS or k in MB_KEYS}
                 if easy:
                     skipped |= set(write_tags(path, easy))
                 if "lyrics" in ch or "_cover" in ch:
@@ -6571,6 +6578,8 @@ class Main(QMainWindow):
                              ("🔄 Convertir formato…", self.convert_selected),
                              ("🏷 Géneros en lote…", self.open_batch_genres),
                              ("📁 Crear carpetas por… (intérprete, álbum, género…)", self.open_folders_by),
+                             ("🎧 Identificar por sonido (AcoustID)…", self.open_acoustid),
+                             ("💿 Emparejar álbum con MusicBrainz…", self.open_album_match),
                              ("▶️ Buscar en YouTube", lambda: self.open_youtube(p))):
                 tools.addAction(T(text), fn)
             artist = self.val(p, "artist")
@@ -7059,6 +7068,10 @@ class Main(QMainWindow):
                              "Deja todas las canciones seleccionadas con el mismo volumen"))
         t.addAction(self.act("🏷 Géneros en lote…", self.open_batch_genres,
                              "Afina géneros generales («Electronic», «Rock»…) por álbum con MusicBrainz y la IA, o pon géneros a muchas a la vez"))
+        t.addAction(self.act("🎧 Identificar por sonido (AcoustID)…", self.open_acoustid,
+                             "Reconoce las canciones seleccionadas escuchando su audio, aunque no tengan nombre ni etiquetas"))
+        t.addAction(self.act("💿 Emparejar álbum con MusicBrainz…", self.open_album_match,
+                             "Coloca cada archivo en su pista del álbum y corrige título, pista, disco, año e intérprete del álbum"))
         t.addAction(self.act("📡 Navidrome (servidor de música)…", self.open_navidrome,
                              "Conecta con tu Navidrome: actualizar la biblioteca, revisar qué se verá mal y ver tus más escuchadas"))
         t.addAction(self.act("🔁 Buscar canciones repetidas…", self.open_dupes,
@@ -7174,6 +7187,26 @@ class Main(QMainWindow):
         f = self._lib_folder()
         if f:
             self._show_tool(libtools.OrganizeDialog(self, f, AUDIO_EXT))
+
+    def open_acoustid(self):
+        import picard_tools
+        paths = [p for p in self.selected_paths() if p and os.path.isfile(p)]
+        if not paths:
+            self.statusBar().showMessage(T("Selecciona una o varias canciones."))
+            return
+        self._show_tool(picard_tools.AcoustIdDialog(self, paths[:200]))
+
+    def open_album_match(self):
+        import picard_tools
+        paths = [p for p in self.selected_paths() if p and os.path.isfile(p)]
+        if len(paths) < 2:   # sin selección (o una sola): todas las canciones de la carpeta abierta
+            paths = [self.list.item(r).data(PATH_ROLE) for r in range(self.list.count())
+                     if self.list.item(r).data(KIND_ROLE) != "dir"]
+        paths = [p for p in paths if p and os.path.isfile(p)]
+        if not paths:
+            self.statusBar().showMessage(T("Abre una carpeta con un álbum o selecciona sus canciones."))
+            return
+        self._show_tool(picard_tools.AlbumMatchDialog(self, paths[:150], tech_info))
 
     def open_navidrome(self):
         import navidrome
