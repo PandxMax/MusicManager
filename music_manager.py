@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.89"
+APP_VERSION = "1.90"
 
 
 class TMenu(QMenu):
@@ -882,6 +882,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.90', [
+        'El analizador de audio fpcalc (para «Identificar por sonido») ya viene incluido en el programa: no hay que descargar nada al usarlo por primera vez.',
+    ]),
     ('1.89', [
         'Nuevo (idea de Picard): Herramientas → «Identificar por sonido (AcoustID)». Reconoce las canciones escuchando el audio, aunque se llamen «track01.mp3» y no tengan etiquetas. Muestra los resultados con su porcentaje de seguridad y eliges el correcto. Necesita una clave gratuita de AcoustID (botón «Conseguir clave gratis»); el analizador fpcalc (1,5 MB) se descarga solo la primera vez.',
         'Nuevo (idea de Picard): Herramientas → «Emparejar álbum con MusicBrainz». Busca el álbum, eliges el lanzamiento (fecha, país, formato, sello, nº de pistas) y coloca cada archivo en su pista según título, duración y número. Corrige de una vez título, intérprete, pista, disco, año e intérprete del álbum, pone la portada del Cover Art Archive y guarda los IDs de MusicBrainz.',
@@ -1427,7 +1430,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.89 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.90 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()

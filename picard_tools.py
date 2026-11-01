@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushBut
                              QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar, QMessageBox, QAbstractItemView)
 from i18n import tr as T
 
-UA = "MusicManager/1.89 ( https://github.com/PandxMax/MusicManager )"
+UA = "MusicManager/1.90 ( https://github.com/PandxMax/MusicManager )"
 FP_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
 FP_SHA256 = "36b478e16aa69f757f376645db0d436073a42c0097b6bb2677109e7835b59bbc"
 MB_KEYS = {"musicbrainz_trackid", "musicbrainz_releasetrackid", "musicbrainz_albumid", "musicbrainz_releasegroupid",
@@ -80,9 +80,11 @@ def tools_dir():
 
 
 def fpcalc_exe():
-    p = os.path.join(tools_dir(), "fpcalc.exe" if sys.platform == "win32" else "fpcalc")
-    if os.path.isfile(p):
-        return p
+    name = "fpcalc.exe" if sys.platform == "win32" else "fpcalc"
+    here = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
+    for p in (os.path.join(here, name), os.path.join(tools_dir(), name)):   # viene incluido junto al programa
+        if os.path.isfile(p):
+            return p
     return shutil.which("fpcalc")
 
 

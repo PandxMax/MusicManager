@@ -532,3 +532,7 @@ VERSIÓN 1.89
 ------------
  - Nuevo: Identificar por sonido (AcoustID) y Emparejar álbum con MusicBrainz (ideas de Picard),
    con portada del Cover Art Archive e IDs de MusicBrainz en las etiquetas.
+
+VERSIÓN 1.90
+------------
+ - fpcalc (analizador para Identificar por sonido) viene incluido.

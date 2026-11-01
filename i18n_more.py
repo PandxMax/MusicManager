@@ -1198,3 +1198,8 @@ ROWS += [
      "MusicBrainz and AcoustID IDs are saved in the tags: Navidrome, Plex, Jellyfin and others group albums without errors.",
      "ID MusicBrainz и AcoustID сохраняются в тегах для точной группировки альбомов."),
 ]
+ROWS += [
+    ("El analizador de audio fpcalc (para «Identificar por sonido») ya viene incluido en el programa: no hay que descargar nada al usarlo por primera vez.",
+     "The fpcalc audio analyzer (for “Identify by sound”) now comes bundled with the program: nothing to download the first time.",
+     "Анализатор fpcalc (для «Распознать по звуку») теперь входит в программу: ничего скачивать не нужно."),
+]
