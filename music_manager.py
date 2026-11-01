@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QRadioButton, QButtonGroup,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QRadioButton, QButtonGroup,
 )
 import mutagen
 import i18n
@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.86"
+APP_VERSION = "1.87"
 
 
 class TMenu(QMenu):
@@ -444,6 +444,7 @@ QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 1
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
+QLineEdit#renameedit { background: @surface; border: 2px solid @accent; border-radius: 6px; padding: 2px 6px; }
 QToolButton#foldmini { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 0px; }
 QToolButton#foldmini:hover { background: @accent_soft; border-color: @accent; }
 QToolButton#foldbar { background: transparent; border: none; border-top: 1px solid @border; color: @muted; padding: 2px 8px; font-size: 12px; }
@@ -879,6 +880,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.87', [
+        'Renombrar en la lista: el cuadro para escribir ahora es ancho, con borde de color y se ve entero (antes salía pequeño y cortado en el modo iconos). Al abrirse ya tiene el nombre seleccionado.',
+        'Modo iconos: los nombres largos se ven en hasta 3 líneas en vez de cortarse con «…» a la primera.',
+        'Renombrar ya no falla si el archivo estaba abierto un instante (miniatura o tonalidad): se reintenta solo.',
+    ]),
     ('1.86', [
         'Arreglo importante: al eliminar (o mover / renombrar) una carpeta que se veía en el árbol, el programa podía quedarse colgado («No responde»). La vigilancia de carpetas de la 1.83 dejaba la carpeta «en uso» y Windows no podía llevarla a la papelera. Ahora se deja de vigilar antes de tocarla.',
     ]),
@@ -1411,7 +1417,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.86 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.87 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2927,6 +2933,51 @@ class GenreChat(QDialog):
         self.main.apply_genre(self.path, self.apply_le.text().strip())
 
 
+class SongDelegate(QStyledItemDelegate):
+    """Delegado de la lista en modo iconos/lista: los nombres largos se ven en varias líneas (no se cortan con «…»
+    a la primera) y el cuadro para renombrar es ancho y se ve entero."""
+    def __init__(self, lst):
+        super().__init__(lst)
+        self.lst = lst
+
+    def _icons(self):
+        return self.lst.viewMode() == QListView.ViewMode.IconMode and self.lst.gridSize().isValid()
+
+    def sizeHint(self, option, index):
+        if self._icons():   # todas del mismo tamaño que la cuadrícula: caben 3 líneas de nombre
+            g = self.lst.gridSize()
+            return QSize(g.width() - 6, g.height() - 6)
+        return super().sizeHint(option, index)
+
+    def createEditor(self, parent, option, index):
+        ed = super().createEditor(parent, option, index)
+        if isinstance(ed, QLineEdit):
+            ed.setObjectName("renameedit")
+            if self._icons():
+                ed.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        return ed
+
+    def setEditorData(self, editor, index):
+        super().setEditorData(editor, index)
+        if isinstance(editor, QLineEdit):
+            editor.selectAll()
+
+    def updateEditorGeometry(self, editor, option, index):
+        r = option.rect
+        vp = self.lst.viewport().rect()
+        isz = self.lst.iconSize()
+        if self._icons():
+            w = min(max(r.width() + 90, 280), vp.width() - 8)
+            x = max(4, min(r.center().x() - w // 2, vp.width() - w - 4))
+            y = min(r.top() + isz.height() + 8, vp.height() - 34)
+            editor.setGeometry(QRect(x, y, w, 30))
+        else:
+            x = r.x() + isz.width() + 10
+            w = max(min(vp.width() - x - 6, 520), 220)
+            h = max(r.height(), 28)
+            editor.setGeometry(QRect(x, r.y() + (r.height() - h) // 2, w, h))
+
+
 class SongList(QListWidget):
     """Canciones (y subcarpetas) como en un explorador. El arrastre se maneja a mano para
     que funcione siempre: se puede soltar sobre una carpeta de esta lista o de los árboles."""
@@ -3320,6 +3371,8 @@ class Main(QMainWindow):
 
         # ---------- lista de canciones y carpetas (estilo explorador)
         self.list = SongList()
+        self.list.setItemDelegate(SongDelegate(self.list))
+        self.list.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.list.setMovement(QListView.Movement.Static)
         self.list.setResizeMode(QListView.ResizeMode.Adjust)
@@ -4279,7 +4332,7 @@ class Main(QMainWindow):
         if mode == "icons":
             self.list.setViewMode(QListView.ViewMode.IconMode)
             self.list.setIconSize(QSize(self.icon_px, self.icon_px))
-            self.list.setGridSize(QSize(self.icon_px + 38, self.icon_px + 60))
+            self.list.setGridSize(QSize(self.icon_px + 44, self.icon_px + 74))   # 3 líneas para el nombre
             self.list.setSpacing(6)
             self.list.setWordWrap(True)
         else:
@@ -5354,7 +5407,15 @@ class Main(QMainWindow):
                 continue
             try:
                 self.release_if([old])
-                os.rename(old, new)
+                for attempt in range(8):   # el archivo puede estar abierto un instante (miniatura, tonalidad…)
+                    try:
+                        os.rename(old, new)
+                        break
+                    except PermissionError:
+                        if attempt == 7:
+                            raise
+                        QApplication.processEvents()
+                        time.sleep(0.15)
                 self.retarget(old, new)
                 newpaths.append(new)
                 done += 1

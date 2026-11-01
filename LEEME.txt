@@ -518,3 +518,7 @@ VERSIÓN 1.85
 VERSIÓN 1.86
 ------------
  - Arreglo: el programa ya no se cuelga al eliminar, mover o renombrar carpetas que se ven en el árbol.
+
+VERSIÓN 1.87
+------------
+ - Renombrar: cuadro ancho y completo. Modo iconos: nombres en hasta 3 líneas.

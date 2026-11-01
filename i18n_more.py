@@ -1073,3 +1073,14 @@ ROWS += [
      "Important fix: deleting (or moving / renaming) a folder shown in the tree could hang the program (“Not responding”). The folder watching added in 1.83 kept the folder “in use” and Windows couldn't send it to the Recycle Bin. Watching now stops before the folder is touched.",
      "Важное исправление: удаление (перемещение/переименование) папки из дерева могло повесить программу. Наблюдение за папками держало папку «занятой». Теперь наблюдение снимается заранее."),
 ]
+ROWS += [
+    ("Renombrar en la lista: el cuadro para escribir ahora es ancho, con borde de color y se ve entero (antes salía pequeño y cortado en el modo iconos). Al abrirse ya tiene el nombre seleccionado.",
+     "Renaming in the list: the edit box is now wide, with a colored border and fully visible (before it was small and cut off in icon view). It opens with the name selected.",
+     "Переименование в списке: поле ввода теперь широкое, с цветной рамкой и видно целиком. Имя сразу выделено."),
+    ("Modo iconos: los nombres largos se ven en hasta 3 líneas en vez de cortarse con «…» a la primera.",
+     "Icon view: long names show on up to 3 lines instead of being cut with “…” after the first.",
+     "Режим значков: длинные имена показываются в 3 строки вместо обрезки «…»."),
+    ("Renombrar ya no falla si el archivo estaba abierto un instante (miniatura o tonalidad): se reintenta solo.",
+     "Renaming no longer fails if the file was briefly open (thumbnail or key detection): it retries automatically.",
+     "Переименование больше не срывается, если файл был кратко открыт: повтор выполняется сам."),
+]
