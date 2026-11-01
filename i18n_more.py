@@ -1060,3 +1060,11 @@ ROWS += [
      "Lyrics: new “🌐 Search on musica.com” (opens the song's lyrics on musica.com) and “📋 Paste lyrics” (uses what you copied, cleaning extra spaces and lines) buttons. Also in the window shown when lyrics aren't found.",
      "Текст: новые кнопки «🌐 Искать на musica.com» и «📋 Вставить текст». Также в окне, когда текст не найден."),
 ]
+ROWS += [
+    ("Los árboles de carpetas ya no saltan hacia abajo al eliminar, mover, arrastrar, crear o renombrar algo: se quedan desplazados donde estaban.",
+     "Folder trees no longer jump down when you delete, move, drag, create or rename something: they stay scrolled where they were.",
+     "Деревья папок больше не прыгают вниз при удалении, перемещении, создании или переименовании: остаются на месте."),
+    ("La lista de canciones tampoco vuelve arriba al recargar la misma carpeta (tras borrar, mover o renombrar): se queda en la misma posición.",
+     "The song list no longer jumps back to the top when the same folder reloads (after deleting, moving or renaming): it keeps its position.",
+     "Список песен больше не возвращается наверх при перезагрузке той же папки: позиция сохраняется."),
+]

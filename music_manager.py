@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.84"
+APP_VERSION = "1.85"
 
 
 class TMenu(QMenu):
@@ -879,6 +879,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.85', [
+        'Los árboles de carpetas ya no saltan hacia abajo al eliminar, mover, arrastrar, crear o renombrar algo: se quedan desplazados donde estaban.',
+        'La lista de canciones tampoco vuelve arriba al recargar la misma carpeta (tras borrar, mover o renombrar): se queda en la misma posición.',
+    ]),
     ('1.84', [
         'Letra: nuevos botones «🌐 Buscar en musica.com» (abre la letra de la canción en musica.com) y «📋 Pegar letra» (pone lo que copiaste como letra, limpiando espacios y líneas de sobra). También en la ventana que sale cuando no se encuentra la letra.',
     ]),
@@ -1404,7 +1408,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.84 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.85 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2433,10 +2437,23 @@ class FolderTree(QTreeWidget):
             yield it
             stack.extend(it.child(i) for i in range(it.childCount()))
 
+    def keep_scroll(self):
+        """Devuelve una función que deja el árbol desplazado donde estaba (al refrescar no salta abajo)."""
+        vs, hs = self.verticalScrollBar().value(), self.horizontalScrollBar().value()
+
+        def back():
+            self.verticalScrollBar().setValue(vs)
+            self.horizontalScrollBar().setValue(hs)
+        return back
+
     def refresh(self):
+        back = self.keep_scroll()
         exp = {it.data(0, PATH_ROLE) for it in self.all_items() if it.isExpanded()}
         cur = self.currentItem()
         curp = cur.data(0, PATH_ROLE) if cur else None
+        self.setUpdatesEnabled(False)
+        auto = self.hasAutoScroll()
+        self.setAutoScroll(False)   # elegir la carpeta actual no debe mover el árbol
         self.blockSignals(True)
         for i in range(self.topLevelItemCount()):
             top = self.topLevelItem(i)
@@ -2454,6 +2471,10 @@ class FolderTree(QTreeWidget):
             if p is not None and it.isExpanded() != (p in exp) and it.childCount():
                 it.setExpanded(p in exp)
         self.blockSignals(False)
+        self.setAutoScroll(auto)
+        back()
+        self.setUpdatesEnabled(True)
+        QTimer.singleShot(0, back)
 
     def reveal(self, path):
         """Expande el árbol hasta la carpeta indicada y la selecciona."""
@@ -4429,6 +4450,9 @@ class Main(QMainWindow):
         files = self.sort_files(files)
         self.gen += 1
         self.thumb_queue = []
+        same_dir = bool(self.current_dir) and getattr(self, "_listed_dir", None) == path
+        keep_v = self.list.verticalScrollBar().value() if same_dir else 0
+        self._listed_dir = path
         self._loading_dir = True
         self.list.setUpdatesEnabled(False)   # se llena de una vez y se pinta al final (no canción por canción)
         self.list.clear()
@@ -4452,6 +4476,10 @@ class Main(QMainWindow):
         self._loading_dir = False
         self.list.setUpdatesEnabled(True)
         self._thumb_left = len(self.thumb_queue)
+        if keep_v:   # misma carpeta (tras borrar, mover, renombrar…): la lista se queda donde estaba
+            sb = self.list.verticalScrollBar()
+            for ms in (0, 60, 200):
+                QTimer.singleShot(ms, lambda v=keep_v: sb.setValue(min(v, sb.maximum())))
         self.update_nav()
         if keep_paths:
             self.list.blockSignals(True)

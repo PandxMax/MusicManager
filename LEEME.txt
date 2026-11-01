@@ -510,3 +510,7 @@ VERSIÓN 1.83
 VERSIÓN 1.84
 ------------
  - Letra: botones «Buscar en musica.com» y «Pegar letra».
+
+VERSIÓN 1.85
+------------
+ - Árboles y lista conservan su posición de desplazamiento al borrar, mover o arrastrar.
