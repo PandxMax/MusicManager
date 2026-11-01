@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.90"
+APP_VERSION = "1.91"
 
 
 class TMenu(QMenu):
@@ -882,6 +882,11 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.91', [
+        'Arrastrar muchas canciones a una carpeta: ya no se quedan la mayoría sin mover. Si un archivo está «en uso» un instante (miniatura, tonalidad, antivirus), se reintenta hasta 3 segundos; las miniaturas se pausan mientras se mueve, y al final solo quedan marcadas las que de verdad no se pudieron mover (con el motivo).',
+        'Sombrear bajando: al llevar el ratón por debajo de la lista, se desplaza rápido (más lejos = más rápido) en vez de ir lento.',
+        'Árboles: sombrear varias carpetas ya no abre cada carpeta por la que pasas (se abre al soltar). Arrastrar hacia arriba/abajo desde una carpeta no elegida sombrea; hacia un lado, la arrastra.',
+    ]),
     ('1.90', [
         'El analizador de audio fpcalc (para «Identificar por sonido») ya viene incluido en el programa: no hay que descargar nada al usarlo por primera vez.',
     ]),
@@ -1430,7 +1435,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.90 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.91 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2357,6 +2362,28 @@ class FolderTree(QTreeWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.itemExpanded.connect(self.on_expand)
 
+    # ---- sombrear varias carpetas (arrastrando hacia arriba/abajo desde una no elegida) o arrastrarlas
+    def mousePressEvent(self, e):
+        it = self.itemAt(e.position().toPoint())
+        self._t_press = e.position().toPoint() if e.button() == Qt.MouseButton.LeftButton else None
+        self._t_unsel = it is not None and not it.isSelected()
+        super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        pp = getattr(self, "_t_press", None)
+        if (pp is not None and getattr(self, "_t_unsel", False) and self.dragEnabled()
+                and e.buttons() & Qt.MouseButton.LeftButton):
+            d = e.position().toPoint() - pp
+            if d.manhattanLength() >= QApplication.startDragDistance() and abs(d.y()) >= abs(d.x()):
+                self.setDragEnabled(False)   # hacia arriba/abajo = sombrear; hacia un lado = arrastrar la carpeta
+        super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        super().mouseReleaseEvent(e)
+        self._t_press = None
+        if not self.dragEnabled():
+            self.setDragEnabled(True)
+
     # ---- arrastrar y soltar
     def mimeData(self, items):
         md = QMimeData()
@@ -3012,6 +3039,30 @@ class SongList(QListWidget):
         self.overlay.setWordWrap(True)
         self.overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.overlay.hide()
+        self._auto = QTimer(self)
+        self._auto.setInterval(30)
+        self._auto.timeout.connect(self._auto_tick)
+
+    def _auto_tick(self):
+        """Al sombrear y llevar el ratón por debajo (o encima) de la lista, se desplaza rápido: más lejos = más rápido."""
+        if not self.selecting:
+            self._auto.stop()
+            return
+        lp = self.viewport().mapFromGlobal(QCursor.pos())
+        h = self.viewport().height()
+        edge = 28
+        if lp.y() > h - edge:
+            dist = lp.y() - (h - edge)
+        elif lp.y() < edge:
+            dist = lp.y() - edge
+        else:
+            return
+        step = int(max(10, min(140, abs(dist) * 0.9))) * (1 if dist > 0 else -1)
+        sb = self.verticalScrollBar()
+        old = sb.value()
+        sb.setValue(old + step)
+        if sb.value() != old:
+            self._nudge()   # que la selección siga al ratón
 
     @property
     def selecting(self):
@@ -3082,6 +3133,7 @@ class SongList(QListWidget):
             self._press_item = self.itemAt(self._press)
             self._press_unsel = self._press_item is not None and not self._press_item.isSelected()
             self._selecting = True
+            self._auto.start()
             it = self._press_item
             if (it is not None and it.isSelected() and len(self.selectedItems()) > 1
                     and not (e.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier))):
@@ -4177,12 +4229,29 @@ class Main(QMainWindow):
             "Segundo árbol activado: arrastra carpetas de un árbol al otro." if on else "Segundo árbol oculto.")
 
     def on_tree_current(self, tree, cur):
+        """Se abre la carpeta un momento después (y solo al soltar el ratón): al sombrear varias carpetas o bajar
+        con las flechas no se carga cada carpeta por la que pasas."""
         if getattr(self, "xfer_timer", None):
             self.xfer_timer.start()
         if cur is None:
             return
         self.active_tree = tree
-        self.load_folder(cur.data(0, PATH_ROLE))
+        self._tree_pending = cur.data(0, PATH_ROLE)
+        t = getattr(self, "_tree_timer", None)
+        if t is None:
+            t = self._tree_timer = QTimer(self)
+            t.setSingleShot(True)
+            t.setInterval(180)
+            t.timeout.connect(self.tree_load_pending)
+        t.start()
+
+    def tree_load_pending(self):
+        if QApplication.mouseButtons() & Qt.MouseButton.LeftButton:
+            self._tree_timer.start()   # todavía estás sombreando o arrastrando
+            return
+        p = getattr(self, "_tree_pending", None)
+        if p and p != self.current_dir:
+            self.load_folder(p)
 
     def on_tree_click(self, tree, item):
         self.active_tree = tree
@@ -4285,10 +4354,31 @@ class Main(QMainWindow):
                 self.mark_items()
                 return
 
+    def fs_retry(self, fn, *args):
+        """Windows deja un archivo «en uso» un instante si algo lo está leyendo (miniatura, tonalidad, antivirus…):
+        se reintenta durante unos 3 segundos antes de darlo por fallido."""
+        for attempt in range(20):
+            try:
+                return fn(*args)
+            except PermissionError:
+                if attempt == 19:
+                    raise
+                QApplication.processEvents()
+                time.sleep(0.15)
+
     def move_items(self, paths, target):
         target = os.path.normpath(target)
-        moved, errors = 0, []
-        for src in paths:
+        moved, errors, failed = 0, [], []
+        try:
+            self.thumbs.request(self.gen, [])   # que las miniaturas no estén leyendo estos archivos mientras se mueven
+        except Exception:
+            pass
+        self.release_if(list(paths))
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        for i, src in enumerate(paths):
+            if i % 10 == 0:
+                self.statusBar().showMessage(T(f"Moviendo {i + 1} de {len(paths)}…"))
+                QApplication.processEvents()
             src = os.path.normpath(src)
             if not os.path.exists(src):
                 continue
@@ -4309,18 +4399,21 @@ class Main(QMainWindow):
                     n += 1
                 dst = f"{root} ({n}){ext}"
             try:
-                self.release_if([src])
-                shutil.move(src, dst)
+                self.fs_retry(shutil.move, src, dst)
                 moved += 1
                 if os.path.isfile(dst):
                     self.retarget(src, dst)
             except Exception as e:
                 errors.append(f"{name}: {e}")
+                failed.append(src)
+        QApplication.restoreOverrideCursor()
         self.statusBar().showMessage(f"{moved} elemento(s) movido(s) a {target}")
         if errors:
-            QMessageBox.warning(self, "Algunos elementos no se movieron", "\n".join(errors))
+            QMessageBox.warning(self, "Algunos elementos no se movieron", "\n".join(errors[:20]))
         QApplication.processEvents()
         self.after_fs_change()
+        if failed:   # solo quedan marcadas las que no se pudieron mover
+            self.load_folder(self.current_dir, select=failed)
 
     def reload_all(self):
         find_folder_image.cache_clear()

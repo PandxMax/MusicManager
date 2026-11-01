@@ -1203,3 +1203,14 @@ ROWS += [
      "The fpcalc audio analyzer (for “Identify by sound”) now comes bundled with the program: nothing to download the first time.",
      "Анализатор fpcalc (для «Распознать по звуку») теперь входит в программу: ничего скачивать не нужно."),
 ]
+ROWS += [
+    ("Arrastrar muchas canciones a una carpeta: ya no se quedan la mayoría sin mover. Si un archivo está «en uso» un instante (miniatura, tonalidad, antivirus), se reintenta hasta 3 segundos; las miniaturas se pausan mientras se mueve, y al final solo quedan marcadas las que de verdad no se pudieron mover (con el motivo).",
+     "Dragging many songs to a folder: most of them no longer get left behind. If a file is briefly “in use” (thumbnail, key detection, antivirus) it retries for up to 3 seconds; thumbnails pause while moving, and only the files that really couldn't be moved stay selected (with the reason).",
+     "Перетаскивание многих песен в папку: файлы больше не остаются на месте. Занятые файлы повторяются до 3 секунд; выделенными остаются только неперемещённые."),
+    ("Sombrear bajando: al llevar el ratón por debajo de la lista, se desplaza rápido (más lejos = más rápido) en vez de ir lento.",
+     "Highlighting downwards: moving the mouse below the list now scrolls fast (farther = faster) instead of slowly.",
+     "Выделение вниз: при выходе мыши за список прокрутка быстрая (дальше — быстрее)."),
+    ("Árboles: sombrear varias carpetas ya no abre cada carpeta por la que pasas (se abre al soltar). Arrastrar hacia arriba/abajo desde una carpeta no elegida sombrea; hacia un lado, la arrastra.",
+     "Trees: highlighting several folders no longer opens every folder you pass over (it opens on release). Dragging up/down from an unselected folder highlights; sideways drags it.",
+     "Деревья: выделение нескольких папок больше не открывает каждую папку. Вверх/вниз — выделение, в сторону — перетаскивание."),
+]

@@ -536,3 +536,8 @@ VERSIÓN 1.89
 VERSIÓN 1.90
 ------------
  - fpcalc (analizador para Identificar por sonido) viene incluido.
+
+VERSIÓN 1.91
+------------
+ - Mover muchas canciones arrastrando: reintentos si un archivo está en uso; solo quedan marcadas las que fallan.
+ - Sombrear hacia abajo con desplazamiento rápido. Árboles: sombrear sin abrir cada carpeta.
