@@ -522,3 +522,8 @@ VERSIÓN 1.86
 VERSIÓN 1.87
 ------------
  - Renombrar: cuadro ancho y completo. Modo iconos: nombres en hasta 3 líneas.
+
+VERSIÓN 1.88
+------------
+ - Nuevo: Herramientas → Navidrome: conectar, actualizar biblioteca (también al guardar), revisión de lo que
+   se verá mal en Navidrome y tus más escuchadas / favoritas.

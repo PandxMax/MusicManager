@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.87"
+APP_VERSION = "1.88"
 
 
 class TMenu(QMenu):
@@ -880,6 +880,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.88', [
+        'Nuevo: Herramientas → «Navidrome (servidor de música)». Conecta con tu Navidrome (dirección, usuario y contraseña; la contraseña no se guarda, solo un código de acceso) y: actualiza la biblioteca al momento (o automáticamente cada vez que guardas), revisa tus carpetas y te dice lo que se verá mal en Navidrome (álbumes partidos, años distintos, sin pista, sin portada o pequeña, discos sin número, géneros generales…) y muestra tus canciones más escuchadas, favoritas y álbumes más escuchados.',
+    ]),
     ('1.87', [
         'Renombrar en la lista: el cuadro para escribir ahora es ancho, con borde de color y se ve entero (antes salía pequeño y cortado en el modo iconos). Al abrirse ya tiene el nombre seleccionado.',
         'Modo iconos: los nombres largos se ven en hasta 3 líneas en vez de cortarse con «…» a la primera.',
@@ -1417,7 +1420,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.87 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.88 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5936,6 +5939,12 @@ class Main(QMainWindow):
         if skipped:
             msg += f" Campos no soportados por algún formato: {', '.join(sorted(skipped))}."
         self.statusBar().showMessage(msg)
+        if ok:
+            try:
+                import navidrome
+                navidrome.scan_in_background(self)   # si está activado: Navidrome relee la biblioteca
+            except Exception:
+                pass
         if errors:
             QMessageBox.warning(self, "Errores al guardar", "\n".join(errors))
 
@@ -7050,6 +7059,8 @@ class Main(QMainWindow):
                              "Deja todas las canciones seleccionadas con el mismo volumen"))
         t.addAction(self.act("🏷 Géneros en lote…", self.open_batch_genres,
                              "Afina géneros generales («Electronic», «Rock»…) por álbum con MusicBrainz y la IA, o pon géneros a muchas a la vez"))
+        t.addAction(self.act("📡 Navidrome (servidor de música)…", self.open_navidrome,
+                             "Conecta con tu Navidrome: actualizar la biblioteca, revisar qué se verá mal y ver tus más escuchadas"))
         t.addAction(self.act("🔁 Buscar canciones repetidas…", self.open_dupes,
                              "Encuentra canciones duplicadas y deja marcadas las copias de peor calidad"))
         t.addAction(self.act("🎚 Ajustes de la canción…", self.open_fx,
@@ -7163,6 +7174,11 @@ class Main(QMainWindow):
         f = self._lib_folder()
         if f:
             self._show_tool(libtools.OrganizeDialog(self, f, AUDIO_EXT))
+
+    def open_navidrome(self):
+        import navidrome
+        folder = self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else ""
+        self._show_tool(navidrome.NavidromeDialog(self, folder, AUDIO_EXT, read_tags, inspect_file, find_folder_image))
 
     def open_folders_by(self):
         import folders_by
