@@ -22,15 +22,16 @@ _n = [0]
 
 def close_unexpected():
     """Cualquier ventana modal inesperada (avisos, preguntas) se captura y se cierra para no colgarse."""
-    m = QApplication.activeModalWidget()
-    if m is not None and not getattr(m, "_expected", False):
-        _n[0] += 1
-        m.grab().save(os.path.join(OUT, f"inesperado_{_n[0]}.png"))
-        print("modal inesperado:", m.windowTitle(), flush=True)
-        try:
-            m.reject()
-        except Exception:
+    try:
+        m = QApplication.activeModalWidget()
+        if m is not None and not getattr(m, "_expected", False):
+            _n[0] += 1
+            m.grab().save(os.path.join(OUT, f"inesperado_{_n[0]}.png"))
+            txt = getattr(m, "text", lambda: "")()
+            print("modal inesperado:", type(m).__name__, m.windowTitle(), txt, flush=True)
             m.close()
+    except Exception as e:
+        print("guardia:", e, flush=True)
 
 
 _guard = QTimer()

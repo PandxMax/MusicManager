@@ -1,6 +1,8 @@
 name: Capturas
 on:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   shots:
     runs-on: windows-latest
@@ -11,6 +13,16 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -u .github/capturas.py
         timeout-minutes: 8
-      - uses: actions/upload-artifact@v4
+      - name: Subir capturas a la rama «capturas»
         if: always()
-        with: { name: capturas, path: shots }
+        shell: bash
+        run: |
+          mkdir -p /tmp/c && cp -r shots/. /tmp/c/ 2>/dev/null || true
+          git config user.name PandxMax
+          git config user.email 149822534+PandxMax@users.noreply.github.com
+          git checkout --orphan capturas
+          git rm -rfq . || true
+          cp -r /tmp/c/. .
+          git add -A
+          git commit -qm "capturas" || true
+          git push -f origin capturas
