@@ -1068,3 +1068,8 @@ ROWS += [
      "The song list no longer jumps back to the top when the same folder reloads (after deleting, moving or renaming): it keeps its position.",
      "Список песен больше не возвращается наверх при перезагрузке той же папки: позиция сохраняется."),
 ]
+ROWS += [
+    ("Arreglo importante: al eliminar (o mover / renombrar) una carpeta que se veía en el árbol, el programa podía quedarse colgado («No responde»). La vigilancia de carpetas de la 1.83 dejaba la carpeta «en uso» y Windows no podía llevarla a la papelera. Ahora se deja de vigilar antes de tocarla.",
+     "Important fix: deleting (or moving / renaming) a folder shown in the tree could hang the program (“Not responding”). The folder watching added in 1.83 kept the folder “in use” and Windows couldn't send it to the Recycle Bin. Watching now stops before the folder is touched.",
+     "Важное исправление: удаление (перемещение/переименование) папки из дерева могло повесить программу. Наблюдение за папками держало папку «занятой». Теперь наблюдение снимается заранее."),
+]

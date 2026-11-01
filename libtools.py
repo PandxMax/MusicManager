@@ -158,6 +158,8 @@ class OrganizeDialog(QDialog):
                                 T(f"¿Mover {len(self.plan)} canción(es) a sus carpetas?")) != QMessageBox.StandardButton.Yes:
             return
         self.main.release_if([p for p, _ in self.plan])
+        if hasattr(self.main, "unwatch"):
+            self.main.unwatch([self.folder])   # se borrarán carpetas vacías: que no queden «en uso»
         moved, fails, olddirs = 0, [], set()
         for src, dst in self.plan:
             try:

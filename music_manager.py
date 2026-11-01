@@ -71,7 +71,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.85"
+APP_VERSION = "1.86"
 
 
 class TMenu(QMenu):
@@ -879,6 +879,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.86', [
+        'Arreglo importante: al eliminar (o mover / renombrar) una carpeta que se veía en el árbol, el programa podía quedarse colgado («No responde»). La vigilancia de carpetas de la 1.83 dejaba la carpeta «en uso» y Windows no podía llevarla a la papelera. Ahora se deja de vigilar antes de tocarla.',
+    ]),
     ('1.85', [
         'Los árboles de carpetas ya no saltan hacia abajo al eliminar, mover, arrastrar, crear o renombrar algo: se quedan desplazados donde estaban.',
         'La lista de canciones tampoco vuelve arriba al recargar la misma carpeta (tras borrar, mover o renombrar): se queda en la misma posición.',
@@ -1408,7 +1411,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.85 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.86 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3909,7 +3912,7 @@ class Main(QMainWindow):
 
     def update_watch(self):
         w = getattr(self, "watcher", None)
-        if w is None:
+        if w is None or time.monotonic() < getattr(self, "_watch_paused_until", 0):
             return
         want = set()
         for t in (self.tree, self.tree2):
@@ -3937,6 +3940,22 @@ class Main(QMainWindow):
         for p in want:
             if p not in self._tree_sigs:
                 self._tree_sigs[p] = self.dir_signature(p)
+
+    def unwatch(self, paths):
+        w = getattr(self, "watcher", None)
+        if w is None or not paths:
+            return
+        roots = [os.path.normcase(os.path.normpath(p)) for p in paths if p]
+        drop = []
+        for d in w.directories():
+            nd = os.path.normcase(os.path.normpath(d))
+            if any(nd == r or nd.startswith(r + os.sep) for r in roots):
+                drop.append(d)
+                self._tree_sigs.pop(d, None)
+        if drop:
+            w.removePaths(drop)
+        self._watch_paused_until = time.monotonic() + 3   # mientras se trabaja con los archivos no se vigila de nuevo
+        QTimer.singleShot(3200, self.update_watch)
 
     def on_dir_changed(self, path):
         self._watch_changed.add(path)
@@ -4183,7 +4202,10 @@ class Main(QMainWindow):
             self.chosen.add(new)
 
     def release_if(self, paths):
-        """Windows bloquea el archivo que se está reproduciendo: lo suelta antes de tocarlo."""
+        """Windows bloquea el archivo que se está reproduciendo: lo suelta antes de tocarlo. También deja de vigilar
+        las carpetas que se van a borrar, mover o renombrar (vigilar una carpeta la deja «en uso» y Windows no
+        puede llevarla a la papelera: el programa se quedaba colgado)."""
+        self.unwatch(paths)
         if self.player is None or not self.playing_path:
             return
         pp = os.path.normcase(os.path.normpath(self.playing_path))

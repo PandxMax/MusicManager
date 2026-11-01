@@ -514,3 +514,7 @@ VERSIÓN 1.84
 VERSIÓN 1.85
 ------------
  - Árboles y lista conservan su posición de desplazamiento al borrar, mover o arrastrar.
+
+VERSIÓN 1.86
+------------
+ - Arreglo: el programa ya no se cuelga al eliminar, mover o renombrar carpetas que se ven en el árbol.
