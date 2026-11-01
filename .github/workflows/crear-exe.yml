@@ -4,7 +4,7 @@ on:
   # cada vez que se sube una versión nueva del programa, el EXE se crea solo
   push:
     branches: [main]
-    paths: ['**.py', 'requirements.txt', 'MusicManager.ico', '.github/workflows/crear-exe.yml', '.github/slim_build.py']
+    paths: ['**.py', 'requirements.txt', 'MusicManager.ico', '.github/workflows/crear-exe.yml', '.github/slim_build.py', '!.github/capturas.py']
 concurrency:
   group: crear-exe
   cancel-in-progress: true
