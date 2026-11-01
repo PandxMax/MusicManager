@@ -1,6 +1,7 @@
 """Hace capturas de pantalla del programa en GitHub Actions (Windows) para revisar el diseño sin abrirlo.
 Crea una pequeña biblioteca de prueba (tonos de 4 s con etiquetas y portadas) y guarda PNG en la carpeta «shots»."""
-import os, sys, json, time, tempfile, subprocess, shutil
+import os, sys, json, time, tempfile, subprocess, shutil, faulthandler
+faulthandler.dump_traceback_later(200, exit=True)   # si algo se cuelga, muestra dónde
 sys.path.insert(0, os.getcwd())
 from PyQt6.QtCore import QSettings, QTimer, Qt, QByteArray, QBuffer, QIODevice, QRectF
 from PyQt6.QtGui import QImage, QColor, QPainter, QLinearGradient, QFont
@@ -16,6 +17,27 @@ _deco = icons.IconDeco(app)
 app.installEventFilter(_deco)
 
 
+_n = [0]
+
+
+def close_unexpected():
+    """Cualquier ventana modal inesperada (avisos, preguntas) se captura y se cierra para no colgarse."""
+    m = QApplication.activeModalWidget()
+    if m is not None and not getattr(m, "_expected", False):
+        _n[0] += 1
+        m.grab().save(os.path.join(OUT, f"inesperado_{_n[0]}.png"))
+        print("modal inesperado:", m.windowTitle(), flush=True)
+        try:
+            m.reject()
+        except Exception:
+            m.close()
+
+
+_guard = QTimer()
+_guard.timeout.connect(close_unexpected)
+_guard.start(2500)
+
+
 def wait(ms):
     t = time.time() + ms / 1000
     while time.time() < t:
@@ -26,7 +48,7 @@ def wait(ms):
 def shot(widget, name):
     wait(300)
     widget.grab().save(os.path.join(OUT, name + ".png"))
-    print("captura", name)
+    print("captura", name, flush=True)
 
 
 def cover(c1, c2, text):
@@ -115,7 +137,7 @@ def grab_modal(name):
         m = QApplication.activeModalWidget()
         if m is not None:
             m.grab().save(os.path.join(OUT, name + ".png"))
-            print("captura", name)
+            print("captura", name, flush=True)
             m.reject()
     QTimer.singleShot(1500, go)
 
