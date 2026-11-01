@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QRadioButton, QButtonGroup,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QStyleOptionViewItem, QRadioButton, QButtonGroup,
 )
 import mutagen
 import i18n
@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.91"
+APP_VERSION = "1.92"
 
 
 class TMenu(QMenu):
@@ -525,9 +525,80 @@ QMenu::right-arrow { width: 10px; height: 10px; margin-right: 8px; }
 QMenu::item:selected { background: @accent; color: white; }
 QMenu::item:disabled { color: @muted; }
 QMenu::separator { height: 1px; background: @border; margin: 4px 8px; }
-QToolTip { background: @surface2; color: @text; border: 1px solid @border; padding: 4px 6px; }
+QToolTip { background: @surface2; color: @text; border: 1px solid @border; border-radius: 6px; padding: 5px 8px; }
 QDialog { background: @window; }
+/* ---- pulido general (1.92) ---- */
+QComboBox { background: @base; border: 1px solid @border; border-radius: 8px; padding: 5px 30px 5px 9px; min-height: 18px; }
+QComboBox:hover { border-color: @accent; }
+QComboBox:focus { border-color: @accent; }
+QComboBox:disabled { color: @muted; background: @surface; }
+QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: center right; width: 26px; border: none; }
+QComboBox::down-arrow { image: url(@img_chev); width: 12px; height: 12px; }
+QComboBox QAbstractItemView { background: @surface; border: 1px solid @border; border-radius: 8px; padding: 4px;
+                              selection-background-color: @accent; selection-color: white; outline: 0; }
+QCheckBox, QRadioButton { spacing: 8px; }
+QCheckBox::indicator, QRadioButton::indicator { width: 16px; height: 16px; border: 1.5px solid @muted; background: @base; }
+QCheckBox::indicator { border-radius: 5px; }
+QRadioButton::indicator { border-radius: 9px; }
+QCheckBox::indicator:hover, QRadioButton::indicator:hover { border-color: @accent; }
+QCheckBox::indicator:checked { background: @accent; border-color: @accent; image: url(@img_check); }
+QRadioButton::indicator:checked { border-color: @accent; background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+                                  stop:0 @accent, stop:0.45 @accent, stop:0.55 @base, stop:1 @base); }
+QCheckBox::indicator:disabled, QRadioButton::indicator:disabled { border-color: @border; background: @surface; }
+QTabWidget::pane { background: @surface; border: 1px solid @border; border-radius: 12px; top: -1px; padding: 6px; }
+QTabBar::tab { background: transparent; color: @muted; border: none; border-radius: 8px; padding: 8px 16px; margin: 0 4px 6px 0; }
+QTabBar::tab:hover { background: @accent_soft; color: @text; }
+QTabBar::tab:selected { background: @accent; color: white; font-weight: 600; }
+QTableView, QTableWidget { background: @base; alternate-background-color: @surface; border: 1px solid @border;
+                           border-radius: 12px; gridline-color: transparent; selection-background-color: @accent_soft;
+                           selection-color: @text; padding: 2px; }
+QTableView::item { padding: 4px 8px; border: none; }
+QTableView QTableCornerButton::section { background: @surface2; border: none; }
+QHeaderView { background: transparent; border: none; }
+QProgressBar { background: @surface2; border: none; border-radius: 6px; min-height: 10px; max-height: 10px;
+               text-align: center; color: transparent; }
+QProgressBar::chunk { background: @accent; border-radius: 6px; }
+QSpinBox, QDoubleSpinBox { background: @base; border: 1px solid @border; border-radius: 8px; padding: 4px 8px; }
+QSpinBox:focus, QDoubleSpinBox:focus { border-color: @accent; }
+QTreeView { show-decoration-selected: 1; }
+QTreeView::branch:selected { background: @accent; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+QTreeView::item:selected { border-top-left-radius: 0px; border-bottom-left-radius: 0px; }
+QTreeWidget#settingsnav { padding: 6px; }
+QTreeWidget#settingsnav::item { padding: 7px 8px; border-radius: 8px; }
+QLabel#dlgtitle { font-size: 17px; font-weight: 700; }
+QLabel#dlgsub { color: @muted; }
+QFrame#card { background: @surface; border: 1px solid @border; border-radius: 12px; }
+QFrame#keyok { background: @accent_soft; border: 1px solid @accent; border-radius: 10px; }
+QPushButton#link { background: transparent; border: none; color: @accent_hover; padding: 2px 4px; font-weight: 600; }
+QPushButton#link:hover { text-decoration: underline; background: transparent; }
+QScrollBar:vertical { width: 10px; }
+QScrollBar:horizontal { height: 10px; }
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal { border-radius: 3px; }
 """
+
+
+def ui_images(t):
+    """Iconos pequeños para la hoja de estilos (flecha de los desplegables y la marca de las casillas), en SVG."""
+    base = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation) or \
+        os.path.join(os.path.expanduser("~"), ".musicmanager")
+    d = os.path.join(base, "ui")
+    os.makedirs(d, exist_ok=True)
+    out = {}
+    for name, svg in (("chev", '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12">'
+                               '<path d="M2.5 4.5 L6 8 L9.5 4.5" fill="none" stroke="%s" stroke-width="1.8" '
+                               'stroke-linecap="round" stroke-linejoin="round"/></svg>' % t["muted"]),
+                      ("check", '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">'
+                                '<path d="M3.5 8.5 L6.7 11.5 L12.5 4.8" fill="none" stroke="#ffffff" stroke-width="2.2" '
+                                'stroke-linecap="round" stroke-linejoin="round"/></svg>')):
+        p = os.path.join(d, f"{name}_{t['muted'].strip('#')}.svg")
+        try:
+            if not os.path.exists(p):
+                with open(p, "w", encoding="utf-8") as fh:
+                    fh.write(svg)
+        except OSError:
+            pass
+        out["img_" + name] = p.replace("\\", "/")
+    return out
 
 
 ACCENTS = [("#7c5cff", "Violeta"), ("#3b82f6", "Azul"), ("#06b6d4", "Cian"), ("#22c55e", "Verde"),
@@ -553,6 +624,7 @@ def apply_theme(app, name, accent=None):
     for role in (R.Text, R.ButtonText, R.WindowText):
         pal.setColor(G.Disabled, role, c(t["muted"]))
     app.setPalette(pal)
+    t.update(ui_images(t))
     qss = QSS
     for k in sorted(t, key=len, reverse=True):  # primero los nombres largos (accent_hover antes que accent)
         qss = qss.replace("@" + k, t[k])
@@ -882,6 +954,13 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.92', [
+        'Identificar por sonido: con la clave de AcoustID ya guardada, el cuadro de la clave se oculta y solo queda una línea «🔑 Clave guardada · Cambiar». Nueva cabecera y tabla más clara.',
+        'Diseño más pulido en todo el programa: desplegables, casillas y opciones redondas con el color de acento, pestañas tipo «píldora», tablas con filas alternas y sin rejilla, barras de progreso redondeadas, cabeceras en las ventanas de herramientas y barras de desplazamiento más finas.',
+        'La portada de la canción elegida ya no se ve teñida de color en la lista.',
+        'La selección en los árboles de carpetas se ve como una sola barra (antes salía un trozo suelto a la izquierda).',
+        'Los campos de metadatos muestran el principio del texto (antes a veces se veía «.uces de Ciudad» en vez de «Luces de Ciudad»).',
+    ]),
     ('1.91', [
         'Arrastrar muchas canciones a una carpeta: ya no se quedan la mayoría sin mover. Si un archivo está «en uso» un instante (miniatura, tonalidad, antivirus), se reintenta hasta 3 segundos; las miniaturas se pausan mientras se mueve, y al final solo quedan marcadas las que de verdad no se pudieron mover (con el motivo).',
         'Sombrear bajando: al llevar el ratón por debajo de la lista, se desplaza rápido (más lejos = más rápido) en vez de ir lento.',
@@ -1435,7 +1514,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.91 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.92 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2988,6 +3067,22 @@ class SongDelegate(QStyledItemDelegate):
             g = self.lst.gridSize()
             return QSize(g.width() - 6, g.height() - 6)
         return super().sizeHint(option, index)
+
+    def paint(self, p, option, index):
+        super().paint(p, option, index)
+        if option.state & QStyle.StateFlag.State_Selected:
+            # la portada de la canción elegida se ve con sus colores reales (sin el tinte de color encima)
+            opt = QStyleOptionViewItem(option)
+            self.initStyleOption(opt, index)
+            if not opt.icon.isNull():
+                st = (opt.widget.style() if opt.widget else QApplication.style())
+                r = st.subElementRect(QStyle.SubElement.SE_ItemViewItemDecoration, opt, opt.widget)
+                pm = opt.icon.pixmap(opt.decorationSize, QIcon.Mode.Normal)
+                if not pm.isNull() and r.isValid():
+                    sz = pm.deviceIndependentSize().toSize()
+                    x = r.x() + (r.width() - sz.width()) // 2
+                    y = r.y() + (r.height() - sz.height()) // 2
+                    p.drawPixmap(x, y, pm)
 
     def createEditor(self, parent, option, index):
         ed = super().createEditor(parent, option, index)
@@ -5627,6 +5722,7 @@ class Main(QMainWindow):
             vs = {self.val(p, k) for p in paths}
             multi = len(vs) > 1
             le.setText("" if multi or not vs else next(iter(vs)))
+            le.setCursorPosition(0)   # que se vea el principio del texto, no el final
             le.setPlaceholderText("‹varios valores›" if multi else ("" if paths else "-"))
             le.setEnabled(bool(paths))
         self.fill_tech(paths)
@@ -7521,6 +7617,7 @@ class Main(QMainWindow):
         body = QHBoxLayout()
         outer.addLayout(body, 1)
         nav = QTreeWidget()
+        nav.setObjectName("settingsnav")
         nav.setHeaderHidden(True)
         nav.setFixedWidth(210)
         nav.setIndentation(14)

@@ -171,8 +171,16 @@ class NavidromeDialog(QDialog):
         self.read_tags, self.inspect_file, self.folder_image = read_tags, inspect_file, folder_image
         self.workers = set()
         self.setWindowTitle("Navidrome")
-        self.resize(900, 620)
+        self.resize(940, 660)
         v = QVBoxLayout(self)
+        v.setContentsMargins(18, 16, 18, 14)
+        v.setSpacing(10)
+        try:
+            from picard_tools import dialog_header
+            dialog_header(v, "📡 Navidrome", T("Tu servidor de música: actualizar la biblioteca, revisar lo que se verá mal "
+                                               "y ver lo que más escuchas."))
+        except Exception:
+            pass
         self.tabs = QTabWidget()
         v.addWidget(self.tabs, 1)
         self.tabs.addTab(self.build_conn(), T("🔌 Conexión"))

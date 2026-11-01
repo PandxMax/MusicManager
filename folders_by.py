@@ -73,8 +73,10 @@ class FoldersByDialog(QDialog):
         self.main, self.paths, self.tech_info = main, list(paths), tech_info
         self.worker, self.plan = None, []
         self.setWindowTitle(T("Crear carpetas por…"))
-        self.resize(820, 620)
+        self.resize(860, 660)
         v = QVBoxLayout(self)
+        v.setContentsMargins(18, 16, 18, 14)
+        v.setSpacing(10)
         info = QLabel(T("Reparte las canciones elegidas en carpetas según sus datos. Elige hasta tres niveles "
                         "(por ejemplo Género → Intérprete → Álbum). Primero ves cómo quedará; no se mueve nada hasta "
                         "que pulses el botón."))

@@ -10,10 +10,29 @@ import urllib.request, urllib.parse, urllib.error
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QStandardPaths, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QCheckBox, QComboBox,
-                             QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar, QMessageBox, QAbstractItemView)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar, QMessageBox, QAbstractItemView,
+                             QFrame, QWidget)
+
+
+def dialog_header(v, title, subtitle):
+    """Cabecera de las ventanas: título grande y una línea de explicación en gris."""
+    t = QLabel(title)
+    t.setObjectName("dlgtitle")
+    sub = QLabel(subtitle)
+    sub.setObjectName("dlgsub")
+    sub.setWordWrap(True)
+    v.addWidget(t)
+    v.addWidget(sub)
+    v.addSpacing(4)
+
+
+def nice_table(tb):
+    tb.setShowGrid(False)
+    tb.setAlternatingRowColors(True)
+    tb.verticalHeader().setDefaultSectionSize(34)
 from i18n import tr as T
 
-UA = "MusicManager/1.91 ( https://github.com/PandxMax/MusicManager )"
+UA = "MusicManager/1.92 ( https://github.com/PandxMax/MusicManager )"
 FP_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
 FP_SHA256 = "36b478e16aa69f757f376645db0d436073a42c0097b6bb2677109e7835b59bbc"
 MB_KEYS = {"musicbrainz_trackid", "musicbrainz_releasetrackid", "musicbrainz_albumid", "musicbrainz_releasegroupid",
@@ -187,22 +206,53 @@ class AcoustIdDialog(QDialog):
         self.main, self.paths = main, list(paths)
         self.cands, self.worker, self.dl = {}, None, None
         self.setWindowTitle(T("Identificar por sonido (AcoustID)"))
-        self.resize(980, 560)
+        self.resize(1000, 600)
         v = QVBoxLayout(self)
-        info = QLabel(T("Reconoce cada canción escuchando su audio (como Shazam), aunque el archivo no tenga nombre ni "
+        v.setContentsMargins(18, 16, 18, 14)
+        v.setSpacing(10)
+        dialog_header(v, T("🎧 Identificar por sonido"),
+                      T("Reconoce cada canción escuchando su audio (como Shazam), aunque el archivo no tenga nombre ni "
                         "etiquetas. Elige el resultado correcto en cada fila y pulsa «Poner estos datos»."))
-        info.setWordWrap(True)
-        v.addWidget(info)
+        # clave: si ya está guardada solo se ve una línea discreta con «Cambiar»
+        self.key_ok = QFrame()
+        self.key_ok.setObjectName("keyok")
+        ko = QHBoxLayout(self.key_ok)
+        ko.setContentsMargins(12, 6, 8, 6)
+        self.key_ok_lbl = QLabel("")
+        ko.addWidget(self.key_ok_lbl, 1)
+        chg = QPushButton(T("Cambiar"))
+        chg.setObjectName("link")
+        chg.setCursor(Qt.CursorShape.PointingHandCursor)
+        chg.clicked.connect(lambda: self.show_key_editor(True))
+        ko.addWidget(chg)
+        v.addWidget(self.key_ok)
+        self.key_card = QFrame()
+        self.key_card.setObjectName("card")
+        kc = QVBoxLayout(self.key_card)
+        kc.setContentsMargins(14, 12, 14, 12)
+        kt = QLabel(T("<b>Clave de AcoustID</b> · gratis, solo se pone una vez"))
+        kc.addWidget(kt)
+        kh = QLabel(T("Pulsa «Conseguir clave gratis», inicia sesión en acoustid.org, registra una aplicación "
+                      "(por ejemplo «Music Manager») y pega aquí la clave que te dan."))
+        kh.setObjectName("dlgsub")
+        kh.setWordWrap(True)
+        kc.addWidget(kh)
         kr = QHBoxLayout()
-        kr.addWidget(QLabel(T("Clave de AcoustID:")))
         self.key = QLineEdit(str(main.cfg.value("acoustid_key", "") or ""))
         self.key.setPlaceholderText(T("pega aquí tu clave gratuita"))
+        self.key.returnPressed.connect(self.save_key)
         kr.addWidget(self.key, 1)
         get = QPushButton(T("Conseguir clave gratis"))
         get.setToolTip(T("Entra en acoustid.org, inicia sesión y registra una aplicación: te dan la clave al momento"))
         get.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://acoustid.org/new-application")))
         kr.addWidget(get)
-        v.addLayout(kr)
+        save = QPushButton(T("Guardar clave"))
+        save.setObjectName("accent")
+        save.clicked.connect(self.save_key)
+        kr.addWidget(save)
+        kc.addLayout(kr)
+        v.addWidget(self.key_card)
+        self.show_key_editor(not self.key.text().strip())
         self.tb = QTableWidget(len(self.paths), 3)
         self.tb.setHorizontalHeaderLabels([T("Archivo"), T("Resultado (seguridad · título · intérprete · álbum)"), T("Estado")])
         self.tb.verticalHeader().setVisible(False)
@@ -211,7 +261,8 @@ class AcoustIdDialog(QDialog):
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.tb.setColumnWidth(0, 280)
+        self.tb.setColumnWidth(0, 300)
+        nice_table(self.tb)
         self.combos = {}
         for r, p in enumerate(self.paths):
             self.tb.setItem(r, 0, QTableWidgetItem(os.path.basename(p)))
@@ -245,12 +296,30 @@ class AcoustIdDialog(QDialog):
             br.addWidget(b)
         v.addLayout(br)
 
+    def show_key_editor(self, on):
+        k = self.key.text().strip()
+        self.key_card.setVisible(on)
+        self.key_ok.setVisible(not on and bool(k))
+        self.key_ok_lbl.setText("🔑  " + T("Clave de AcoustID guardada") + (f"  ·  ••••{k[-4:]}" if len(k) >= 4 else ""))
+        if on:
+            self.key.setFocus()
+
+    def save_key(self):
+        k = self.key.text().strip()
+        if not k:
+            self.key.setFocus()
+            return
+        self.main.cfg.setValue("acoustid_key", k)
+        self.show_key_editor(False)
+
     def start(self):
         key = self.key.text().strip()
         if not key:
+            self.show_key_editor(True)
             self.status.setText(T("Falta la clave de AcoustID. Pulsa «Conseguir clave gratis», regístrate y pégala aquí."))
             return
         self.main.cfg.setValue("acoustid_key", key)
+        self.show_key_editor(False)
         if not fpcalc_exe():
             self.status.setText(T("Descargando el analizador de audio (fpcalc, 1,5 MB, solo la primera vez)…"))
             self.go.setEnabled(False)
@@ -276,6 +345,9 @@ class AcoustIdDialog(QDialog):
         if err:
             cb.addItem("—", None)
             self.tb.item(r, 2).setText("❌ " + err)
+            if err == T("La clave de AcoustID no es válida."):
+                self.show_key_editor(True)
+                self.status.setText("❌ " + err + " " + T("Revisa que la copiaste completa."))
             return
         if not cands:
             cb.addItem(T("(no reconocida)"), None)
@@ -382,13 +454,14 @@ class AlbumMatchDialog(QDialog):
         self.main, self.paths, self.tech_info = main, list(paths), tech_info
         self.release, self.worker = None, None
         self.setWindowTitle(T("Emparejar álbum con MusicBrainz"))
-        self.resize(1050, 680)
+        self.resize(1080, 720)
         v = QVBoxLayout(self)
-        info = QLabel(T("Como en Picard: busca el álbum en MusicBrainz, coloca cada archivo en su pista y corrige de una vez "
+        v.setContentsMargins(18, 16, 18, 14)
+        v.setSpacing(10)
+        dialog_header(v, T("💿 Emparejar álbum con MusicBrainz"),
+                      T("Como en Picard: busca el álbum en MusicBrainz, coloca cada archivo en su pista y corrige de una vez "
                         "título, número de pista y de disco, año e intérprete del álbum. Puedes cambiar a mano la pista de "
                         "cada archivo antes de aplicar."))
-        info.setWordWrap(True)
-        v.addWidget(info)
         alb = self.most_common("album") or os.path.basename(os.path.dirname(self.paths[0]))
         art = self.most_common("albumartist") or self.most_common("artist")
         sr = QHBoxLayout()
@@ -411,7 +484,8 @@ class AlbumMatchDialog(QDialog):
         self.rel_tb.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.rel_tb.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.rel_tb.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.rel_tb.setMaximumHeight(190)
+        self.rel_tb.setMaximumHeight(200)
+        nice_table(self.rel_tb)
         self.rel_tb.itemSelectionChanged.connect(self.pick_release)
         v.addWidget(self.rel_tb)
         self.map_tb = QTableWidget(len(self.paths), 3)
@@ -423,6 +497,7 @@ class AlbumMatchDialog(QDialog):
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.map_tb.setColumnWidth(0, 330)
+        nice_table(self.map_tb)
         self.combos = []
         for r, p in enumerate(self.paths):
             self.map_tb.setItem(r, 0, QTableWidgetItem(os.path.basename(p)))

@@ -541,3 +541,7 @@ VERSIÓN 1.91
 ------------
  - Mover muchas canciones arrastrando: reintentos si un archivo está en uso; solo quedan marcadas las que fallan.
  - Sombrear hacia abajo con desplazamiento rápido. Árboles: sombrear sin abrir cada carpeta.
+
+VERSIÓN 1.92
+------------
+ - Diseño más pulido en todo el programa; la clave de AcoustID se oculta una vez guardada.
