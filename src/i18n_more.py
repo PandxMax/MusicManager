@@ -1291,3 +1291,8 @@ ROWS += [
      "Renaming in icon view works like Windows Explorer: the box is as wide as the icon, the name wraps onto several lines and the box grows downward as you type. Enter saves, Esc cancels and clicking outside also saves.",
      "Переименование в режиме значков как в Проводнике: поле шириной со значок, имя переносится на несколько строк. Enter — сохранить, Esc — отмена."),
 ]
+ROWS += [
+    ("Renombrar en modo iconos: el cuadro se adapta al largo del nombre. Un nombre corto da un cuadro estrecho; uno largo lo ensancha (hasta un poco más que el icono) y, si aún no cabe, pasa a varias líneas. Cambia en vivo mientras escribes o borras.",
+     "Renaming in icon view: the box adapts to the name's length. A short name gives a narrow box; a long one widens it (up to a bit more than the icon) and, if it still doesn't fit, wraps onto several lines. It updates live as you type or delete.",
+     "Переименование в режиме значков: поле подстраивается под длину имени и меняется во время ввода."),
+]

@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.96"
+APP_VERSION = "1.97"
 
 
 class TMenu(QMenu):
@@ -959,6 +959,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.97', [
+        'Renombrar en modo iconos: el cuadro se adapta al largo del nombre. Un nombre corto da un cuadro estrecho; uno largo lo ensancha (hasta un poco más que el icono) y, si aún no cabe, pasa a varias líneas. Cambia en vivo mientras escribes o borras.',
+    ]),
     ('1.96', [
         'Renombrar en modo iconos como en el Explorador de Windows: el cuadro mide lo mismo que el icono, el nombre se parte en varias líneas y el cuadro crece hacia abajo según lo que escribas. Enter guarda, Esc cancela y hacer clic fuera también guarda.',
     ]),
@@ -1537,7 +1540,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.96 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.97 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3141,16 +3144,24 @@ class RenameBox(QPlainTextEdit):
         self.insertPlainText(src.text().replace("\r", " ").replace("\n", " "))
 
     def fit(self):
-        """El alto se ajusta a las líneas que ocupa el nombre (como en el Explorador)."""
-        m = self.document().documentMargin()
-        w = max(20, self.width() - 2 * self.frameWidth() - int(2 * m) - 4)
+        """El cuadro se adapta a lo que escribes: ancho según el largo del nombre (hasta un máximo) y, si no cabe,
+        el nombre pasa a varias líneas y el cuadro crece hacia abajo."""
+        m = int(self.document().documentMargin())
+        pad = 2 * self.frameWidth() + 2 * m + 12
         fm = self.fontMetrics()
         txt = self.toPlainText() or " "
-        br = fm.boundingRect(QRect(0, 0, w, 10000),
+        max_w = getattr(self, "max_w", self.width() or 200)
+        w = max(70, min(max_w, fm.horizontalAdvance(txt) + pad))
+        br = fm.boundingRect(QRect(0, 0, w - pad + 8, 10000),
                              int(Qt.TextFlag.TextWrapAnywhere.value | Qt.AlignmentFlag.AlignHCenter.value), txt)
-        h = br.height() + int(2 * m) + 2 * self.frameWidth() + 4
-        if h != self.height():
-            self.resize(self.width(), max(26, h))
+        h = max(26, br.height() + 2 * m + 2 * self.frameWidth() + 4)
+        cx = getattr(self, "anchor_cx", self.x() + self.width() // 2)
+        y = getattr(self, "top_y", self.y())
+        par = self.parentWidget()
+        pw = par.width() if par is not None else 10000
+        x = max(2, min(cx - w // 2, pw - w - 2))
+        if (x, y, w, h) != (self.x(), self.y(), self.width(), self.height()):
+            self.setGeometry(x, y, w, h)
 
     def showEvent(self, e):
         super().showEvent(e)
@@ -3241,11 +3252,10 @@ class SongDelegate(QStyledItemDelegate):
         r = option.rect
         vp = self.lst.viewport().rect()
         isz = self.lst.iconSize()
-        if isinstance(editor, RenameBox):   # como en el Explorador: del ancho del icono, justo debajo de la portada
-            w = max(r.width() - 4, 120)
-            x = r.center().x() - w // 2
-            y = r.top() + isz.height() + 6
-            editor.setGeometry(QRect(x, y, w, max(editor.height(), 26)))
+        if isinstance(editor, RenameBox):   # debajo de la portada; el ancho se adapta al nombre
+            editor.anchor_cx = r.center().x()
+            editor.top_y = r.top() + isz.height() + 6
+            editor.max_w = max(160, min(r.width() + 60, vp.width() - 8))
             editor.fit()
             return
         if self._icons():
