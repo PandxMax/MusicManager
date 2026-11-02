@@ -1296,3 +1296,8 @@ ROWS += [
      "Renaming in icon view: the box adapts to the name's length. A short name gives a narrow box; a long one widens it (up to a bit more than the icon) and, if it still doesn't fit, wraps onto several lines. It updates live as you type or delete.",
      "Переименование в режиме значков: поле подстраивается под длину имени и меняется во время ввода."),
 ]
+ROWS += [
+    ("Renombrar en modo iconos: mientras escribes, el recuadro grande de color desaparece y solo queda sombreada la portada (como en el Explorador); el cuadro del nombre ya no parece «flotar» sobre el color. Al terminar, todo vuelve a la normalidad.",
+     "Renaming in icon view: while you type, the big colored box disappears and only the cover stays highlighted (like in Explorer); the name box no longer seems to “float” over the color. When you finish, everything goes back to normal.",
+     "Переименование в режиме значков: во время ввода подсвечена только обложка, как в Проводнике."),
+]

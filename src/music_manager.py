@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.97"
+APP_VERSION = "1.98"
 
 
 class TMenu(QMenu):
@@ -959,6 +959,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.98', [
+        'Renombrar en modo iconos: mientras escribes, el recuadro grande de color desaparece y solo queda sombreada la portada (como en el Explorador); el cuadro del nombre ya no parece «flotar» sobre el color. Al terminar, todo vuelve a la normalidad.',
+    ]),
     ('1.97', [
         'Renombrar en modo iconos: el cuadro se adapta al largo del nombre. Un nombre corto da un cuadro estrecho; uno largo lo ensancha (hasta un poco más que el icono) y, si aún no cabe, pasa a varias líneas. Cambia en vivo mientras escribes o borras.',
     ]),
@@ -1540,7 +1543,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.97 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.98 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3187,11 +3190,25 @@ class SongDelegate(QStyledItemDelegate):
     def paint(self, p, option, index):
         ed = getattr(self, "editing", None)
         if ed is not None and ed.isValid() and ed == QPersistentModelIndex(index):
+            # renombrando: como en el Explorador, solo la portada queda sombreada (el recuadro de color grande
+            # desaparece) y el nombre se escribe en el cuadro de debajo
             opt = QStyleOptionViewItem(option)
             self.initStyleOption(opt, index)
             opt.text = ""
+            opt.state &= ~(QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_MouseOver | QStyle.StateFlag.State_HasFocus)
             st = opt.widget.style() if opt.widget else QApplication.style()
+            dr = st.subElementRect(QStyle.SubElement.SE_ItemViewItemDecoration, opt, opt.widget)
+            if dr.isValid():
+                c = QColor(opt.palette.color(QPalette.ColorRole.Highlight))
+                c.setAlpha(110)
+                p.save()
+                p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(c)
+                p.drawRoundedRect(QRectF(dr.adjusted(-6, -6, 6, 6)), 8, 8)
+                p.restore()
             st.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, p, opt.widget)
+            return
         else:
             super().paint(p, option, index)
         if option.state & QStyle.StateFlag.State_Selected:

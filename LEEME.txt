@@ -568,3 +568,7 @@ VERSIÓN 1.96
 VERSIÓN 1.97
 ------------
  - Renombrar: el cuadro se adapta al largo del nombre mientras escribes.
+
+VERSIÓN 1.98
+------------
+ - Renombrar: mientras escribes solo se sombrea la portada (sin el recuadro grande de color).
