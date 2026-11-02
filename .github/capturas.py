@@ -1,7 +1,7 @@
 """Hace capturas de pantalla del programa en GitHub Actions (Windows) para revisar el diseño sin abrirlo.
 Crea una pequeña biblioteca de prueba (tonos de 4 s con etiquetas y portadas) y guarda PNG en la carpeta «shots»."""
 import os, sys, json, time, tempfile, subprocess, shutil, faulthandler
-faulthandler.dump_traceback_later(200, exit=True)   # si algo se cuelga, muestra dónde
+faulthandler.dump_traceback_later(480, exit=True)   # si algo se cuelga, muestra dónde
 sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 from PyQt6.QtCore import QSettings, QTimer, Qt, QByteArray, QBuffer, QIODevice, QRectF
 from PyQt6.QtGui import QImage, QColor, QPainter, QLinearGradient, QFont
@@ -15,9 +15,15 @@ import music_manager as mm, i18n, icons
 i18n.install_hooks()
 _deco = icons.IconDeco(app)
 app.installEventFilter(_deco)
+_polish = mm.DialogPolish()
+app.installEventFilter(_polish)
 
 
 _n = [0]
+import traceback
+def _exc(t, v, tb):
+    print("EXC:", ascii("".join(traceback.format_exception(t, v, tb))), flush=True)
+sys.excepthook = _exc
 
 
 def close_unexpected():
@@ -236,6 +242,111 @@ try:
     wait(300)
 except Exception as e:
     print("parentesis error:", ascii(str(e)), flush=True)
+
+# ---------------- prueba general: abrir todo lo que se pueda y anotar los fallos
+from PyQt6.QtWidgets import QDialog as _QD
+
+
+def tops():
+    return {id(x): x for x in QApplication.topLevelWidgets() if x.isVisible() and x is not w}
+
+
+def smoke(name, fn, keep=False):
+    before = set(tops())
+    try:
+        fn()
+    except Exception:
+        print("FALLO", name, ascii(traceback.format_exc()), flush=True)
+    wait(900)
+    new = [x for k, x in tops().items() if k not in before]
+    for i, x in enumerate(new):
+        try:
+            x.grab().save(os.path.join(OUT, f"s_{name}_{i}.png"))
+        except Exception:
+            pass
+        if not keep:
+            try:
+                x.close()
+            except Exception:
+                pass
+    print("ok", name, len(new), flush=True)
+
+
+w.load_folder(first)
+wait(800)
+w.list.clearSelection()
+for r in range(min(3, w.list.count())):
+    w.list.item(r).setSelected(True)
+w.on_select()
+wait(500)
+for nm in ("open_report", "open_dupes", "open_organize", "open_tags_from_name", "open_normalize", "open_batch_genres",
+           "open_fx", "convert_selected", "open_spectrum", "open_ytdl", "show_about", "show_guide", "open_upscale",
+           "open_meta_ai", "open_folders_by", "open_navidrome", "open_acoustid", "open_album_match"):
+    f = getattr(w, nm, None)
+    if f is None:
+        print("NO EXISTE", nm, flush=True)
+        continue
+    smoke(nm, f)
+try:
+    w.close_spectrum()
+except Exception:
+    pass
+smoke("whats_new", lambda: w.show_whats_new(True))
+smoke("atajos", w.show_shortcuts)
+smoke("fold_off", lambda: w.set_meta_open(False))
+shot(w, "s_plegado")
+smoke("fold_on", lambda: w.set_meta_open(True))
+smoke("drawer", lambda: w.set_trees_mode("drawer"))
+shot(w, "s_cajon")
+smoke("drawer_off", lambda: w.set_trees_mode("normal"))
+smoke("tree2_on", lambda: w.act_tree2.setChecked(True))
+shot(w, "s_dos_arboles")
+smoke("tree2_off", lambda: w.act_tree2.setChecked(False))
+smoke("mobile", lambda: w.set_player_style("mobile"))
+shot(w, "s_movil")
+smoke("classic", lambda: w.set_player_style("classic"))
+# guardar una etiqueta y renombrar / mover un archivo
+try:
+    p0 = w.list.item(0).data(mm.PATH_ROLE)
+    w.pending.setdefault(p0, {})["comment"] = "prueba"
+    w.save_all()
+    wait(800)
+    print("guardado comentario:", ascii(mm.read_tags(p0).get("comment")), flush=True)
+    w.do_renames([(p0, "00. Prueba renombrada")])
+    wait(800)
+    newp = os.path.join(os.path.dirname(p0), "00. Prueba renombrada.mp3")
+    print("renombrado:", os.path.exists(newp), flush=True)
+    dst = os.path.join(root, "House")
+    w.move_items([newp], dst)
+    wait(1200)
+    print("movido:", os.path.exists(os.path.join(dst, "00. Prueba renombrada.mp3")), flush=True)
+except Exception:
+    print("FALLO archivos", ascii(traceback.format_exc()), flush=True)
+# textos sin traducir en inglés
+try:
+    w.set_language("en")
+    wait(1500)
+    shot(w, "s_ingles")
+    import re as _re
+    from PyQt6.QtWidgets import QAbstractButton, QLabel as _QL
+    from PyQt6.QtGui import QAction as _QA
+    left = set()
+    sp = _re.compile(r"[ñáéíóú¿¡]|\b(de|la|las|los|una|canci|carpeta|elige|pulsa|sin|con)\b", _re.I)
+    for x in w.findChildren(QAbstractButton) + w.findChildren(_QL):
+        for t in (x.text(), x.toolTip()):
+            t = _re.sub(r"<[^>]+>", "", t or "")
+            if t and sp.search(t) and not x.window().isHidden():
+                left.add(t[:90])
+    for a in w.findChildren(_QA):
+        for t in (a.text(), a.toolTip()):
+            if t and sp.search(t):
+                left.add(t[:90])
+    for t in sorted(left):
+        print("SIN TRADUCIR:", ascii(t), flush=True)
+    w.set_language("es")
+    wait(800)
+except Exception:
+    print("FALLO idioma", ascii(traceback.format_exc()), flush=True)
 
 w.set_theme("light")
 wait(1200)

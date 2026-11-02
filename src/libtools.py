@@ -136,8 +136,8 @@ class OrganizeDialog(QDialog):
                 self.plan.append((p, dst))
                 r = self.tb.rowCount()
                 self.tb.insertRow(r)
-                for c, txt in enumerate((name, os.path.relpath(os.path.dirname(p), self.folder),
-                                         os.path.relpath(dst_dir, self.folder))):
+                here = lambda d: (T("(aquí)") if os.path.relpath(d, self.folder) == "." else os.path.relpath(d, self.folder))
+                for c, txt in enumerate((name, here(os.path.dirname(p)), here(dst_dir))):
                     self.tb.setItem(r, c, QTableWidgetItem(txt))
         finally:
             QApplication.restoreOverrideCursor()

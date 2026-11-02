@@ -576,3 +576,11 @@ VERSIÓN 1.98
 VERSIÓN 1.99
 ------------
  - Renombrar: el cuadro va fijo dentro de la tarjeta de color, sin moverse ni cambiar de tamaño.
+
+VERSIÓN 2.00
+------------
+ - Revisión general con pruebas automáticas de todo el programa y corrección de fallos.
+ - Más estable: los errores ya no cierran el programa; se anotan en Ayuda → Registro de errores.
+ - Renombrar en modo iconos integrado en la tarjeta (crece si el nombre es largo).
+ - Ventanas de herramientas con el mismo aspecto (título y márgenes).
+ - Nuevo: Ayuda → Atajos de teclado.

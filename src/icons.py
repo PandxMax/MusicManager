@@ -14,7 +14,7 @@ LEAD = {
     "💿": "disc", "💬": "chat", "✔": "check", "🔳": "grid", "🆕": "sparkle", "🔊": "vol3", "🔉": "vol2",
     "🔈": "vol1", "🔇": "vol0", "⋯": "more", "✕": "close", "◀": "arrow_l", "▲": "arrow_u", "🎚": "fx",
     "🔁": "loop", "🎵": "note", "⚙": "gear", "🌐": "globe", "▤": "table", "👁": "eye", "↕": "sort", "👤": "person", "🛠": "tools", "🗃": "explorer", "🎧": "note", "📖": "book", "🏷": "tag", "📤": "download",
-    "📁": "folder", "📡": "server", "🩺": "check", "📈": "chart", "🔌": "server", "🔑": "pin", "🧹": "sparkle",
+    "📁": "folder", "📡": "server", "🩺": "check", "📈": "chart", "🔌": "server", "🔑": "pin", "🧹": "sparkle", "⌨": "grid",
 }
 
 

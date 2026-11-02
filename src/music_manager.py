@@ -11,7 +11,7 @@ from functools import lru_cache
 from urllib.parse import quote_plus, quote
 
 from PyQt6.QtCore import (QAbstractNativeEventFilter, QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
-                          QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF, QPersistentModelIndex)
+                          QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF, QPersistentModelIndex, QObject)
 from PyQt6.QtGui import (QFontMetrics, QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
                          QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent, QPen, QTextOption)
 from PyQt6.QtWidgets import (
@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.99"
+APP_VERSION = "2.00"
 
 
 class TMenu(QMenu):
@@ -446,8 +446,10 @@ QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 1
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
-QPlainTextEdit#renamebox { background: rgba(0, 0, 0, 75); color: white; border: none; border-radius: 6px; padding: 0px;
-                           selection-background-color: white; selection-color: @accent; }
+QPlainTextEdit#renamebox { background: @accent_dark; color: white; border: 5px solid @accent; border-top-width: 3px;
+                           border-top-left-radius: 0px; border-top-right-radius: 0px; border-bottom-left-radius: 10px;
+                           border-bottom-right-radius: 10px; padding: 0px;
+                           selection-background-color: white; selection-color: @accent_dark; }
 QLineEdit#treeedit { background: @surface; border: 2px solid @accent; border-radius: 6px; padding: 0px 6px; margin: 0px; }
 QLineEdit#renameedit { background: @surface; border: 1px solid @accent; border-radius: 6px; padding: 1px 6px; }
 QToolButton#foldmini { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 0px; }
@@ -629,6 +631,7 @@ def apply_theme(app, name, accent=None):
     for role in (R.Text, R.ButtonText, R.WindowText):
         pal.setColor(G.Disabled, role, c(t["muted"]))
     app.setPalette(pal)
+    t["accent_dark"] = QColor(t["accent"]).darker(155).name()
     t.update(ui_images(t))
     qss = QSS
     for k in sorted(t, key=len, reverse=True):  # primero los nombres largos (accent_hover antes que accent)
@@ -959,6 +962,15 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.00', [
+        '¡Versión 2.00! Revisión general: se probó el programa entero de forma automática (todas las herramientas, guardar, renombrar, mover, vistas, temas e idiomas) y se corrigieron los fallos encontrados.',
+        'Más estable: si algo falla dentro del programa, ya no se cierra de golpe; se anota en un registro y se avisa abajo. Nuevo: Ayuda → «Registro de errores» para ver o enviar los detalles.',
+        'Renombrar en modo iconos: el cuadro forma parte de la tarjeta de la canción (mismo ancho y color). Si el nombre es largo, la tarjeta crece hacia abajo para que se vea entero; si es corto, se queda de su tamaño.',
+        'Todas las ventanas de herramientas tienen el mismo aspecto: título grande arriba y márgenes amplios.',
+        'Nuevo: Ayuda → «Atajos de teclado», con todas las teclas rápidas del programa.',
+        'Organizar en carpetas: la columna «Ahora en» muestra «(aquí)» en vez de un punto.',
+        'Al cambiar de idioma, la barra de enviar entre árboles y sus títulos también se traducen al momento.',
+    ]),
     ('1.99', [
         'Renombrar en modo iconos, más limpio: la tarjeta de color de la canción se queda igual (mismo tamaño) y el cuadro para escribir va dentro de ella, justo donde estaba el nombre. Ya no se mueve ni cambia de tamaño mientras escribes; los nombres largos se parten en líneas dentro del cuadro.',
     ]),
@@ -1546,7 +1558,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.99 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.00 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3150,7 +3162,17 @@ class RenameBox(QPlainTextEdit):
         self.insertPlainText(src.text().replace("\r", " ").replace("\n", " "))
 
     def fit(self):
-        """El cuadro es fijo (no se mueve ni cambia de tamaño): si el nombre es muy largo, se desplaza por dentro."""
+        """Mismo ancho que la tarjeta y alto según las líneas del nombre: si no cabe en la tarjeta, la tarjeta
+        «crece» hacia abajo (el borde del cuadro es del mismo color que la tarjeta)."""
+        fm = self.fontMetrics()
+        b = 2 * self.frameWidth() + int(2 * self.document().documentMargin())
+        inner = max(20, self.width() - b - 6)
+        br = fm.boundingRect(QRect(0, 0, inner, 10000),
+                             int(Qt.TextFlag.TextWrapAnywhere.value | Qt.AlignmentFlag.AlignHCenter.value),
+                             self.toPlainText() or " ")
+        h = max(getattr(self, "min_h", 30), br.height() + b + 6)
+        if h != self.height():
+            self.resize(self.width(), h)
         self.ensureCursorVisible()
 
     def showEvent(self, e):
@@ -3244,9 +3266,11 @@ class SongDelegate(QStyledItemDelegate):
         r = option.rect
         vp = self.lst.viewport().rect()
         isz = self.lst.iconSize()
-        if isinstance(editor, RenameBox):   # dentro de la tarjeta, justo donde está el nombre, siempre del mismo tamaño
-            y = r.top() + isz.height() + 7
-            editor.setGeometry(QRect(r.x() + 5, y, r.width() - 10, max(30, r.bottom() - y - 5)))
+        if isinstance(editor, RenameBox):   # parte de abajo de la tarjeta: mismo ancho; crece si el nombre es largo
+            y = r.top() + isz.height() + 2
+            editor.min_h = max(30, r.bottom() - y + 1)
+            editor.setGeometry(QRect(r.x(), y, r.width(), max(editor.min_h, editor.height())))
+            editor.fit()
             return
         if self._icons():
             # cuadro compacto justo donde va el nombre (el nombre viejo se oculta mientras escribes)
@@ -7635,6 +7659,7 @@ class Main(QMainWindow):
 
         a = mb.addMenu("A&yuda")
         a.addAction(self.act("❓ Guía rápida", self.show_guide))
+        a.addAction(self.act("⌨ Atajos de teclado", self.show_shortcuts, "Todas las teclas rápidas del programa"))
         a.addAction(self.act("🔄 Buscar actualizaciones…", self.check_updates))
         self.act_autoupd = self.act("Buscar actualizaciones al abrir el programa", self.toggle_auto_update, "", True)
         self.act_autoupd.setChecked(bool(int(self.cfg.value("auto_update", 1) or 0)))
@@ -7642,6 +7667,8 @@ class Main(QMainWindow):
         a.addSeparator()
         a.addAction(self.act("🆕 Novedades de esta versión", lambda: self.show_whats_new(True)))
         a.addAction(self.act("ℹ️ Acerca de Music Manager", self.show_about))
+        a.addAction(self.act("📋 Registro de errores…", self.open_error_log,
+                             "Abre el archivo donde el programa anota los fallos (útil para enviarlo si algo no funciona)"))
         mb.setCornerWidget(self._corner, Qt.Corner.TopRightCorner)
         i18n.set_lang(str(self.cfg.value("lang", "es")))
         self.set_view_mode(str(self.cfg.value("view_mode", "icons") or "icons"), save=False)
@@ -7957,10 +7984,11 @@ class Main(QMainWindow):
         self.cfg.setValue("lang", code)
         i18n.retranslate(self)
         self.update_lang_btn()
-        try:
-            self.update_vol_icon()
-        except Exception:
-            pass
+        for fn in (self.update_vol_icon, self.update_xfer, self.update_tree_titles):
+            try:
+                fn()
+            except Exception:
+                pass
         self.statusBar().showMessage({"es": "Idioma: Español", "en": "Language: English",
                                       "ru": "Язык: Русский"}.get(code, ""), 3000)
 
@@ -8411,6 +8439,64 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         dlg.exec()
 
+    def show_shortcuts(self):
+        rows = [("Archivos", [("F2", "Renombrar (canción o carpeta)"), ("Supr", "Eliminar (a la papelera)"),
+                              ("Ctrl + C / Ctrl + X / Ctrl + V", "Copiar / cortar / pegar"),
+                              ("F5", "Actualizar la carpeta"), ("Alt + ← / Alt + →", "Atrás / adelante"),
+                              ("Alt + ↑", "Subir a la carpeta de arriba")]),
+                ("Etiquetas", [("Ctrl + S", "Guardar los cambios"), ("Ctrl + F", "Buscar canción")]),
+                ("Reproducir", [("Enter / doble clic", "Reproducir la canción"), ("Espacio", "Pausa / seguir")]),
+                ("Dos árboles", [("F6", "Enviar (mover) de «De» a «A»"), ("F7", "Copiar de «De» a «A»")]),
+                ("Vista", [("Ctrl + rueda del ratón", "Agrandar o achicar las portadas"),
+                           ("Arrastrar arriba/abajo", "Sombrear varias canciones o carpetas")])]
+        dlg = QDialog(self)
+        dlg.setWindowTitle(T("Atajos de teclado"))
+        dlg.resize(560, 520)
+        v = QVBoxLayout(dlg)
+        tb = QTableWidget(0, 2)
+        tb.horizontalHeader().setVisible(False)
+        tb.verticalHeader().setVisible(False)
+        tb.setShowGrid(False)
+        tb.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        tb.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        tb.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        tb.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for group, items in rows:
+            r = tb.rowCount()
+            tb.insertRow(r)
+            gi = QTableWidgetItem(T(group).upper())
+            f = gi.font()
+            f.setBold(True)
+            f.setPointSizeF(max(7.5, f.pointSizeF() - 1))
+            gi.setFont(f)
+            gi.setForeground(QBrush(self.palette().color(QPalette.ColorRole.PlaceholderText)))
+            tb.setItem(r, 0, gi)
+            for key, what in items:
+                r = tb.rowCount()
+                tb.insertRow(r)
+                ki = QTableWidgetItem(key)
+                kf = ki.font()
+                kf.setBold(True)
+                ki.setFont(kf)
+                tb.setItem(r, 0, ki)
+                tb.setItem(r, 1, QTableWidgetItem(T(what)))
+        tb.verticalHeader().setDefaultSectionSize(30)
+        v.addWidget(tb, 1)
+        close = QPushButton(T("Cerrar"))
+        close.clicked.connect(dlg.accept)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(close)
+        v.addLayout(row)
+        dlg.exec()
+
+    def open_error_log(self):
+        p = error_log_path()
+        if not os.path.exists(p) or os.path.getsize(p) == 0:
+            QMessageBox.information(self, T("Registro de errores"), T("No se ha anotado ningún error. ¡Todo bien!"))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(p))
+
     def show_about(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("Acerca de Music Manager")
@@ -8527,7 +8613,79 @@ class Main(QMainWindow):
         QTimer.singleShot(0, advance)
 
 
+class DialogPolish(QObject):
+    """Todas las ventanas de herramientas con el mismo aspecto: márgenes amplios y el título arriba en grande."""
+    SKIP = ("QMessageBox", "QFileDialog", "QInputDialog", "QProgressDialog", "QColorDialog", "QFontDialog")
+
+    def eventFilter(self, obj, ev):
+        if ev.type() == QEvent.Type.Show and isinstance(obj, QDialog) and obj.isWindow() \
+                and not obj.property("_polished") and type(obj).__name__ not in self.SKIP:
+            obj.setProperty("_polished", True)
+            try:
+                self.polish(obj)
+            except Exception:
+                pass
+        return False
+
+    def polish(self, dlg):
+        lay = dlg.layout()
+        if lay is None:
+            return
+        m = lay.contentsMargins()
+        if m.left() < 14:
+            lay.setContentsMargins(18, 14, 18, 14)
+        if lay.spacing() < 8:
+            lay.setSpacing(10)
+        title = dlg.windowTitle().strip()
+        has_head = any(l.objectName() in ("dlgtitle", "title") or "<h" in (l.text() or "")
+                       for l in dlg.findChildren(QLabel))
+        if title and not has_head and isinstance(lay, QVBoxLayout) and dlg.windowTitle() not in ("Ajustes", T("Ajustes")):
+            head = QLabel(title)
+            head.setObjectName("dlgtitle")
+            lay.insertWidget(0, head)
+
+
+def error_log_path():
+    base = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation) or \
+        os.path.join(os.path.expanduser("~"), ".musicmanager")
+    os.makedirs(base, exist_ok=True)
+    return os.path.join(base, "errores.txt")
+
+
+_last_err = [0.0]
+
+
+def install_error_guard():
+    """Si algo falla dentro del programa, se anota en «errores.txt» y se avisa en la barra de abajo, en vez de
+    cerrarse de golpe (PyQt6 cierra el programa ante cualquier error no controlado)."""
+    import traceback
+
+    def hook(etype, value, tb):
+        text = "".join(traceback.format_exception(etype, value, tb))
+        try:
+            p = error_log_path()
+            if os.path.exists(p) and os.path.getsize(p) > 512 * 1024:   # que no crezca sin fin
+                os.replace(p, p + ".old")
+            with open(p, "a", encoding="utf-8") as fh:
+                fh.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} · versión {APP_VERSION} =====\n{text}")
+        except OSError:
+            pass
+        sys.__stderr__ and sys.__stderr__.write(text)
+        try:
+            app = QApplication.instance()
+            win = next((w for w in app.topLevelWidgets() if isinstance(w, QMainWindow) and w.isVisible()), None)
+            if win is not None and time.time() - _last_err[0] > 3:
+                _last_err[0] = time.time()
+                win.statusBar().showMessage(T("Algo falló, pero el programa sigue funcionando. Detalles en Ayuda → "
+                                              "Registro de errores."), 8000)
+        except Exception:
+            pass
+    sys.excepthook = hook
+
+
 if __name__ == "__main__":
+    install_error_guard()
+    _polish = DialogPolish()
     if sys.platform == "win32":
         try:  # para que Windows muestre el icono propio en la barra de tareas
             import ctypes
@@ -8541,6 +8699,7 @@ if __name__ == "__main__":
     app.installNativeEventFilter(_wheel)
     _deco = icons.IconDeco(app)
     app.installEventFilter(_deco)
+    app.installEventFilter(_polish)
     # una sola ventana del programa: si ya estaba abierto, aquel se cierra y se abre este de nuevo
     _server = None
     try:
