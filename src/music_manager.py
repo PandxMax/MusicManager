@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.00"
+APP_VERSION = "2.01"
 
 
 class TMenu(QMenu):
@@ -430,6 +430,9 @@ QToolBar { background: @surface; border: none; border-bottom: 1px solid @border;
 QToolBar QToolButton { background: transparent; border: none; border-radius: 8px; padding: 6px 10px; }
 QToolBar QToolButton:hover { background: @accent_soft; }
 QToolBar QToolButton:checked { background: @accent; color: white; }
+QToolButton#kofibtn { background: #ffffff; color: #202124; border: 1px solid #e3e3e3; border-radius: 8px; padding: 3px 10px 3px 6px; font-weight: 700; }
+QToolButton#kofibtn:hover { background: #fff1ea; border-color: #ff5e2b; }
+QToolButton#kofibtn:pressed { background: #ffe0d1; }
 QToolButton#langbtn { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 3px 8px; font-weight: 600; }
 QToolButton#langbtn:hover { border-color: @accent; background: @accent_soft; }
 QToolButton#langbtn::menu-indicator { image: none; width: 0px; }
@@ -962,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.01', [
+        'Nuevo botón «Apoyar» con el logo de Ko-fi junto al cambio de idioma, y un recuadro en «Acerca de» para apoyar el programa invitándome un café (ko-fi.com/pandxmax). ¡Gracias!',
+    ]),
     ('2.00', [
         '¡Versión 2.00! Revisión general: se probó el programa entero de forma automática (todas las herramientas, guardar, renombrar, mover, vistas, temas e idiomas) y se corrigieron los fallos encontrados.',
         'Más estable: si algo falla dentro del programa, ya no se cierra de golpe; se anota en un registro y se avisa abajo. Nuevo: Ayuda → «Registro de errores» para ver o enviar los detalles.',
@@ -1558,7 +1564,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.00 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.01 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3671,6 +3677,8 @@ class Main(QMainWindow):
             a.triggered.connect(lambda _=False, c=code: self.set_language(c))
         self.lang_btn.setMenu(lm)
         cwl.addWidget(self.lang_btn)
+        self.kofi_btn = self.make_kofi_button("Apoyar")   # ☕ apoyar el programa en Ko-fi
+        cwl.addWidget(self.kofi_btn)
         cwl.addWidget(self.search)
         cwl.addWidget(self.chk_sub)
 
@@ -8497,6 +8505,37 @@ class Main(QMainWindow):
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(p))
 
+    def kofi_icon(self):
+        if getattr(self, "_kofi_icon", None) is None:
+            pm = QPixmap()
+            try:
+                import kofi_data
+                pm.loadFromData(base64.b64decode("".join(kofi_data.KOFI_PNG_B64)))
+            except Exception:
+                pass
+            self._kofi_icon = QIcon(pm) if not pm.isNull() else QIcon()
+        return self._kofi_icon
+
+    def make_kofi_button(self, text):
+        b = QToolButton()
+        b.setObjectName("kofibtn")
+        b.setText(T(text))
+        b.setIcon(self.kofi_icon())
+        b.setIconSize(QSize(22, 17))
+        b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.setToolTip(T("¿Te gusta Music Manager? Invítame un café en Ko-fi ☕ (ko-fi.com/pandxmax)"))
+        b.clicked.connect(self.open_kofi)
+        return b
+
+    def open_kofi(self):
+        try:
+            import kofi_data
+            url = kofi_data.KOFI_URL
+        except Exception:
+            url = "https://ko-fi.com/pandxmax"
+        QDesktopServices.openUrl(QUrl(url))
+
     def show_about(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("Acerca de Music Manager")
@@ -8514,6 +8553,17 @@ class Main(QMainWindow):
         t.setOpenExternalLinks(True)
         top.addWidget(t, 1)
         v.addLayout(top)
+        sup = QFrame()
+        sup.setObjectName("card")
+        sl = QHBoxLayout(sup)
+        sl.setContentsMargins(14, 10, 10, 10)
+        sup_t = QLabel(T("<b>¿Te gusta Music Manager?</b><br>Es gratis y lo hago en mi tiempo libre. Si te sirve, "
+                         "puedes apoyarlo invitándome un café en Ko-fi."))
+        sup_t.setWordWrap(True)
+        sup_t.setTextFormat(Qt.TextFormat.RichText)
+        sl.addWidget(sup_t, 1)
+        sl.addWidget(self.make_kofi_button("Apoyar en Ko-fi"), 0, Qt.AlignmentFlag.AlignVCenter)
+        v.addWidget(sup)
         log = QTextBrowser()
         log.setOpenExternalLinks(True)
         log.setHtml("<h3>📜 Historial de versiones</h3>" + changelog_html(CHANGELOG, APP_VERSION))

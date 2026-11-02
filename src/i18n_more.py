@@ -1344,3 +1344,14 @@ ROWS += [
     ("Al cambiar de idioma, la barra de enviar entre árboles y sus títulos también se traducen al momento.",
      "When switching language, the send-between-trees bar and its titles are translated right away too.", "При смене языка панель отправки между деревьями тоже переводится сразу."),
 ]
+ROWS += [
+    ("Apoyar", "Support", "Поддержать"), ("Apoyar en Ko-fi", "Support on Ko-fi", "Поддержать на Ko-fi"),
+    ("¿Te gusta Music Manager? Invítame un café en Ko-fi ☕ (ko-fi.com/pandxmax)", "Like Music Manager? Buy me a coffee on Ko-fi ☕ (ko-fi.com/pandxmax)",
+     "Нравится Music Manager? Угостите меня кофе на Ko-fi ☕ (ko-fi.com/pandxmax)"),
+    ("<b>¿Te gusta Music Manager?</b><br>Es gratis y lo hago en mi tiempo libre. Si te sirve, puedes apoyarlo invitándome un café en Ko-fi.",
+     "<b>Like Music Manager?</b><br>It's free and I make it in my spare time. If it helps you, you can support it by buying me a coffee on Ko-fi.",
+     "<b>Нравится Music Manager?</b><br>Программа бесплатная, я делаю её в свободное время. Можно поддержать, угостив меня кофе на Ko-fi."),
+    ("Nuevo botón «Apoyar» con el logo de Ko-fi junto al cambio de idioma, y un recuadro en «Acerca de» para apoyar el programa invitándome un café (ko-fi.com/pandxmax). ¡Gracias!",
+     "New “Support” button with the Ko-fi logo next to the language switch, and a box in “About” to support the program by buying me a coffee (ko-fi.com/pandxmax). Thank you!",
+     "Новая кнопка «Поддержать» с логотипом Ko-fi рядом с выбором языка и блок в «О программе». Спасибо!"),
+]

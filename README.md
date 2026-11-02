@@ -16,12 +16,16 @@
 
 <br/>
 
-![Versión](https://img.shields.io/badge/Versi%C3%B3n-2.00-7C5CFF)
+![Versión](https://img.shields.io/badge/Versi%C3%B3n-2.01-7C5CFF)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![PyQt6](https://img.shields.io/badge/Interfaz-PyQt6-41CD52?logo=qt&logoColor=white)
 ![IA](https://img.shields.io/badge/IA-Claude%20%7C%20ChatGPT%20%7C%20Gemini-7C5CFF)
 ![Idiomas](https://img.shields.io/badge/Idiomas-ES%20%7C%20EN%20%7C%20RU-orange)
+
+<br/>
+
+<a href="https://ko-fi.com/pandxmax"><img src="https://img.shields.io/badge/Apoya%20el%20proyecto-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white&style=for-the-badge" alt="Apoyar en Ko-fi"/></a>
 
 </div>
 
