@@ -1286,3 +1286,8 @@ ROWS += [
      "The “Settings” menu no longer drops down a list: clicking it opens the options window directly (AI, appearance, language… are all inside).",
      "Меню «Настройки» больше не раскрывает список: сразу открывается окно параметров."),
 ]
+ROWS += [
+    ("Renombrar en modo iconos como en el Explorador de Windows: el cuadro mide lo mismo que el icono, el nombre se parte en varias líneas y el cuadro crece hacia abajo según lo que escribas. Enter guarda, Esc cancela y hacer clic fuera también guarda.",
+     "Renaming in icon view works like Windows Explorer: the box is as wide as the icon, the name wraps onto several lines and the box grows downward as you type. Enter saves, Esc cancels and clicking outside also saves.",
+     "Переименование в режиме значков как в Проводнике: поле шириной со значок, имя переносится на несколько строк. Enter — сохранить, Esc — отмена."),
+]

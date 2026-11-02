@@ -560,3 +560,7 @@ VERSIÓN 1.95
 ------------
  - Renombrar en modo iconos con un cuadro pequeño (el nombre viejo se oculta mientras escribes).
  - «Ajustes» abre directamente la ventana de opciones.
+
+VERSIÓN 1.96
+------------
+ - Renombrar en modo iconos como en el Explorador (cuadro del ancho del icono, nombre en varias líneas).

@@ -13,13 +13,13 @@ from urllib.parse import quote_plus, quote
 from PyQt6.QtCore import (QAbstractNativeEventFilter, QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
                           QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF, QPersistentModelIndex)
 from PyQt6.QtGui import (QFontMetrics, QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
-                         QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent, QPen)
+                         QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent, QPen, QTextOption)
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QSplitter, QTreeWidget, QTreeWidgetItem,
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QStyleOptionViewItem, QTableWidget, QTableWidgetItem, QRadioButton, QButtonGroup,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QStyleOptionViewItem, QAbstractItemDelegate, QTableWidget, QTableWidgetItem, QRadioButton, QButtonGroup,
 )
 import mutagen
 import i18n
@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.95"
+APP_VERSION = "1.96"
 
 
 class TMenu(QMenu):
@@ -446,6 +446,8 @@ QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 1
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
+QPlainTextEdit#renamebox { background: @base; border: 1px solid @accent; border-radius: 4px; padding: 0px;
+                           selection-background-color: @accent; selection-color: white; }
 QLineEdit#treeedit { background: @surface; border: 2px solid @accent; border-radius: 6px; padding: 0px 6px; margin: 0px; }
 QLineEdit#renameedit { background: @surface; border: 1px solid @accent; border-radius: 6px; padding: 1px 6px; }
 QToolButton#foldmini { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 0px; }
@@ -957,6 +959,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.96', [
+        'Renombrar en modo iconos como en el Explorador de Windows: el cuadro mide lo mismo que el icono, el nombre se parte en varias líneas y el cuadro crece hacia abajo según lo que escribas. Enter guarda, Esc cancela y hacer clic fuera también guarda.',
+    ]),
     ('1.95', [
         'Renombrar en modo iconos: el cuadro vuelve a ser pequeño, justo donde va el nombre; mientras escribes, el nombre viejo de debajo se oculta (ya no asoma ni hace falta taparlo).',
         'El menú «Ajustes» ya no despliega una lista: al pulsarlo se abre directamente la ventana de opciones (IA, apariencia, idioma… están todas dentro).',
@@ -1532,7 +1537,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.95 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.96 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3108,6 +3113,50 @@ class GenreChat(QDialog):
         self.main.apply_genre(self.path, self.apply_le.text().strip())
 
 
+class RenameBox(QPlainTextEdit):
+    """Cuadro para renombrar en modo iconos, como el Explorador de Windows: del ancho del icono, el nombre se parte
+    en varias líneas y el cuadro crece hacia abajo. Enter guarda, Esc cancela."""
+    done = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("renamebox")
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setWordWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self.setTabChangesFocus(True)
+        self.document().setDocumentMargin(2)
+        opt = self.document().defaultTextOption()
+        opt.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.document().setDefaultTextOption(opt)
+        self.textChanged.connect(self.fit)
+
+    def keyPressEvent(self, e):
+        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.done.emit()
+            return
+        super().keyPressEvent(e)
+
+    def insertFromMimeData(self, src):
+        self.insertPlainText(src.text().replace("\r", " ").replace("\n", " "))
+
+    def fit(self):
+        """El alto se ajusta a las líneas que ocupa el nombre (como en el Explorador)."""
+        m = self.document().documentMargin()
+        w = max(20, self.width() - 2 * self.frameWidth() - int(2 * m) - 4)
+        fm = self.fontMetrics()
+        txt = self.toPlainText() or " "
+        br = fm.boundingRect(QRect(0, 0, w, 10000),
+                             int(Qt.TextFlag.TextWrapAnywhere.value | Qt.AlignmentFlag.AlignHCenter.value), txt)
+        h = br.height() + int(2 * m) + 2 * self.frameWidth() + 4
+        if h != self.height():
+            self.resize(self.width(), max(26, h))
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        QTimer.singleShot(0, self.fit)
+
+
 class SongDelegate(QStyledItemDelegate):
     """Delegado de la lista en modo iconos/lista: los nombres largos se ven en varias líneas (no se cortan con «…»
     a la primera) y el cuadro para renombrar es ancho y se ve entero."""
@@ -3149,6 +3198,13 @@ class SongDelegate(QStyledItemDelegate):
                     p.drawPixmap(x, y, pm)
 
     def createEditor(self, parent, option, index):
+        if self._icons():
+            ed = RenameBox(parent)
+            ed.done.connect(lambda ed=ed: (self.commitData.emit(ed),
+                                           self.closeEditor.emit(ed, QAbstractItemDelegate.EndEditHint.NoHint)))
+            self.editing = QPersistentModelIndex(index)
+            ed.destroyed.connect(self._edit_done)
+            return ed
         ed = super().createEditor(parent, option, index)
         if isinstance(ed, QLineEdit):
             ed.setObjectName("renameedit")
@@ -3166,14 +3222,32 @@ class SongDelegate(QStyledItemDelegate):
             pass
 
     def setEditorData(self, editor, index):
+        if isinstance(editor, RenameBox):
+            editor.setPlainText(str(index.data(Qt.ItemDataRole.DisplayRole) or ""))
+            editor.selectAll()
+            editor.fit()
+            return
         super().setEditorData(editor, index)
         if isinstance(editor, QLineEdit):
             editor.selectAll()
+
+    def setModelData(self, editor, model, index):
+        if isinstance(editor, RenameBox):
+            model.setData(index, " ".join(editor.toPlainText().split()), Qt.ItemDataRole.EditRole)
+            return
+        super().setModelData(editor, model, index)
 
     def updateEditorGeometry(self, editor, option, index):
         r = option.rect
         vp = self.lst.viewport().rect()
         isz = self.lst.iconSize()
+        if isinstance(editor, RenameBox):   # como en el Explorador: del ancho del icono, justo debajo de la portada
+            w = max(r.width() - 4, 120)
+            x = r.center().x() - w // 2
+            y = r.top() + isz.height() + 6
+            editor.setGeometry(QRect(x, y, w, max(editor.height(), 26)))
+            editor.fit()
+            return
         if self._icons():
             # cuadro compacto justo donde va el nombre (el nombre viejo se oculta mientras escribes)
             w = min(max(r.width() + 24, 190), vp.width() - 8)
