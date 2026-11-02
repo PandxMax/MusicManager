@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.92"
+APP_VERSION = "1.93"
 
 
 class TMenu(QMenu):
@@ -446,6 +446,7 @@ QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 1
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
+QLineEdit#treeedit { background: @surface; border: 2px solid @accent; border-radius: 6px; padding: 0px 6px; margin: 0px; }
 QLineEdit#renameedit { background: @surface; border: 2px solid @accent; border-radius: 6px; padding: 2px 6px; }
 QToolButton#foldmini { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 0px; }
 QToolButton#foldmini:hover { background: @accent_soft; border-color: @accent; }
@@ -565,6 +566,8 @@ QTreeView::branch:selected { background: @accent; border-top-left-radius: 6px; b
 QTreeView::item:selected { border-top-left-radius: 0px; border-bottom-left-radius: 0px; }
 QTreeWidget#settingsnav { padding: 6px; }
 QTreeWidget#settingsnav::item { padding: 7px 8px; border-radius: 8px; }
+QLabel#menuhead { color: @muted; font-size: 10px; font-weight: 700; padding: 6px 12px 3px 12px; }
+QRubberBand { background: @accent_soft; border: 1px solid @accent; border-radius: 6px; }
 QLabel#dlgtitle { font-size: 17px; font-weight: 700; }
 QLabel#dlgsub { color: @muted; }
 QFrame#card { background: @surface; border: 1px solid @border; border-radius: 12px; }
@@ -954,6 +957,13 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.93', [
+        'Menú Herramientas ordenado en 4 grupos con título: Audio y calidad · Etiquetas y portadas · Organizar la biblioteca · Internet y servidor. Todas las opciones con su icono.',
+        'Árboles de carpetas: ahora sí se pueden sombrear varias carpetas arrastrando hacia arriba o abajo (antes se empezaba a arrastrar la carpeta). Arrastrar hacia un lado sigue moviendo la carpeta.',
+        'Renombrar carpetas (F2 o clic derecho, en el árbol o en la lista) se hace ahí mismo sobre el nombre, sin ventana. Si estabas dentro de esa carpeta, sigues en ella con su nombre nuevo.',
+        'Renombrar canciones en modo iconos: el cuadro tapa todo el nombre viejo (ya no asoma por debajo).',
+        'El recuadro de selección al sombrear en la lista tiene el color de acento, más suave y con bordes redondeados.',
+    ]),
     ('1.92', [
         'Identificar por sonido: con la clave de AcoustID ya guardada, el cuadro de la clave se oculta y solo queda una línea «🔑 Clave guardada · Cambiar». Nueva cabecera y tabla más clara.',
         'Diseño más pulido en todo el programa: desplegables, casillas y opciones redondas con el color de acento, pestañas tipo «píldora», tablas con filas alternas y sin rejilla, barras de progreso redondeadas, cabeceras en las ventanas de herramientas y barras de desplazamiento más finas.',
@@ -1514,7 +1524,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.92 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.93 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2413,6 +2423,27 @@ class GlyphButton(QPushButton):
                 p.drawRoundedRect(QRectF(x - 7, y + dy - 1.3, 14, 2.6), 1.3, 1.3)
 
 
+class TreeEditDelegate(QStyledItemDelegate):
+    """Cuadro para renombrar carpetas en el árbol: del alto de la fila, con borde de color y el nombre seleccionado."""
+    def createEditor(self, parent, option, index):
+        ed = super().createEditor(parent, option, index)
+        if isinstance(ed, QLineEdit):
+            ed.setObjectName("treeedit")
+        return ed
+
+    def setEditorData(self, editor, index):
+        super().setEditorData(editor, index)
+        if isinstance(editor, QLineEdit):
+            editor.selectAll()
+
+    def updateEditorGeometry(self, editor, option, index):
+        r = option.rect
+        vp = editor.parentWidget().rect() if editor.parentWidget() else r
+        x = r.x() + option.decorationSize.width() + 6
+        w = max(220, min(vp.width() - x - 4, r.width() + 120))
+        editor.setGeometry(QRect(x, r.y() - 1, w, r.height() + 2))
+
+
 class FolderTree(QTreeWidget):
     """Árbol de carpetas. Arrastra carpetas o canciones y suéltalas en otra carpeta,
     incluso desde un árbol hacia el otro."""
@@ -2440,26 +2471,43 @@ class FolderTree(QTreeWidget):
         self.setAutoExpandDelay(-1)   # no abre carpetas por sí solo al arrastrar
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.itemExpanded.connect(self.on_expand)
+        self.setItemDelegate(TreeEditDelegate(self))
 
     # ---- sombrear varias carpetas (arrastrando hacia arriba/abajo desde una no elegida) o arrastrarlas
     def mousePressEvent(self, e):
         it = self.itemAt(e.position().toPoint())
-        self._t_press = e.position().toPoint() if e.button() == Qt.MouseButton.LeftButton else None
-        self._t_unsel = it is not None and not it.isSelected()
+        left = e.button() == Qt.MouseButton.LeftButton
+        self._t_press = e.position().toPoint() if left else None
+        self._t_item = it
+        # Qt decide «arrastrar» ya en el primer movimiento: si pulsas una carpeta no elegida, de entrada se sombrea;
+        # si luego mueves hacia un lado, la arrastramos nosotros
+        self._t_free = left and it is not None and not it.isSelected() and not (
+            e.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier))
+        if self._t_free:
+            self.setDragEnabled(False)
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e):
         pp = getattr(self, "_t_press", None)
-        if (pp is not None and getattr(self, "_t_unsel", False) and self.dragEnabled()
-                and e.buttons() & Qt.MouseButton.LeftButton):
+        if pp is not None and getattr(self, "_t_free", False) and e.buttons() & Qt.MouseButton.LeftButton:
             d = e.position().toPoint() - pp
-            if d.manhattanLength() >= QApplication.startDragDistance() and abs(d.y()) >= abs(d.x()):
-                self.setDragEnabled(False)   # hacia arriba/abajo = sombrear; hacia un lado = arrastrar la carpeta
+            if d.manhattanLength() >= QApplication.startDragDistance():
+                self._t_free = False
+                if abs(d.x()) > abs(d.y()) and self._t_item is not None:   # hacia un lado: arrastrar esa carpeta
+                    it = self._t_item
+                    self._t_press = None
+                    self.setState(QAbstractItemView.State.NoState)
+                    self.clearSelection()
+                    it.setSelected(True)
+                    self.setCurrentItem(it)
+                    self.setDragEnabled(True)
+                    self.startDrag(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction)
+                    return
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e):
         super().mouseReleaseEvent(e)
-        self._t_press = None
+        self._t_press, self._t_free = None, False
         if not self.dragEnabled():
             self.setDragEnabled(True)
 
@@ -3102,10 +3150,13 @@ class SongDelegate(QStyledItemDelegate):
         vp = self.lst.viewport().rect()
         isz = self.lst.iconSize()
         if self._icons():
+            # tapa todo el nombre de debajo (si no, se ve el texto viejo asomando por abajo)
             w = min(max(r.width() + 90, 280), vp.width() - 8)
             x = max(4, min(r.center().x() - w // 2, vp.width() - w - 4))
-            y = min(r.top() + isz.height() + 8, vp.height() - 34)
-            editor.setGeometry(QRect(x, y, w, 30))
+            y = r.top() + isz.height() + 4
+            h = max(32, r.bottom() - y)
+            y = min(y, vp.height() - h - 2)
+            editor.setGeometry(QRect(x, y, w, h))
         else:
             x = r.x() + isz.width() + 10
             w = max(min(vp.width() - x - 6, 520), 220)
@@ -4396,9 +4447,23 @@ class Main(QMainWindow):
                 self.load_folder(self.current_dir, select=self.selected_paths() or None)
             self.update_watch()
 
-    def rename_folder(self, path):
+    def rename_folder(self, path, tree=None):
+        """Renombrar una carpeta escribiendo directamente sobre su nombre (en el árbol o en la lista)."""
         if self.is_protected(path):
             QMessageBox.information(self, "Carpeta principal", "Las carpetas principales no se pueden renombrar.")
+            return
+        np_ = os.path.normcase(os.path.normpath(path))
+        for t in ([tree] if tree is not None else [getattr(self, "active_tree", self.tree), self.tree, self.tree2]):
+            if t is None or not t.isVisible():
+                continue
+            for it in t.all_items():
+                p_ = it.data(0, PATH_ROLE)
+                if p_ and it.parent() is not None and os.path.normcase(os.path.normpath(p_)) == np_:
+                    self.start_tree_rename(t, it, path)
+                    return
+        r = self.row_index.get(path)
+        if r is not None and self.list.item(r) is not None:
+            self.start_inline_rename(self.list.item(r), path)
             return
         name, ok = QInputDialog.getText(self, "Renombrar carpeta", "Nuevo nombre:", text=os.path.basename(path))
         name = safe_filename(name)
@@ -4411,10 +4476,70 @@ class Main(QMainWindow):
                 return
             self.after_fs_change()
 
+    def start_tree_rename(self, t, it, path):
+        if not getattr(t, "_ren_hooked", False):
+            t._ren_hooked = True
+            t.itemChanged.connect(lambda item, col, t=t: self.tree_rename_changed(t, item))
+            t.itemDelegate().closeEditor.connect(lambda *_, t=t: QTimer.singleShot(0, lambda: self.tree_rename_end(t)))
+        t._ren = (it, path, it.text(0))
+        t.blockSignals(True)
+        it.setFlags(it.flags() | Qt.ItemFlag.ItemIsEditable)
+        t.blockSignals(False)
+        t.scrollToItem(it)
+        t.editItem(it, 0)
+
+    def tree_rename_changed(self, t, it):
+        info = getattr(t, "_ren", None)
+        if not info or it is not info[0] or it.text(0) == info[2]:
+            return
+        t._ren = None
+        old_text = info[2]
+        new = safe_filename(it.text(0).strip())
+        t.blockSignals(True)
+        it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        if not new:
+            it.setText(0, old_text)
+        t.blockSignals(False)
+        if new:
+            QTimer.singleShot(0, lambda: self.do_rename_folder(info[1], new))
+
+    def tree_rename_end(self, t):
+        info = getattr(t, "_ren", None)
+        if info:   # Esc o sin cambios
+            t._ren = None
+            try:
+                t.blockSignals(True)
+                info[0].setFlags(info[0].flags() & ~Qt.ItemFlag.ItemIsEditable)
+                t.blockSignals(False)
+            except RuntimeError:
+                t.blockSignals(False)
+
+    def do_rename_folder(self, path, name):
+        if name == os.path.basename(path):
+            return
+        new = os.path.join(os.path.dirname(path), name)
+        if os.path.exists(new):
+            QMessageBox.warning(self, T("Renombrar carpeta"), T(f"Ya existe una carpeta llamada «{name}»."))
+            self.refresh_trees()
+            return
+        try:
+            self.release_if([path])
+            self.fs_retry(os.rename, path, new)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", str(e))
+            self.refresh_trees()
+            return
+        cd = self.current_dir or ""
+        ncd, npath = os.path.normcase(os.path.normpath(cd)), os.path.normcase(os.path.normpath(path))
+        if ncd == npath or ncd.startswith(npath + os.sep):   # estabas dentro: se sigue en la carpeta renombrada
+            self.current_dir = new + cd[len(path):]
+        self.after_fs_change()
+        self.statusBar().showMessage(T(f"Carpeta renombrada a «{name}»."))
+
     def rename_tree_current(self, tree):
         it = tree.currentItem()
         if it is not None and it.data(0, PATH_ROLE):
-            self.rename_folder(it.data(0, PATH_ROLE))
+            self.rename_folder(it.data(0, PATH_ROLE), tree)
 
     def after_fs_change(self, _=None):
         while self.current_dir and not os.path.isdir(self.current_dir):
@@ -5531,6 +5656,10 @@ class Main(QMainWindow):
         return safe_filename(" - ".join(parts))
 
     def rename_selected(self):
+        it = self.list.currentItem()
+        if it is not None and it.isSelected() and it.data(KIND_ROLE) == "dir" and not self.cur_paths:
+            self.rename_folder(it.data(PATH_ROLE))   # una carpeta de la lista: se renombra ahí mismo
+            return
         self.apply_form()
         paths = list(self.cur_paths)
         if not paths:
@@ -5578,6 +5707,9 @@ class Main(QMainWindow):
         old_path = info[1]
         if not new:
             it.setText(info[2])
+            return
+        if it.data(KIND_ROLE) == "dir":
+            QTimer.singleShot(0, lambda: self.do_rename_folder(old_path, new))
             return
         QTimer.singleShot(0, lambda: self.do_renames([(old_path, new)]))
 
@@ -6729,7 +6861,7 @@ class Main(QMainWindow):
                 m.addAction("📌 Quitar de la lista", lambda: self.unpin(p))
             elif it.data(0, KIND_ROLE) is None:
                 m.addSeparator()
-                m.addAction("✏️ Renombrar (F2)", lambda: self.rename_folder(p))
+                m.addAction("✏️ Renombrar (F2)", lambda: self.rename_folder(p, tree))
                 m.addAction("🗑 Eliminar", self.delete_selected)
         m.exec(tree.viewport().mapToGlobal(pos))
 
@@ -6749,6 +6881,7 @@ class Main(QMainWindow):
             m.addSeparator()
             m.addAction("✂️ Cortar (Ctrl+X)", lambda: self.clip_set("cut"))
             m.addAction("📋 Copiar (Ctrl+C)", lambda: self.clip_set("copy"))
+            m.addAction("✏️ Renombrar (F2)", lambda: self.rename_folder(d))
             m.addAction("🗑 Eliminar (Supr)", lambda: self.delete_paths(self.selected_all_paths()))
             m.addSeparator()
             m.addAction("🏷 Géneros en lote de esta carpeta…", lambda: self.open_batch_genres(folder=d))
@@ -7242,37 +7375,47 @@ class Main(QMainWindow):
         p.addAction(self.act("➕ Añadir selección a la lista", lambda: self.pl_add(self.selected_paths())))
 
         t = mb.addMenu("&Herramientas")
-        t.addAction(self.act("📊 Espectrograma y calidad…", self.open_spectrum,
-                             "Espectrograma y análisis de calidad de las canciones seleccionadas (varias = comparar)"))
-        t.addAction(self.act("✨ Portadas automáticas (alta calidad)", self.auto_cover,
-                             "Busca en iTunes/Deezer la portada de las canciones seleccionadas"))
-        t.addAction(self.act("🔄 Convertir formato…", self.convert_selected))
-        t.addSeparator()
-        t.addAction(self.act("📋 Informe de la biblioteca…", self.open_report,
-                             "Cuántas canciones no tienen portada, letra, género, año… y acceso directo a cada una"))
-        t.addAction(self.act("🗂 Organizar en carpetas (Artista / Álbum)…", self.open_organize,
-                             "Mueve las canciones a carpetas según sus etiquetas"))
-        t.addAction(self.act("📁 Crear carpetas por… (canciones elegidas)", self.open_folders_by,
-                             "Reparte las canciones seleccionadas en carpetas por intérprete, álbum, género, año…"))
-        t.addAction(self.act("🏷 Etiquetas desde el nombre del archivo…", self.open_tags_from_name,
-                             "Saca artista, título, pista… del nombre de los archivos seleccionados"))
-        t.addAction(self.act("🔊 Normalizar volumen…", self.open_normalize,
-                             "Deja todas las canciones seleccionadas con el mismo volumen"))
-        t.addAction(self.act("🏷 Géneros en lote…", self.open_batch_genres,
-                             "Afina géneros generales («Electronic», «Rock»…) por álbum con MusicBrainz y la IA, o pon géneros a muchas a la vez"))
-        t.addAction(self.act("🎧 Identificar por sonido (AcoustID)…", self.open_acoustid,
-                             "Reconoce las canciones seleccionadas escuchando su audio, aunque no tengan nombre ni etiquetas"))
-        t.addAction(self.act("💿 Emparejar álbum con MusicBrainz…", self.open_album_match,
-                             "Coloca cada archivo en su pista del álbum y corrige título, pista, disco, año e intérprete del álbum"))
-        t.addAction(self.act("📡 Navidrome (servidor de música)…", self.open_navidrome,
-                             "Conecta con tu Navidrome: actualizar la biblioteca, revisar qué se verá mal y ver tus más escuchadas"))
-        t.addAction(self.act("🔁 Buscar canciones repetidas…", self.open_dupes,
-                             "Encuentra canciones duplicadas y deja marcadas las copias de peor calidad"))
-        t.addAction(self.act("🎚 Ajustes de la canción…", self.open_fx,
-                             "Graves, agudos, tempo, tono, velocidad, bucle, eco… y guardar como canción nueva o reemplazar"))
-        t.addAction(self.act("▶️ Buscar en YouTube (navegador)", self.youtube_current))
-        t.addAction(self.act("⬇ Descargar de YouTube / SoundCloud a MP3…", self.open_ytdl,
-                             "Descarga el audio de un enlace de YouTube o SoundCloud como MP3 para luego editarlo"))
+        t.setToolTipsVisible(True)
+        groups = [
+            ("Audio y calidad", [
+                ("📊 Espectrograma y calidad…", self.open_spectrum,
+                 "Espectrograma y análisis de calidad de las canciones seleccionadas (varias = comparar)"),
+                ("🎚 Ajustes de la canción…", self.open_fx,
+                 "Graves, agudos, tempo, tono, velocidad, bucle, eco… y guardar como canción nueva o reemplazar"),
+                ("🔊 Normalizar volumen…", self.open_normalize, "Deja todas las canciones seleccionadas con el mismo volumen"),
+                ("🔄 Convertir formato…", self.convert_selected, "Convierte las canciones seleccionadas a otro formato")]),
+            ("Etiquetas y portadas", [
+                ("🎧 Identificar por sonido (AcoustID)…", self.open_acoustid,
+                 "Reconoce las canciones seleccionadas escuchando su audio, aunque no tengan nombre ni etiquetas"),
+                ("💿 Emparejar álbum con MusicBrainz…", self.open_album_match,
+                 "Coloca cada archivo en su pista del álbum y corrige título, pista, disco, año e intérprete del álbum"),
+                ("✨ Portadas automáticas (alta calidad)", self.auto_cover,
+                 "Busca en iTunes/Deezer la portada de las canciones seleccionadas"),
+                ("🏷 Géneros en lote…", self.open_batch_genres,
+                 "Afina géneros generales («Electronic», «Rock»…) por álbum con MusicBrainz y la IA, o pon géneros a muchas a la vez"),
+                ("🏷 Etiquetas desde el nombre del archivo…", self.open_tags_from_name,
+                 "Saca artista, título, pista… del nombre de los archivos seleccionados")]),
+            ("Organizar la biblioteca", [
+                ("📋 Informe de la biblioteca…", self.open_report,
+                 "Cuántas canciones no tienen portada, letra, género, año… y acceso directo a cada una"),
+                ("🔁 Buscar canciones repetidas…", self.open_dupes,
+                 "Encuentra canciones duplicadas y deja marcadas las copias de peor calidad"),
+                ("🗂 Organizar en carpetas (Artista / Álbum)…", self.open_organize, "Mueve las canciones a carpetas según sus etiquetas"),
+                ("📁 Crear carpetas por… (canciones elegidas)", self.open_folders_by,
+                 "Reparte las canciones seleccionadas en carpetas por intérprete, álbum, género, año…")]),
+            ("Internet y servidor", [
+                ("⬇ Descargar de YouTube / SoundCloud a MP3…", self.open_ytdl,
+                 "Descarga el audio de un enlace de YouTube o SoundCloud como MP3 para luego editarlo"),
+                ("▶️ Buscar en YouTube (navegador)", self.youtube_current, "Abre la canción elegida en YouTube"),
+                ("📡 Navidrome (servidor de música)…", self.open_navidrome,
+                 "Conecta con tu Navidrome: actualizar la biblioteca, revisar qué se verá mal y ver tus más escuchadas")]),
+        ]
+        for gi, (head, items) in enumerate(groups):
+            if gi:
+                t.addSeparator()
+            self.menu_head(t, head)
+            for text, fn, tip in items:
+                t.addAction(self.act(text, fn, tip))
 
         fs = mb.addMenu("&Fuente de etiquetas")
         fs.addAction(self.act("🎼 Buscar en MusicBrainz…", lambda: self.open_tag_source("musicbrainz")))
@@ -7399,6 +7542,17 @@ class Main(QMainWindow):
             self.statusBar().showMessage(T("Abre una carpeta con un álbum o selecciona sus canciones."))
             return
         self._show_tool(picard_tools.AlbumMatchDialog(self, paths[:150], tech_info))
+
+    def menu_head(self, menu, text):
+        """Título de grupo dentro de un menú (texto pequeño en gris, no se puede pulsar)."""
+        from PyQt6.QtWidgets import QWidgetAction
+        lab = QLabel(T(text).upper())
+        lab.setObjectName("menuhead")
+        wa = QWidgetAction(menu)
+        wa.setDefaultWidget(lab)
+        wa.setEnabled(False)
+        menu.addAction(wa)
+        return wa
 
     def open_navidrome(self):
         import navidrome

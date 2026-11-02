@@ -164,6 +164,70 @@ dlg.show()
 shot(dlg, "09_crear_carpetas")
 dlg.close()
 
+# ---------------- interacciones (sombrear en el árbol, renombrar, recuadro de selección, menú Herramientas)
+from PyQt6.QtTest import QTest
+from PyQt6.QtCore import QPoint
+try:
+    t = w.tree
+    items = [it for it in t.all_items() if it.data(0, mm.PATH_ROLE) and it.parent() is not None and it.parent().parent() is None]
+    print("árbol hijos:", [ascii(i.text(0)) for i in items], flush=True)
+    if len(items) >= 3:
+        r1, r3 = t.visualItemRect(items[0]), t.visualItemRect(items[2])
+        vp = t.viewport()
+        QTest.mousePress(vp, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, r1.center())
+        for k in range(1, 9):
+            QTest.mouseMove(vp, QPoint(r1.center().x(), r1.center().y() + (r3.center().y() - r1.center().y()) * k // 8))
+            wait(40)
+        shot(w, "11_sombrear_arbol")
+        QTest.mouseRelease(vp, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, r3.center())
+        print("árbol seleccionadas:", len(t.selectedItems()), flush=True)
+        wait(400)
+        w.rename_folder(items[1].data(0, mm.PATH_ROLE), t)
+        wait(500)
+        shot(w, "12_renombrar_carpeta")
+        fw = QApplication.focusWidget()
+        if fw is not None:
+            QTest.keyClick(fw, Qt.Key.Key_Escape)
+        wait(300)
+except Exception as e:
+    print("árbol error:", ascii(str(e)), flush=True)
+try:
+    w.load_folder(first)
+    wait(800)
+    w.list.clearSelection()
+    w.list.setCurrentRow(1)
+    w.list.item(1).setSelected(True)
+    wait(400)
+    w.rename_selected()
+    wait(500)
+    shot(w, "13_renombrar_cancion")
+    fw = QApplication.focusWidget()
+    if fw is not None:
+        QTest.keyClick(fw, Qt.Key.Key_Escape)
+    wait(300)
+    vp = w.list.viewport()
+    a, b = QPoint(vp.width() - 10, vp.height() - 10), QPoint(60, 40)
+    QTest.mousePress(vp, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, a)
+    for k in range(1, 9):
+        QTest.mouseMove(vp, QPoint(a.x() + (b.x() - a.x()) * k // 8, a.y() + (b.y() - a.y()) * k // 8))
+        wait(40)
+    shot(w, "14_recuadro_lista")
+    QTest.mouseRelease(vp, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, b)
+    wait(300)
+except Exception as e:
+    print("lista error:", ascii(str(e)), flush=True)
+try:
+    for a in w.menuBar().actions():
+        if a.menu() is not None and "Herramientas" in a.text().replace("&", ""):
+            mnu = a.menu()
+            mnu.popup(w.mapToGlobal(QPoint(300, 30)))
+            wait(700)
+            mnu.grab().save(os.path.join(OUT, "15_menu_herramientas.png"))
+            print("captura menu", flush=True)
+            mnu.close()
+except Exception as e:
+    print("menu error:", ascii(str(e)), flush=True)
+
 w.set_theme("light")
 wait(1200)
 shot(w, "10_principal_claro")

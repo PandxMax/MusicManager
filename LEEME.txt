@@ -545,3 +545,8 @@ VERSIÓN 1.91
 VERSIÓN 1.92
 ------------
  - Diseño más pulido en todo el programa; la clave de AcoustID se oculta una vez guardada.
+
+VERSIÓN 1.93
+------------
+ - Menú Herramientas ordenado por grupos. Sombrear varias carpetas en los árboles.
+ - Renombrar carpetas directamente sobre el nombre (sin ventana).

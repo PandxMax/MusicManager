@@ -14,6 +14,7 @@ LEAD = {
     "💿": "disc", "💬": "chat", "✔": "check", "🔳": "grid", "🆕": "sparkle", "🔊": "vol3", "🔉": "vol2",
     "🔈": "vol1", "🔇": "vol0", "⋯": "more", "✕": "close", "◀": "arrow_l", "▲": "arrow_u", "🎚": "fx",
     "🔁": "loop", "🎵": "note", "⚙": "gear", "🌐": "globe", "▤": "table", "👁": "eye", "↕": "sort", "👤": "person", "🛠": "tools", "🗃": "explorer", "🎧": "note", "📖": "book", "🏷": "tag", "📤": "download",
+    "📁": "folder", "📡": "server", "🩺": "check", "📈": "chart", "🔌": "server", "🔑": "pin",
 }
 
 
@@ -372,6 +373,13 @@ def draw_glyph(p, kind, rect, col):
         else:
             p.setPen(_pen(col, 2.6))
             p.drawPath(_line_path([(9, 5), (16, 12), (9, 19)]))
+    elif k == "server":
+        p.drawRoundedRect(QRectF(4, 4, 16, 6.5), 1.8, 1.8)
+        p.drawRoundedRect(QRectF(4, 13.5, 16, 6.5), 1.8, 1.8)
+        p.setBrush(col)
+        p.drawEllipse(QPointF(7.5, 7.25), 1.1, 1.1)
+        p.drawEllipse(QPointF(7.5, 16.75), 1.1, 1.1)
+        p.setBrush(Qt.BrushStyle.NoBrush)
     elif k == "gear":
         p.drawEllipse(QPointF(12, 12), 3, 3)
         for i in range(8):
