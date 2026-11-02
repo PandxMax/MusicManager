@@ -1363,3 +1363,8 @@ ROWS += [
      "The “Support” button is no longer white: it matches the other buttons and its cup-with-heart icon follows the theme and accent color.",
      "Кнопка «Поддержать» больше не белая: стиль как у других кнопок, значок следует теме."),
 ]
+ROWS += [
+    ("La carpeta del programa queda limpia: el analizador fpcalc.exe ahora va escondido dentro de «_internal» (junto a MusicManager.exe solo queda el programa). La copia vieja se borra sola al abrir.",
+     "The program folder stays clean: the fpcalc.exe analyzer now lives hidden inside “_internal” (only the program sits next to MusicManager.exe). The old copy is removed automatically on launch.",
+     "Папка программы чистая: fpcalc.exe теперь скрыт в «_internal», старая копия удаляется сама."),
+]

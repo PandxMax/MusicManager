@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.02"
+APP_VERSION = "2.03"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.03', [
+        'La carpeta del programa queda limpia: el analizador fpcalc.exe ahora va escondido dentro de «_internal» (junto a MusicManager.exe solo queda el programa). La copia vieja se borra sola al abrir.',
+    ]),
     ('2.02', [
         'Menú Herramientas más corto: 4 categorías (Audio y calidad · Etiquetas y portadas · Organizar la biblioteca · Internet y servidor); al pasar el ratón por una se despliegan sus herramientas al lado.',
         'El botón «Apoyar» ya no es blanco: tiene el mismo estilo que los demás botones y su icono de taza con corazón sigue el tema y el color de acento.',
@@ -1567,7 +1570,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.02 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.03 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -8737,8 +8740,22 @@ def install_error_guard():
     sys.excepthook = hook
 
 
+def tidy_install_folder():
+    """fpcalc.exe ahora va escondido dentro de «_internal»: si quedó la copia vieja junto al programa, se borra."""
+    if not getattr(sys, "frozen", False):
+        return
+    here = os.path.dirname(sys.executable)
+    old = os.path.join(here, "fpcalc.exe")
+    if os.path.isfile(old) and os.path.isfile(os.path.join(getattr(sys, "_MEIPASS", os.path.join(here, "_internal")), "fpcalc.exe")):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+
+
 if __name__ == "__main__":
     install_error_guard()
+    tidy_install_folder()
     _polish = DialogPolish()
     if sys.platform == "win32":
         try:  # para que Windows muestre el icono propio en la barra de tareas

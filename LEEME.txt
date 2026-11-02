@@ -593,3 +593,7 @@ VERSIÓN 2.02
 ------------
  - Herramientas en 4 categorías que se despliegan al pasar el ratón.
  - Botón «Apoyar» con el estilo y los colores del tema.
+
+VERSIÓN 2.03
+------------
+ - fpcalc.exe va dentro de la carpeta _internal (la carpeta del programa queda limpia).

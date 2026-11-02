@@ -28,7 +28,7 @@ jobs:
           $h = (Get-FileHash fpcalc.zip -Algorithm SHA256).Hash.ToLower()
           if ($h -ne "36b478e16aa69f757f376645db0d436073a42c0097b6bb2677109e7835b59bbc") { throw "fpcalc: hash inesperado $h" }
           Expand-Archive fpcalc.zip -DestinationPath fpcalc_tmp -Force
-          Copy-Item (Get-ChildItem fpcalc_tmp -Recurse -Filter fpcalc.exe | Select-Object -First 1).FullName dist/MusicManager/fpcalc.exe
+          Copy-Item (Get-ChildItem fpcalc_tmp -Recurse -Filter fpcalc.exe | Select-Object -First 1).FullName dist/MusicManager/_internal/fpcalc.exe
       - uses: actions/upload-artifact@v4
         with: { name: MusicManager-Windows, path: dist/MusicManager }
       # Publica una "Release" con el zip: de ahí se actualiza el programa solo (Ayuda > Buscar actualizaciones)

@@ -32,7 +32,7 @@ def nice_table(tb):
     tb.verticalHeader().setDefaultSectionSize(34)
 from i18n import tr as T
 
-UA = "MusicManager/2.02 ( https://github.com/PandxMax/MusicManager )"
+UA = "MusicManager/2.03 ( https://github.com/PandxMax/MusicManager )"
 FP_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
 FP_SHA256 = "36b478e16aa69f757f376645db0d436073a42c0097b6bb2677109e7835b59bbc"
 MB_KEYS = {"musicbrainz_trackid", "musicbrainz_releasetrackid", "musicbrainz_albumid", "musicbrainz_releasegroupid",
@@ -101,7 +101,8 @@ def tools_dir():
 def fpcalc_exe():
     name = "fpcalc.exe" if sys.platform == "win32" else "fpcalc"
     here = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
-    for p in (os.path.join(here, name), os.path.join(tools_dir(), name)):   # viene incluido junto al programa
+    inner = getattr(sys, "_MEIPASS", os.path.join(here, "_internal"))
+    for p in (os.path.join(inner, name), os.path.join(here, name), os.path.join(tools_dir(), name)):   # viene incluido
         if os.path.isfile(p):
             return p
     return shutil.which("fpcalc")
