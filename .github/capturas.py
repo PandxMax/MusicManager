@@ -228,6 +228,15 @@ try:
 except Exception as e:
     print("menu error:", ascii(str(e)), flush=True)
 
+try:
+    house = os.path.join(root, "House", "DJ Kora")
+    hp = [os.path.join(house, f) for f in sorted(os.listdir(house))]
+    grab_modal("16_parentesis")
+    w.open_strip_parens(hp)
+    wait(300)
+except Exception as e:
+    print("parentesis error:", ascii(str(e)), flush=True)
+
 w.set_theme("light")
 wait(1200)
 shot(w, "10_principal_claro")
