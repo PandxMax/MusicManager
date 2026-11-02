@@ -572,3 +572,7 @@ VERSIÓN 1.97
 VERSIÓN 1.98
 ------------
  - Renombrar: mientras escribes solo se sombrea la portada (sin el recuadro grande de color).
+
+VERSIÓN 1.99
+------------
+ - Renombrar: el cuadro va fijo dentro de la tarjeta de color, sin moverse ni cambiar de tamaño.

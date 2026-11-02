@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.98"
+APP_VERSION = "1.99"
 
 
 class TMenu(QMenu):
@@ -446,8 +446,8 @@ QFrame#xfer { background: @surface2; border: 1px solid @border; border-radius: 1
 QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
-QPlainTextEdit#renamebox { background: @base; border: 1px solid @accent; border-radius: 4px; padding: 0px;
-                           selection-background-color: @accent; selection-color: white; }
+QPlainTextEdit#renamebox { background: rgba(0, 0, 0, 75); color: white; border: none; border-radius: 6px; padding: 0px;
+                           selection-background-color: white; selection-color: @accent; }
 QLineEdit#treeedit { background: @surface; border: 2px solid @accent; border-radius: 6px; padding: 0px 6px; margin: 0px; }
 QLineEdit#renameedit { background: @surface; border: 1px solid @accent; border-radius: 6px; padding: 1px 6px; }
 QToolButton#foldmini { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 0px; }
@@ -959,6 +959,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.99', [
+        'Renombrar en modo iconos, más limpio: la tarjeta de color de la canción se queda igual (mismo tamaño) y el cuadro para escribir va dentro de ella, justo donde estaba el nombre. Ya no se mueve ni cambia de tamaño mientras escribes; los nombres largos se parten en líneas dentro del cuadro.',
+    ]),
     ('1.98', [
         'Renombrar en modo iconos: mientras escribes, el recuadro grande de color desaparece y solo queda sombreada la portada (como en el Explorador); el cuadro del nombre ya no parece «flotar» sobre el color. Al terminar, todo vuelve a la normalidad.',
     ]),
@@ -1543,7 +1546,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.98 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.99 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3147,24 +3150,8 @@ class RenameBox(QPlainTextEdit):
         self.insertPlainText(src.text().replace("\r", " ").replace("\n", " "))
 
     def fit(self):
-        """El cuadro se adapta a lo que escribes: ancho según el largo del nombre (hasta un máximo) y, si no cabe,
-        el nombre pasa a varias líneas y el cuadro crece hacia abajo."""
-        m = int(self.document().documentMargin())
-        pad = 2 * self.frameWidth() + 2 * m + 12
-        fm = self.fontMetrics()
-        txt = self.toPlainText() or " "
-        max_w = getattr(self, "max_w", self.width() or 200)
-        w = max(70, min(max_w, fm.horizontalAdvance(txt) + pad))
-        br = fm.boundingRect(QRect(0, 0, w - pad + 8, 10000),
-                             int(Qt.TextFlag.TextWrapAnywhere.value | Qt.AlignmentFlag.AlignHCenter.value), txt)
-        h = max(26, br.height() + 2 * m + 2 * self.frameWidth() + 4)
-        cx = getattr(self, "anchor_cx", self.x() + self.width() // 2)
-        y = getattr(self, "top_y", self.y())
-        par = self.parentWidget()
-        pw = par.width() if par is not None else 10000
-        x = max(2, min(cx - w // 2, pw - w - 2))
-        if (x, y, w, h) != (self.x(), self.y(), self.width(), self.height()):
-            self.setGeometry(x, y, w, h)
+        """El cuadro es fijo (no se mueve ni cambia de tamaño): si el nombre es muy largo, se desplaza por dentro."""
+        self.ensureCursorVisible()
 
     def showEvent(self, e):
         super().showEvent(e)
@@ -3190,25 +3177,13 @@ class SongDelegate(QStyledItemDelegate):
     def paint(self, p, option, index):
         ed = getattr(self, "editing", None)
         if ed is not None and ed.isValid() and ed == QPersistentModelIndex(index):
-            # renombrando: como en el Explorador, solo la portada queda sombreada (el recuadro de color grande
-            # desaparece) y el nombre se escribe en el cuadro de debajo
+            # renombrando: la tarjeta de color se queda igual (mismo tamaño); solo se oculta el nombre, que se
+            # escribe en el cuadro fijo que va dentro de la tarjeta, en el mismo sitio
             opt = QStyleOptionViewItem(option)
             self.initStyleOption(opt, index)
             opt.text = ""
-            opt.state &= ~(QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_MouseOver | QStyle.StateFlag.State_HasFocus)
             st = opt.widget.style() if opt.widget else QApplication.style()
-            dr = st.subElementRect(QStyle.SubElement.SE_ItemViewItemDecoration, opt, opt.widget)
-            if dr.isValid():
-                c = QColor(opt.palette.color(QPalette.ColorRole.Highlight))
-                c.setAlpha(110)
-                p.save()
-                p.setRenderHint(QPainter.RenderHint.Antialiasing)
-                p.setPen(Qt.PenStyle.NoPen)
-                p.setBrush(c)
-                p.drawRoundedRect(QRectF(dr.adjusted(-6, -6, 6, 6)), 8, 8)
-                p.restore()
             st.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, p, opt.widget)
-            return
         else:
             super().paint(p, option, index)
         if option.state & QStyle.StateFlag.State_Selected:
@@ -3269,11 +3244,9 @@ class SongDelegate(QStyledItemDelegate):
         r = option.rect
         vp = self.lst.viewport().rect()
         isz = self.lst.iconSize()
-        if isinstance(editor, RenameBox):   # debajo de la portada; el ancho se adapta al nombre
-            editor.anchor_cx = r.center().x()
-            editor.top_y = r.top() + isz.height() + 6
-            editor.max_w = max(160, min(r.width() + 60, vp.width() - 8))
-            editor.fit()
+        if isinstance(editor, RenameBox):   # dentro de la tarjeta, justo donde está el nombre, siempre del mismo tamaño
+            y = r.top() + isz.height() + 7
+            editor.setGeometry(QRect(r.x() + 5, y, r.width() - 10, max(30, r.bottom() - y - 5)))
             return
         if self._icons():
             # cuadro compacto justo donde va el nombre (el nombre viejo se oculta mientras escribes)

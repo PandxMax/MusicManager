@@ -1301,3 +1301,8 @@ ROWS += [
      "Renaming in icon view: while you type, the big colored box disappears and only the cover stays highlighted (like in Explorer); the name box no longer seems to “float” over the color. When you finish, everything goes back to normal.",
      "Переименование в режиме значков: во время ввода подсвечена только обложка, как в Проводнике."),
 ]
+ROWS += [
+    ("Renombrar en modo iconos, más limpio: la tarjeta de color de la canción se queda igual (mismo tamaño) y el cuadro para escribir va dentro de ella, justo donde estaba el nombre. Ya no se mueve ni cambia de tamaño mientras escribes; los nombres largos se parten en líneas dentro del cuadro.",
+     "Cleaner renaming in icon view: the song's colored card stays the same size and the edit box sits inside it, right where the name was. It no longer moves or resizes while you type; long names wrap inside the box.",
+     "Переименование в режиме значков: карточка не меняется, поле ввода находится внутри неё на месте имени и не двигается."),
+]
