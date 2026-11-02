@@ -555,3 +555,8 @@ VERSIÓN 1.94
 ------------
  - Clic derecho → «Quitar paréntesis del nombre…» (archivo y título, con vista previa).
  - Repositorio ordenado: código en src/, icono y logo en assets/.
+
+VERSIÓN 1.95
+------------
+ - Renombrar en modo iconos con un cuadro pequeño (el nombre viejo se oculta mientras escribes).
+ - «Ajustes» abre directamente la ventana de opciones.

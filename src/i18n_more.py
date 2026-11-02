@@ -1277,3 +1277,12 @@ ROWS += [
      "The GitHub repository is tidy: code in “src”, icon and logo in “assets”. The project page (README) shows right away without scrolling through a long file list.",
      "Репозиторий упорядочен: код в «src», значок и логотип в «assets»."),
 ]
+ROWS += [
+    ("Opciones del programa", "Program options", "Параметры программы"),
+    ("Renombrar en modo iconos: el cuadro vuelve a ser pequeño, justo donde va el nombre; mientras escribes, el nombre viejo de debajo se oculta (ya no asoma ni hace falta taparlo).",
+     "Renaming in icon view: the box is small again, right where the name goes; while you type, the old name underneath is hidden.",
+     "Переименование в режиме значков: поле снова компактное, старое имя скрывается во время ввода."),
+    ("El menú «Ajustes» ya no despliega una lista: al pulsarlo se abre directamente la ventana de opciones (IA, apariencia, idioma… están todas dentro).",
+     "The “Settings” menu no longer drops down a list: clicking it opens the options window directly (AI, appearance, language… are all inside).",
+     "Меню «Настройки» больше не раскрывает список: сразу открывается окно параметров."),
+]

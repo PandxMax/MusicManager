@@ -11,7 +11,7 @@ from functools import lru_cache
 from urllib.parse import quote_plus, quote
 
 from PyQt6.QtCore import (QAbstractNativeEventFilter, QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
-                          QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF)
+                          QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF, QPersistentModelIndex)
 from PyQt6.QtGui import (QFontMetrics, QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
                          QFont, QDesktopServices, QShortcut, QKeySequence, QDrag, QPalette, QLinearGradient, QPainterPath, QPolygonF, QCursor, QMouseEvent, QPen)
 from PyQt6.QtWidgets import (
@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.94"
+APP_VERSION = "1.95"
 
 
 class TMenu(QMenu):
@@ -447,7 +447,7 @@ QToolBar QLineEdit { min-width: 200px; }
 QLabel#title { font-size: 15px; font-weight: 700; }
 QLabel#hint { color: @muted; font-size: 11px; }
 QLineEdit#treeedit { background: @surface; border: 2px solid @accent; border-radius: 6px; padding: 0px 6px; margin: 0px; }
-QLineEdit#renameedit { background: @surface; border: 2px solid @accent; border-radius: 6px; padding: 2px 6px; }
+QLineEdit#renameedit { background: @surface; border: 1px solid @accent; border-radius: 6px; padding: 1px 6px; }
 QToolButton#foldmini { background: transparent; border: 1px solid @border; border-radius: 8px; padding: 0px; }
 QToolButton#foldmini:hover { background: @accent_soft; border-color: @accent; }
 QToolButton#foldbar { background: transparent; border: none; border-top: 1px solid @border; color: @muted; padding: 2px 8px; font-size: 12px; }
@@ -957,6 +957,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.95', [
+        'Renombrar en modo iconos: el cuadro vuelve a ser pequeño, justo donde va el nombre; mientras escribes, el nombre viejo de debajo se oculta (ya no asoma ni hace falta taparlo).',
+        'El menú «Ajustes» ya no despliega una lista: al pulsarlo se abre directamente la ventana de opciones (IA, apariencia, idioma… están todas dentro).',
+    ]),
     ('1.94', [
         'Nuevo: clic derecho en canciones → «Quitar paréntesis del nombre…». Quita lo que va entre paréntesis (y si quieres entre corchetes) en el nombre del archivo y en el título: «Summer (Official Video) [HD]» → «Summer». Antes de aplicar ves la lista con cómo quedará cada una.',
         'El repositorio de GitHub está ordenado: el código en «src», el icono y el logo en «assets». La portada del proyecto (README) se ve enseguida, sin bajar por una lista larga de archivos.',
@@ -1528,7 +1532,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.94 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.95 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3121,7 +3125,15 @@ class SongDelegate(QStyledItemDelegate):
         return super().sizeHint(option, index)
 
     def paint(self, p, option, index):
-        super().paint(p, option, index)
+        ed = getattr(self, "editing", None)
+        if ed is not None and ed.isValid() and ed == QPersistentModelIndex(index):
+            opt = QStyleOptionViewItem(option)
+            self.initStyleOption(opt, index)
+            opt.text = ""
+            st = opt.widget.style() if opt.widget else QApplication.style()
+            st.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, p, opt.widget)
+        else:
+            super().paint(p, option, index)
         if option.state & QStyle.StateFlag.State_Selected:
             # la portada de la canción elegida se ve con sus colores reales (sin el tinte de color encima)
             opt = QStyleOptionViewItem(option)
@@ -3142,7 +3154,16 @@ class SongDelegate(QStyledItemDelegate):
             ed.setObjectName("renameedit")
             if self._icons():
                 ed.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.editing = QPersistentModelIndex(index)   # mientras se escribe, el nombre de debajo no se pinta
+            ed.destroyed.connect(self._edit_done)
         return ed
+
+    def _edit_done(self, *_):
+        self.editing = None
+        try:
+            self.lst.viewport().update()
+        except RuntimeError:
+            pass
 
     def setEditorData(self, editor, index):
         super().setEditorData(editor, index)
@@ -3154,12 +3175,11 @@ class SongDelegate(QStyledItemDelegate):
         vp = self.lst.viewport().rect()
         isz = self.lst.iconSize()
         if self._icons():
-            # tapa todo el nombre de debajo (si no, se ve el texto viejo asomando por abajo)
-            w = min(max(r.width() + 90, 280), vp.width() - 8)
+            # cuadro compacto justo donde va el nombre (el nombre viejo se oculta mientras escribes)
+            w = min(max(r.width() + 24, 190), vp.width() - 8)
             x = max(4, min(r.center().x() - w // 2, vp.width() - w - 4))
-            y = r.top() + isz.height() + 4
-            h = max(32, r.bottom() - y)
-            y = min(y, vp.height() - h - 2)
+            h = 28
+            y = min(r.top() + isz.height() + 8, vp.height() - h - 2)
             editor.setGeometry(QRect(x, y, w, h))
         else:
             x = r.x() + isz.width() + 10
@@ -7535,12 +7555,9 @@ class Main(QMainWindow):
         fs.addSeparator()
         fs.addAction(self.act("🔑 Token de Discogs…", lambda: self.open_settings(3)))
 
-        st = mb.addMenu("&Ajustes")
-        st.addAction(self.act("⚙ Opciones…", lambda: self.open_settings("general")))
-        st.addSeparator()
-        st.addAction(self.act("🤖 Ajustes de IA…", lambda: self.open_settings(0)))
-        st.addAction(self.act("🎨 Apariencia (tema y color)…", lambda: self.open_settings(1)))
-        st.addAction(self.act("🌍 Idioma…", lambda: self.open_settings(2)))
+        # «Ajustes» abre la ventana de opciones directamente (todo está dentro: IA, apariencia, idioma…)
+        self.act_settings = self.act("&Ajustes", lambda: self.open_settings("general"), "Opciones del programa")
+        mb.addAction(self.act_settings)
 
         a = mb.addMenu("A&yuda")
         a.addAction(self.act("❓ Guía rápida", self.show_guide))
