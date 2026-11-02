@@ -4,7 +4,7 @@ Music Manager: explorador de carpetas (arrastrar y soltar) + editor de metadatos
 (con portada y letra) + sugerencia de géneros/subgéneros con Claude, ChatGPT o Gemini.
 
 Instalación:   pip install PyQt6 mutagen send2trash
-Ejecutar:      python music_manager.py
+Ejecutar:      python src/music_manager.py
 """
 import sys, os, json, re, shutil, time, base64, html, urllib.request, urllib.error, urllib.parse
 from functools import lru_cache
@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
     QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QStyleOptionViewItem, QRadioButton, QButtonGroup,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QStyleOptionViewItem, QTableWidget, QTableWidgetItem, QRadioButton, QButtonGroup,
 )
 import mutagen
 import i18n
@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "1.93"
+APP_VERSION = "1.94"
 
 
 class TMenu(QMenu):
@@ -957,6 +957,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('1.94', [
+        'Nuevo: clic derecho en canciones → «Quitar paréntesis del nombre…». Quita lo que va entre paréntesis (y si quieres entre corchetes) en el nombre del archivo y en el título: «Summer (Official Video) [HD]» → «Summer». Antes de aplicar ves la lista con cómo quedará cada una.',
+        'El repositorio de GitHub está ordenado: el código en «src», el icono y el logo en «assets». La portada del proyecto (README) se ve enseguida, sin bajar por una lista larga de archivos.',
+    ]),
     ('1.93', [
         'Menú Herramientas ordenado en 4 grupos con título: Audio y calidad · Etiquetas y portadas · Organizar la biblioteca · Internet y servidor. Todas las opciones con su icono.',
         'Árboles de carpetas: ahora sí se pueden sombrear varias carpetas arrastrando hacia arriba o abajo (antes se empezaba a arrastrar la carpeta). Arrastrar hacia un lado sigue moviendo la carpeta.',
@@ -1524,7 +1528,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/1.93 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/1.94 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5683,6 +5687,113 @@ class Main(QMainWindow):
             res = [(p, self.pattern_name(p, pat)) for p in paths]
         self.do_renames(res)
 
+    @staticmethod
+    def strip_parens(text, square=True):
+        """«Summer (Official Video) [HD]» → «Summer». Quita lo que va entre paréntesis (y corchetes), también anidado."""
+        t, prev = text or "", None
+        while t != prev:
+            prev = t
+            t = re.sub(r"\s*\([^()]*\)", "", t)
+            t = re.sub(r"\s*（[^（）]*）", "", t)
+            if square:
+                t = re.sub(r"\s*\[[^\[\]]*\]", "", t)
+        t = re.sub(r"\s{2,}", " ", t)
+        t = re.sub(r"(\s*-\s*){2,}", " - ", t)   # «Artista -  - Título»
+        return t.strip(" -_.,")
+
+    def open_strip_parens(self, paths):
+        paths = [p for p in paths if p and os.path.isfile(p)]
+        if not paths:
+            self.statusBar().showMessage(T("Selecciona una o varias canciones."))
+            return
+        self.apply_form()
+        dlg = QDialog(self)
+        dlg.setWindowTitle(T("Quitar paréntesis"))
+        dlg.resize(980, 520)
+        v = QVBoxLayout(dlg)
+        v.setContentsMargins(18, 16, 18, 14)
+        v.setSpacing(10)
+        try:
+            from picard_tools import dialog_header, nice_table
+        except Exception:
+            dialog_header = nice_table = None
+        if dialog_header:
+            dialog_header(v, T("🧹 Quitar paréntesis"), T("Quita lo que va entre paréntesis (y si quieres entre corchetes) "
+                                                        "en el nombre del archivo y en el título: «Summer (Official Video)» → «Summer»."))
+        opts = QHBoxLayout()
+        c_file = QCheckBox(T("En el nombre del archivo"))
+        c_title = QCheckBox(T("En el título de la canción"))
+        c_sq = QCheckBox(T("También lo que va entre corchetes [ ]"))
+        for c in (c_file, c_title, c_sq):
+            c.setChecked(True)
+            opts.addWidget(c)
+        opts.addStretch(1)
+        v.addLayout(opts)
+        tb = QTableWidget(0, 4)
+        tb.setHorizontalHeaderLabels([T("Archivo"), T("Nuevo nombre"), T("Título"), T("Nuevo título")])
+        tb.verticalHeader().setVisible(False)
+        tb.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        tb.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        for c in range(4):
+            tb.horizontalHeader().setSectionResizeMode(c, QHeaderView.ResizeMode.Stretch)
+        if nice_table:
+            nice_table(tb)
+        v.addWidget(tb, 1)
+        status = QLabel("")
+        status.setObjectName("dlgsub")
+        v.addWidget(status)
+        br = QHBoxLayout()
+        br.addStretch(1)
+        go = QPushButton(T("🧹 Quitar paréntesis"))
+        go.setObjectName("accent")
+        cancel = QPushButton(T("Cancelar"))
+        br.addWidget(go)
+        br.addWidget(cancel)
+        v.addLayout(br)
+        plan = []
+
+        def preview():
+            plan.clear()
+            tb.setRowCount(0)
+            for p in paths:
+                stem = os.path.splitext(os.path.basename(p))[0]
+                title = self.val(p, "title")
+                nstem = self.strip_parens(stem, c_sq.isChecked()) if c_file.isChecked() else stem
+                ntitle = self.strip_parens(title, c_sq.isChecked()) if (c_title.isChecked() and title) else title
+                nstem = safe_filename(nstem) or stem
+                ntitle = ntitle or title
+                if nstem == stem and ntitle == title:
+                    continue
+                plan.append((p, nstem if nstem != stem else None, ntitle if ntitle != title else None))
+                r = tb.rowCount()
+                tb.insertRow(r)
+                for c_, txt in enumerate((stem, nstem if nstem != stem else "—", title, ntitle if ntitle != title else "—")):
+                    tb.setItem(r, c_, QTableWidgetItem(txt))
+            n_f = sum(1 for _p, f, _t in plan if f)
+            n_t = sum(1 for _p, _f, t in plan if t)
+            status.setText(T(f"{len(plan)} de {len(paths)} canciones cambian · {n_f} nombres de archivo · {n_t} títulos.")
+                           if plan else T("Ninguna de estas canciones tiene paréntesis que quitar."))
+            go.setEnabled(bool(plan))
+
+        for c in (c_file, c_title, c_sq):
+            c.toggled.connect(preview)
+        cancel.clicked.connect(dlg.reject)
+        go.clicked.connect(dlg.accept)
+        preview()
+        i18n.retranslate(dlg)
+        if dlg.exec() != QDialog.DialogCode.Accepted or not plan:
+            return
+        for p, _f, title in plan:   # títulos: quedan pendientes de guardar (en naranja)
+            if title:
+                self.pending.setdefault(p, {})["title"] = title
+        renames = [(p, f) for p, f, _t in plan if f]
+        if renames:
+            self.do_renames(renames)   # los cambios pendientes pasan al nombre nuevo
+        else:
+            self.mark_items()
+            self.on_select()
+        self.statusBar().showMessage(T(f"Paréntesis quitados en {len(plan)} canción(es). Los títulos están pendientes de guardar (Ctrl+S)."))
+
     def start_inline_rename(self, it, path):
         if not getattr(self, "_inline_hooked", False):
             self._inline_hooked = True
@@ -6895,6 +7006,7 @@ class Main(QMainWindow):
             m.addAction("📋 Copiar (Ctrl+C)", lambda: self.clip_set("copy"))
             m.addAction("📥 Pegar aquí (Ctrl+V)", self.paste_here)
             m.addAction("✏️ Renombrar (F2)", self.rename_selected)
+            m.addAction(T("🧹 Quitar paréntesis del nombre…"), lambda: self.open_strip_parens(self.selected_paths()))
             m.addAction("🗑 Eliminar (Supr)", lambda: self.delete_paths(self.selected_all_paths()))
             m.addSeparator()
             tools = m.addMenu(icons.vicon("tools", ctx="menu"), T("Herramientas"))

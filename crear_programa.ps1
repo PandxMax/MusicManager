@@ -14,7 +14,7 @@ function Fail($t) {
     exit 1
 }
 
-if (-not (Test-Path (Join-Path $PSScriptRoot "music_manager.py"))) {
+if (-not (Test-Path (Join-Path $PSScriptRoot "src\music_manager.py"))) {
     Fail "No encuentro music_manager.py. Extrae el ZIP completo en una carpeta antes de ejecutar este archivo."
 }
 
@@ -68,7 +68,7 @@ if ($LASTEXITCODE -ne 0) { Fail "No se pudieron instalar los componentes. Revisa
 Step "Creando MusicManager.exe (de 1 a 3 minutos)..."
 if (Test-Path "build") { Remove-Item "build" -Recurse -Force -ErrorAction SilentlyContinue }
 if (Test-Path "dist") { Remove-Item "dist" -Recurse -Force -ErrorAction SilentlyContinue }
-& $vpy -m PyInstaller --noconfirm --clean --windowed --name MusicManager --icon MusicManager.ico --hidden-import logo_data --hidden-import spectro --hidden-import i18n --hidden-import convert --collect-all imageio_ffmpeg music_manager.py
+& $vpy -m PyInstaller --noconfirm --clean --windowed --name MusicManager --icon assets\MusicManager.ico --paths src --hidden-import logo_data --hidden-import spectro --hidden-import i18n --hidden-import convert --collect-all imageio_ffmpeg src\music_manager.py
 if (-not (Test-Path "dist\MusicManager\MusicManager.exe")) { Fail "No se pudo crear MusicManager.exe." }
 
 # ---------- 4) Instalar como programa normal
@@ -79,7 +79,7 @@ Start-Sleep -Milliseconds 600
 if (Test-Path $dest) { Remove-Item $dest -Recurse -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Path $dest -Force | Out-Null
 Copy-Item "dist\MusicManager\*" $dest -Recurse -Force
-Copy-Item "MusicManager.ico" $dest -Force
+Copy-Item "assets\MusicManager.ico" $dest -Force
 $exe = Join-Path $dest "MusicManager.exe"
 if (-not (Test-Path $exe)) { Fail "No se pudo copiar el programa a $dest." }
 

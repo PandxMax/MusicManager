@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="logo.png" width="140" alt="Music Manager"/>
+<img src="assets/logo.png" width="140" alt="Music Manager"/>
 
 # 🎵 Music Manager
 
@@ -16,7 +16,7 @@
 
 <br/>
 
-![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.93-7C5CFF)
+![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.94-7C5CFF)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![PyQt6](https://img.shields.io/badge/Interfaz-PyQt6-41CD52?logo=qt&logoColor=white)
@@ -128,7 +128,7 @@ No necesitas instalar nada: GitHub lo construye por ti.
 
 ```bash
 pip install -r requirements.txt
-python music_manager.py
+python src/music_manager.py
 ```
 
 En Windows también puedes hacer doble clic en `CREAR_PROGRAMA.bat` para crear el `.exe`, instalarlo y generar los accesos directos.
@@ -156,6 +156,16 @@ En Windows también puedes hacer doble clic en `CREAR_PROGRAMA.bat` para crear e
 ## 🧩 Tecnología
 
 **Python** · **PyQt6** (interfaz y reproductor) · **mutagen** (etiquetas) · **MusicBrainz / Discogs** (fuentes de etiquetas) · **numpy** + **ffmpeg** (espectrogramas y conversión) · **PyInstaller** (el `.exe`).
+
+### 📂 Estructura del proyecto
+
+```
+src/        código del programa (music_manager.py es el principal)
+assets/     icono y logo
+.github/    creación automática del .exe y capturas de pantalla
+INICIAR.bat / iniciar.sh   abrir desde el código (Windows / Linux)
+CREAR_PROGRAMA.bat         crear e instalar el .exe en tu PC
+```
 
 ---
 

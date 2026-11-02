@@ -550,3 +550,8 @@ VERSIÓN 1.93
 ------------
  - Menú Herramientas ordenado por grupos. Sombrear varias carpetas en los árboles.
  - Renombrar carpetas directamente sobre el nombre (sin ventana).
+
+VERSIÓN 1.94
+------------
+ - Clic derecho → «Quitar paréntesis del nombre…» (archivo y título, con vista previa).
+ - Repositorio ordenado: código en src/, icono y logo en assets/.

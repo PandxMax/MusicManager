@@ -1260,3 +1260,20 @@ ROWS += [
     ("El recuadro de selección al sombrear en la lista tiene el color de acento, más suave y con bordes redondeados.",
      "The selection rectangle in the list now uses the accent color, softer and with rounded corners.", "Рамка выделения в списке — в цвете акцента, со скруглёнными углами."),
 ]
+ROWS += [
+    ("🧹 Quitar paréntesis del nombre…", "🧹 Remove parentheses from name…", "🧹 Убрать скобки из имени…"),
+    ("Quitar paréntesis", "Remove parentheses", "Убрать скобки"), ("🧹 Quitar paréntesis", "🧹 Remove parentheses", "🧹 Убрать скобки"),
+    ("Quita lo que va entre paréntesis (y si quieres entre corchetes) en el nombre del archivo y en el título: «Summer (Official Video)» → «Summer».",
+     "Removes what's in parentheses (and optionally brackets) from the file name and the title: “Summer (Official Video)” → “Summer”.",
+     "Убирает текст в скобках (и при желании в квадратных) из имени файла и названия: «Summer (Official Video)» → «Summer»."),
+    ("En el nombre del archivo", "In the file name", "В имени файла"), ("En el título de la canción", "In the song title", "В названии песни"),
+    ("También lo que va entre corchetes [ ]", "Also what's inside brackets [ ]", "Также текст в квадратных скобках [ ]"),
+    ("Nuevo nombre", "New name", "Новое имя"), ("Nuevo título", "New title", "Новое название"), ("Título", "Title", "Название"),
+    ("Ninguna de estas canciones tiene paréntesis que quitar.", "None of these songs has parentheses to remove.", "В этих песнях нет скобок."),
+    ("Nuevo: clic derecho en canciones → «Quitar paréntesis del nombre…». Quita lo que va entre paréntesis (y si quieres entre corchetes) en el nombre del archivo y en el título: «Summer (Official Video) [HD]» → «Summer». Antes de aplicar ves la lista con cómo quedará cada una.",
+     "New: right-click songs → “Remove parentheses from name…”. Removes what's in parentheses (and optionally brackets) from the file name and the title: “Summer (Official Video) [HD]” → “Summer”. You see a preview of each before applying.",
+     "Новое: правый клик → «Убрать скобки из имени…» для имени файла и названия, с предпросмотром."),
+    ("El repositorio de GitHub está ordenado: el código en «src», el icono y el logo en «assets». La portada del proyecto (README) se ve enseguida, sin bajar por una lista larga de archivos.",
+     "The GitHub repository is tidy: code in “src”, icon and logo in “assets”. The project page (README) shows right away without scrolling through a long file list.",
+     "Репозиторий упорядочен: код в «src», значок и логотип в «assets»."),
+]

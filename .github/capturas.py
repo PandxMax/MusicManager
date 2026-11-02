@@ -2,7 +2,7 @@
 Crea una pequeña biblioteca de prueba (tonos de 4 s con etiquetas y portadas) y guarda PNG en la carpeta «shots»."""
 import os, sys, json, time, tempfile, subprocess, shutil, faulthandler
 faulthandler.dump_traceback_later(200, exit=True)   # si algo se cuelga, muestra dónde
-sys.path.insert(0, os.getcwd())
+sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 from PyQt6.QtCore import QSettings, QTimer, Qt, QByteArray, QBuffer, QIODevice, QRectF
 from PyQt6.QtGui import QImage, QColor, QPainter, QLinearGradient, QFont
 from PyQt6.QtWidgets import QApplication

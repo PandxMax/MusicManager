@@ -4,7 +4,7 @@ on:
   # cada vez que se sube una versión nueva del programa, el EXE se crea solo
   push:
     branches: [main]
-    paths: ['**.py', 'requirements.txt', 'MusicManager.ico', '.github/workflows/crear-exe.yml', '.github/slim_build.py', '!.github/capturas.py']
+    paths: ['**.py', 'requirements.txt', 'assets/**', '.github/workflows/crear-exe.yml', '.github/slim_build.py', '!.github/capturas.py']
 concurrency:
   group: crear-exe
   cancel-in-progress: true
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - run: pip install -r requirements.txt pyinstaller
-      - run: pyinstaller --noconfirm --clean --windowed --name MusicManager --icon MusicManager.ico --hidden-import logo_data --hidden-import spectro --hidden-import i18n --hidden-import convert --collect-all imageio_ffmpeg --collect-submodules yt_dlp --hidden-import ytdl --hidden-import fx --hidden-import icons --hidden-import thumbs --hidden-import i18n_more --hidden-import dupes --hidden-import libtools --hidden-import mobile --hidden-import keydetect --hidden-import drawer --hidden-import upscale --hidden-import details --hidden-import genres --hidden-import taskbar --hidden-import folders_by --hidden-import navidrome --hidden-import picard_tools --hidden-import PyQt6.QtNetwork --exclude-module tkinter --exclude-module matplotlib --exclude-module scipy --exclude-module pandas --exclude-module PIL --exclude-module unittest --exclude-module pydoc --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.QtQml --exclude-module PyQt6.QtQuick --exclude-module PyQt6.QtSql --exclude-module PyQt6.QtTest music_manager.py
+      - run: pyinstaller --noconfirm --clean --windowed --name MusicManager --icon assets/MusicManager.ico --paths src --hidden-import logo_data --hidden-import spectro --hidden-import i18n --hidden-import convert --collect-all imageio_ffmpeg --collect-submodules yt_dlp --hidden-import ytdl --hidden-import fx --hidden-import icons --hidden-import thumbs --hidden-import i18n_more --hidden-import dupes --hidden-import libtools --hidden-import mobile --hidden-import keydetect --hidden-import drawer --hidden-import upscale --hidden-import details --hidden-import genres --hidden-import taskbar --hidden-import folders_by --hidden-import navidrome --hidden-import picard_tools --hidden-import PyQt6.QtNetwork --exclude-module tkinter --exclude-module matplotlib --exclude-module scipy --exclude-module pandas --exclude-module PIL --exclude-module unittest --exclude-module pydoc --exclude-module PyQt6.QtWebEngineCore --exclude-module PyQt6.QtQml --exclude-module PyQt6.QtQuick --exclude-module PyQt6.QtSql --exclude-module PyQt6.QtTest src/music_manager.py
       - name: Aligerar (quitar lo que no se usa)
         run: python .github/slim_build.py dist/MusicManager
       - name: Incluir el analizador de audio fpcalc (Chromaprint, para Identificar por sonido)
@@ -40,6 +40,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          V=$(grep -m1 '^APP_VERSION' music_manager.py | sed 's/.*"\(.*\)".*/\1/')
+          V=$(grep -m1 '^APP_VERSION' src/music_manager.py | sed 's/.*"\(.*\)".*/\1/')
           gh release delete "v$V" --yes --cleanup-tag || true
           gh release create "v$V" MusicManager-Windows.zip --title "Music Manager $V" --notes "Versión $V. Si ya tienes el programa, ábrelo y usa Ayuda > Buscar actualizaciones."

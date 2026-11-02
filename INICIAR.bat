@@ -14,4 +14,4 @@ if not exist .venv\Scripts\activate.bat (
 )
 call .venv\Scripts\activate.bat
 pip install -q -r requirements.txt
-start "" pythonw music_manager.py
+start "" pythonw src\music_manager.py
