@@ -588,3 +588,8 @@ VERSIÓN 2.00
 VERSIÓN 2.01
 ------------
  - Botón «Apoyar» (Ko-fi) junto al idioma y en «Acerca de»: https://ko-fi.com/pandxmax
+
+VERSIÓN 2.02
+------------
+ - Herramientas en 4 categorías que se despliegan al pasar el ratón.
+ - Botón «Apoyar» con el estilo y los colores del tema.

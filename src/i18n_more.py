@@ -1355,3 +1355,11 @@ ROWS += [
      "New “Support” button with the Ko-fi logo next to the language switch, and a box in “About” to support the program by buying me a coffee (ko-fi.com/pandxmax). Thank you!",
      "Новая кнопка «Поддержать» с логотипом Ko-fi рядом с выбором языка и блок в «О программе». Спасибо!"),
 ]
+ROWS += [
+    ("Menú Herramientas más corto: 4 categorías (Audio y calidad · Etiquetas y portadas · Organizar la biblioteca · Internet y servidor); al pasar el ratón por una se despliegan sus herramientas al lado.",
+     "Shorter Tools menu: 4 categories (Audio and quality · Tags and covers · Organize the library · Internet and server); hovering one opens its tools to the side.",
+     "Меню «Инструменты» короче: 4 категории, при наведении раскрываются инструменты."),
+    ("El botón «Apoyar» ya no es blanco: tiene el mismo estilo que los demás botones y su icono de taza con corazón sigue el tema y el color de acento.",
+     "The “Support” button is no longer white: it matches the other buttons and its cup-with-heart icon follows the theme and accent color.",
+     "Кнопка «Поддержать» больше не белая: стиль как у других кнопок, значок следует теме."),
+]

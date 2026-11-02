@@ -230,6 +230,13 @@ try:
             wait(700)
             mnu.grab().save(os.path.join(OUT, "15_menu_herramientas.png"))
             print("captura menu", flush=True)
+            subs = [x.menu() for x in mnu.actions() if x.menu() is not None]
+            if subs:
+                g = mnu.mapToGlobal(QPoint(mnu.width() - 4, 4))
+                subs[1 if len(subs) > 1 else 0].popup(g)
+                wait(600)
+                subs[1 if len(subs) > 1 else 0].grab().save(os.path.join(OUT, "15b_submenu.png"))
+                subs[1 if len(subs) > 1 else 0].close()
             mnu.close()
 except Exception as e:
     print("menu error:", ascii(str(e)), flush=True)
