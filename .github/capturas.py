@@ -329,6 +329,20 @@ try:
     print("movido:", os.path.exists(os.path.join(dst, "00. Prueba renombrada.mp3")), flush=True)
 except Exception:
     print("FALLO archivos", ascii(traceback.format_exc()), flush=True)
+# búsqueda activa y cambio de carpeta
+try:
+    w.load_folder(first)
+    wait(600)
+    w.search.setText("medianoche")
+    wait(600)
+    shot(w, "s_busqueda")
+    print("barra busqueda visible:", w.filter_bar.isVisible(), ascii(w.filter_lbl.text()), flush=True)
+    w.load_folder(os.path.join(root, "House", "DJ Kora"))
+    wait(600)
+    print("busqueda tras cambiar carpeta:", ascii(w.search.text()), "barra:", w.filter_bar.isVisible(),
+          "visibles:", sum(not w.list.item(r).isHidden() for r in range(w.list.count())), flush=True)
+except Exception:
+    print("FALLO busqueda", ascii(traceback.format_exc()), flush=True)
 # textos sin traducir en inglés
 try:
     w.set_language("en")

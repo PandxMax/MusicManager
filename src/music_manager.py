@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.03"
+APP_VERSION = "2.04"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.04', [
+        'Arreglo: si había algo escrito en «Buscar canción», al cambiar de carpeta las canciones parecían desaparecer (solo se veían las que coincidían). Ahora, como en el Explorador, la búsqueda se quita sola al cambiar de carpeta.',
+        'Mientras hay una búsqueda activa, encima de la lista se ve «Mostrando X de Y canciones · búsqueda «…»» con un botón «Quitar búsqueda»; si ninguna coincide, también se avisa.',
+    ]),
     ('2.03', [
         'La carpeta del programa queda limpia: el analizador fpcalc.exe ahora va escondido dentro de «_internal» (junto a MusicManager.exe solo queda el programa). La copia vieja se borra sola al abrir.',
     ]),
@@ -1570,7 +1574,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.03 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.04 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3931,6 +3935,20 @@ class Main(QMainWindow):
             navbar.addWidget(vb)
         navbar.addSpacing(6)
         lpv.addLayout(navbar)
+        # aviso cuando hay una búsqueda activa (si no, parece que las canciones desaparecieron)
+        self.filter_bar = QFrame()
+        self.filter_bar.setObjectName("keyok")
+        fb_l = QHBoxLayout(self.filter_bar)
+        fb_l.setContentsMargins(10, 3, 6, 3)
+        self.filter_lbl = QLabel("")
+        fb_l.addWidget(self.filter_lbl, 1)
+        fb_clear = QPushButton(T("Quitar búsqueda"))
+        fb_clear.setObjectName("link")
+        fb_clear.setCursor(Qt.CursorShape.PointingHandCursor)
+        fb_clear.clicked.connect(self.search.clear)
+        fb_l.addWidget(fb_clear)
+        self.filter_bar.hide()
+        lpv.addWidget(self.filter_bar)
         lpv.addWidget(self.list, 1)
         QShortcut(QKeySequence("Alt+Left"), self, activated=self.nav_back)
         QShortcut(QKeySequence("Alt+Right"), self, activated=self.nav_fwd)
@@ -4967,6 +4985,12 @@ class Main(QMainWindow):
             self.fwd_stack.clear()
             del self.back_stack[:-100]
         self.cfg.setValue("last_dir", path)
+        if self.current_dir and os.path.normcase(os.path.normpath(path)) != os.path.normcase(os.path.normpath(self.current_dir)) \
+                and self.search.text():
+            # como en el Explorador: al cambiar de carpeta se quita la búsqueda (si no, la carpeta nueva sale casi vacía)
+            self.search.blockSignals(True)
+            self.search.clear()
+            self.search.blockSignals(False)
         keep_paths = set(select) if select else (
             set(self.selected_paths()) if keep and path == self.current_dir else set())
         self.current_dir = path
@@ -5026,10 +5050,10 @@ class Main(QMainWindow):
             self.list.blockSignals(False)
             self.on_select()
         self.mark_items()
-        self.apply_filter(self.search.text())
         self.list.overlay.setText("Aquí no hay música todavía.\n\nElige otra carpeta a la izquierda o pega archivos con Ctrl+V.")
         self.list.overlay.setGeometry(self.list.viewport().rect())
         self.list.overlay.setVisible(self.list.count() == 0)
+        self.apply_filter(self.search.text())
         self.thumbs.request(self.gen, self.thumb_queue)
         self.statusBar().showMessage(f"{os.path.basename(os.path.normpath(path)) or path} · {len(files)} canciones")
         if self._resort_pending and not self._thumb_left:
@@ -7213,16 +7237,31 @@ class Main(QMainWindow):
     def apply_filter(self, text=""):
         t = (text or "").strip().lower()
         if not t and not getattr(self, "_filtered", False):
+            self.filter_bar.hide()
             return   # sin búsqueda y nada oculto: no hay que recorrer la lista
         self._filtered = bool(t)
+        shown = total = 0
         for r in range(self.list.count()):
             it = self.list.item(r)
             if it.data(KIND_ROLE) == "dir":
                 it.setHidden(bool(t))
                 continue
+            total += 1
             tags = self.tags_cache.get(it.data(PATH_ROLE), {})
-            hay = (it.text() + " " + " ".join(tags.values())).lower()
-            it.setHidden(bool(t) and t not in hay)
+            hay = (it.text() + " " + " ".join(v for v in tags.values() if isinstance(v, str))).lower()
+            hide = bool(t) and t not in hay
+            it.setHidden(hide)
+            shown += not hide
+        if t:
+            self.filter_lbl.setText("🔍  " + T(f"Mostrando {shown} de {total} canciones · búsqueda «{text.strip()}»"))
+            self.filter_bar.show()
+            self.list.overlay.setText(T(f"Ninguna canción de esta carpeta coincide con «{text.strip()}».") if not shown else "")
+            self.list.overlay.setGeometry(self.list.viewport().rect())
+            self.list.overlay.setVisible(shown == 0)
+        else:
+            self.filter_bar.hide()
+            self.list.overlay.setText("Aquí no hay música todavía.\n\nElige otra carpeta a la izquierda o pega archivos con Ctrl+V.")
+            self.list.overlay.setVisible(self.list.count() == 0)
 
     def set_rows_locked(self, locked):
         """Con los metadatos a la vista, la división entre la fila de arriba y la de abajo no se estira (se ve mejor);

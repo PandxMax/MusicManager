@@ -1368,3 +1368,14 @@ ROWS += [
      "The program folder stays clean: the fpcalc.exe analyzer now lives hidden inside “_internal” (only the program sits next to MusicManager.exe). The old copy is removed automatically on launch.",
      "Папка программы чистая: fpcalc.exe теперь скрыт в «_internal», старая копия удаляется сама."),
 ]
+ROWS += [
+    ("Quitar búsqueda", "Clear search", "Сбросить поиск"),
+    ("Mostrando %s de %s canciones · búsqueda «%s»", "Showing %s of %s songs · search “%s”", "Показано %s из %s песен · поиск «%s»"),
+    ("Ninguna canción de esta carpeta coincide con «%s».", "No song in this folder matches “%s”.", "В этой папке нет песен, совпадающих с «%s»."),
+    ("Arreglo: si había algo escrito en «Buscar canción», al cambiar de carpeta las canciones parecían desaparecer (solo se veían las que coincidían). Ahora, como en el Explorador, la búsqueda se quita sola al cambiar de carpeta.",
+     "Fix: if something was typed in “Search song”, songs seemed to disappear when changing folders (only matching ones showed). Now, like in Explorer, the search clears itself when you change folders.",
+     "Исправлено: при смене папки с активным поиском песни будто исчезали. Теперь поиск сбрасывается при смене папки."),
+    ("Mientras hay una búsqueda activa, encima de la lista se ve «Mostrando X de Y canciones · búsqueda «…»» con un botón «Quitar búsqueda»; si ninguna coincide, también se avisa.",
+     "While a search is active, a bar above the list shows “Showing X of Y songs · search “…”” with a “Clear search” button; if nothing matches, you're told too.",
+     "Пока поиск активен, над списком показывается «Показано X из Y» и кнопка «Сбросить поиск»."),
+]

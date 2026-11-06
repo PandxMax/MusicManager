@@ -597,3 +597,8 @@ VERSIÓN 2.02
 VERSIÓN 2.03
 ------------
  - fpcalc.exe va dentro de la carpeta _internal (la carpeta del programa queda limpia).
+
+VERSIÓN 2.04
+------------
+ - Arreglo: la búsqueda se quita al cambiar de carpeta (las canciones ya no «desaparecen»).
+ - Aviso «Mostrando X de Y canciones» con botón «Quitar búsqueda» mientras buscas.
