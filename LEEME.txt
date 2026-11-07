@@ -606,3 +606,7 @@ VERSIÓN 2.04
 VERSIÓN 2.05
 ------------
  - MusicBrainz y Discogs pasan a Herramientas → Etiquetas y portadas; arriba solo queda «Espectro».
+
+VERSIÓN 2.06
+------------
+ - Copiar y pegar metadatos (Ctrl+Shift+C / Ctrl+Shift+V), eligiendo qué campos y la portada.

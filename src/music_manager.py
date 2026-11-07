@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.05"
+APP_VERSION = "2.06"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.06', [
+        'Nuevo: copiar y pegar metadatos. Clic derecho en una canción → «Copiar metadatos» (Ctrl+Shift+C); luego eliges otras canciones → «Pegar metadatos…» (Ctrl+Shift+V) y marcas qué pegar: intérprete, álbum, género, año, portada… (título y pista vienen desmarcados). También en el menú Edición.',
+    ]),
     ('2.05', [
         'Barra de arriba más despejada: solo queda el botón «Espectro». «Buscar etiquetas en MusicBrainz» y «Buscar etiquetas en Discogs» están ahora en Herramientas → Etiquetas y portadas.',
     ]),
@@ -1577,7 +1580,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.05 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.06 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5859,6 +5862,99 @@ class Main(QMainWindow):
         t = re.sub(r"(\s*-\s*){2,}", " - ", t)   # «Artista -  - Título»
         return t.strip(" -_.,")
 
+    def copy_meta(self):
+        """Copia las etiquetas (y la portada) de UNA canción para pegarlas luego en otras."""
+        paths = self.selected_paths()
+        if len(paths) != 1:
+            self.statusBar().showMessage(T("Elige una sola canción para copiar sus metadatos."))
+            return
+        self.apply_form()
+        p = paths[0]
+        data = {k: self.val(p, k) for k, _ in FIELDS}
+        pend = self.pending.get(p, {})
+        cover = pend["_cover"] if "_cover" in pend else None
+        if cover is None:
+            try:
+                cover = inspect_file(p).get("cover")
+            except Exception:
+                cover = None
+        self.meta_clip = {"src": p, "tags": data, "cover": cover or None}
+        self.statusBar().showMessage(T(f"Metadatos copiados de «{os.path.basename(p)}». Elige otras canciones y pulsa "
+                                       f"Ctrl+Shift+V (o clic derecho → Pegar metadatos)."))
+
+    def paste_meta(self):
+        clip = getattr(self, "meta_clip", None)
+        if not clip:
+            self.statusBar().showMessage(T("Primero copia los metadatos de una canción (clic derecho → Copiar metadatos)."))
+            return
+        paths = [p for p in self.selected_paths() if p != clip["src"]] or self.selected_paths()
+        if not paths:
+            self.statusBar().showMessage(T("Selecciona las canciones donde quieres pegar los metadatos."))
+            return
+        self.apply_form()
+        dlg = QDialog(self)
+        dlg.setWindowTitle(T("Pegar metadatos"))
+        dlg.resize(520, 520)
+        v = QVBoxLayout(dlg)
+        sub = QLabel(T(f"De «{os.path.basename(clip['src'])}» a {len(paths)} canción(es). Marca lo que quieres pegar:"))
+        sub.setObjectName("dlgsub")
+        sub.setWordWrap(True)
+        v.addWidget(sub)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        checks = {}
+        for i, (k, label) in enumerate(FIELDS):
+            val = clip["tags"].get(k, "")
+            c = QCheckBox(T(label))
+            c.setChecked(bool(val) and k not in ("title", "tracknumber"))   # título y pista suelen ser distintos
+            c.setEnabled(True)
+            lv = QLabel(val or "—")
+            lv.setObjectName("hint")
+            lv.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            grid.addWidget(c, i, 0)
+            grid.addWidget(lv, i, 1)
+            checks[k] = c
+        r = len(FIELDS)
+        c_cov = QCheckBox(T("Portada"))
+        c_cov.setChecked(bool(clip.get("cover")))
+        c_cov.setEnabled(bool(clip.get("cover")))
+        grid.addWidget(c_cov, r, 0)
+        grid.addWidget(QLabel(T("sí") if clip.get("cover") else T("(la canción no tiene portada)")), r, 1)
+        grid.setColumnStretch(1, 1)
+        v.addLayout(grid)
+        note = QLabel(T("Un campo vacío marcado también se pega (sirve para borrar ese dato en las otras)."))
+        note.setObjectName("dlgsub")
+        note.setWordWrap(True)
+        v.addWidget(note)
+        v.addStretch(1)
+        row = QHBoxLayout()
+        b_all = QPushButton(T("Marcar todo"))
+        b_all.clicked.connect(lambda: [c.setChecked(True) for c in checks.values()])
+        row.addWidget(b_all)
+        row.addStretch(1)
+        ok = QPushButton(T("📥 Pegar"))
+        ok.setObjectName("accent")
+        ok.clicked.connect(dlg.accept)
+        cancel = QPushButton(T("Cancelar"))
+        cancel.clicked.connect(dlg.reject)
+        row.addWidget(ok)
+        row.addWidget(cancel)
+        v.addLayout(row)
+        i18n.retranslate(dlg)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        keys = [k for k, c in checks.items() if c.isChecked()]
+        for p in paths:
+            ch = self.pending.setdefault(p, {})
+            for k in keys:
+                ch[k] = clip["tags"].get(k, "")
+        if c_cov.isChecked() and clip.get("cover"):
+            for p in paths:
+                self.pending.setdefault(p, {})["_cover"] = clip["cover"]
+        self.mark_items()
+        self.on_select()
+        self.statusBar().showMessage(T(f"Metadatos pegados en {len(paths)} canción(es) (en naranja). Pulsa Ctrl+S para guardar."))
+
     def open_strip_parens(self, paths):
         paths = [p for p in paths if p and os.path.isfile(p)]
         if not paths:
@@ -7165,6 +7261,11 @@ class Main(QMainWindow):
             m.addAction("📥 Pegar aquí (Ctrl+V)", self.paste_here)
             m.addAction("✏️ Renombrar (F2)", self.rename_selected)
             m.addAction(T("🧹 Quitar paréntesis del nombre…"), lambda: self.open_strip_parens(self.selected_paths()))
+            m.addSeparator()
+            a_cm = m.addAction(T("📋 Copiar metadatos") + "\tCtrl+Shift+C", self.copy_meta)
+            a_cm.setEnabled(len(self.selected_paths()) == 1)
+            a_pm = m.addAction(T("📥 Pegar metadatos…") + "\tCtrl+Shift+V", self.paste_meta)
+            a_pm.setEnabled(bool(getattr(self, "meta_clip", None)))
             m.addAction("🗑 Eliminar (Supr)", lambda: self.delete_paths(self.selected_all_paths()))
             m.addSeparator()
             tools = m.addMenu(icons.vicon("tools", ctx="menu"), T("Herramientas"))
@@ -7628,6 +7729,13 @@ class Main(QMainWindow):
         e.addAction(self.act("✂️ Cortar\tCtrl+X", lambda: self.clip_set("cut")))
         e.addAction(self.act("📋 Copiar\tCtrl+C", lambda: self.clip_set("copy")))
         e.addAction(self.act("📥 Pegar\tCtrl+V", self.paste_here))
+        e.addSeparator()
+        e.addAction(self.act("📋 Copiar metadatos\tCtrl+Shift+C", self.copy_meta,
+                             "Copia las etiquetas y la portada de la canción elegida"))
+        e.addAction(self.act("📥 Pegar metadatos…\tCtrl+Shift+V", self.paste_meta,
+                             "Pega en las canciones elegidas las etiquetas copiadas (eliges cuáles)"))
+        QShortcut(QKeySequence("Ctrl+Shift+C"), self, activated=self.copy_meta)
+        QShortcut(QKeySequence("Ctrl+Shift+V"), self, activated=self.paste_meta)
         e.addSeparator()
         e.addAction(self.act("✏️ Renombrar\tF2", self.rename_current))
         e.addAction(self.act("🗑 Eliminar\tSupr", self.delete_current))
@@ -8504,7 +8612,8 @@ class Main(QMainWindow):
                               ("Ctrl + C / Ctrl + X / Ctrl + V", "Copiar / cortar / pegar"),
                               ("F5", "Actualizar la carpeta"), ("Alt + ← / Alt + →", "Atrás / adelante"),
                               ("Alt + ↑", "Subir a la carpeta de arriba")]),
-                ("Etiquetas", [("Ctrl + S", "Guardar los cambios"), ("Ctrl + F", "Buscar canción")]),
+                ("Etiquetas", [("Ctrl + S", "Guardar los cambios"), ("Ctrl + F", "Buscar canción"),
+                               ("Ctrl + Shift + C", "Copiar metadatos"), ("Ctrl + Shift + V", "Pegar metadatos")]),
                 ("Reproducir", [("Enter / doble clic", "Reproducir la canción"), ("Espacio", "Pausa / seguir")]),
                 ("Dos árboles", [("F6", "Enviar (mover) de «De» a «A»"), ("F7", "Copiar de «De» a «A»")]),
                 ("Vista", [("Ctrl + rueda del ratón", "Agrandar o achicar las portadas"),

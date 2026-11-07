@@ -329,6 +329,24 @@ try:
     print("movido:", os.path.exists(os.path.join(dst, "00. Prueba renombrada.mp3")), flush=True)
 except Exception:
     print("FALLO archivos", ascii(traceback.format_exc()), flush=True)
+# copiar / pegar metadatos
+try:
+    w.load_folder(first)
+    wait(600)
+    w.list.clearSelection()
+    w.list.item(0).setSelected(True)
+    w.on_select()
+    w.copy_meta()
+    print("clip:", sorted((w.meta_clip or {}).get("tags", {}).items())[:3], "portada:", bool((w.meta_clip or {}).get("cover")), flush=True)
+    w.list.clearSelection()
+    for r in (1, 2):
+        w.list.item(r).setSelected(True)
+    w.on_select()
+    grab_modal("s_pegar_meta")
+    w.paste_meta()
+    wait(300)
+except Exception:
+    print("FALLO metadatos", ascii(traceback.format_exc()), flush=True)
 # búsqueda activa y cambio de carpeta
 try:
     w.load_folder(first)
