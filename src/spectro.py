@@ -143,6 +143,26 @@ def analyze(path, max_frames=1100):
     return res
 
 
+def fake_lossless_tip(r):
+    """Solo para FLAC «sospechosos» (vienen de un MP3/AAC): recomendar MP3 320 y cuánto se ahorra."""
+    if not str(r.get("verdict", "")).startswith("Sospechoso"):
+        return ""
+    p = r.get("path")
+    try:
+        size = os.path.getsize(p) / 1048576 if p else 0
+    except OSError:
+        size = 0
+    mp3 = r.get("duration", 0) * 320 / 8 / 1024
+    save = size - mp3
+    txt = T("Recomendado: guardarla como MP3 320 kbps. Este FLAC viene de un MP3, así que como MP3 suena igual")
+    if size and save > 0.5:
+        f = (lambda x: f"{x:.1f}" if x < 10 else f"{x:.0f}")
+        txt += T(f" y ocupa unos {f(mp3)} MB en vez de {f(size)} MB (ahorras {f(save)} MB).")
+    else:
+        txt += "."
+    return txt
+
+
 def verdict(r):
     """Clasifica: Alta fidelidad / Normal / Calidad baja + motivos."""
     info, cutoff, nyq, sr = r["info"], r["cutoff"], r["nyq"], r["sr"]
@@ -500,11 +520,29 @@ class SpectrumDialog(QWidget):
             f"{inf['codec']} · {r['sr']/1000:g} kHz{bits}{br} · {r['duration']//60:.0f}:{r['duration']%60:02.0f}  |  "
             f"Corte ≈ <b>{r['cutoff']/1000:.1f} kHz</b> (máx. posible {r['nyq']/1000:.1f} kHz)  |  "
             f"Pico {r['peak']:.1f} dB · RMS {r['rms']:.1f} dB · Rango dinámico {r['dyn']:.1f} dB"))
+        rec = fake_lossless_tip(r)
+        if rec:   # FLAC que viene de un MP3: se recomienda convertirlo (mismo sonido, mucho menos espacio)
+            row = QHBoxLayout()
+            tip = QLabel("💡 " + rec)
+            tip.setWordWrap(True)
+            tip.setObjectName("hint")
+            row.addWidget(tip, 1)
+            b = QPushButton(T("Convertir a MP3…"))
+            b.setObjectName("accent")
+            b.clicked.connect(lambda _=False, p=r.get("path"): self.convert_one(p))
+            row.addWidget(b, 0, Qt.AlignmentFlag.AlignVCenter)
+            v.addLayout(row)
         sv = SpecView(r); sv.set_fmax(self.fmax.currentData())
         r["_view"] = sv
         v.addWidget(sv)
+
         self.spec_lay.insertWidget(self.spec_lay.count() - 1, box)
         self.cards.append(box)
+
+    def convert_one(self, path):
+        w = self.window()
+        if path and hasattr(w, "convert_paths"):
+            w.convert_paths([path], "MP3", 320)
 
     def ordered(self):
         return [self.results[k] for k in sorted(self.results)]
@@ -555,6 +593,9 @@ class SpectrumDialog(QWidget):
             c = LEVEL_COLOR[r["level"]]
             out.append(f"<h3>{r['name']}</h3><p style='color:{c}'><b>{T(r['verdict'])}</b></p><ul>" +
                        "".join(f"<li>{T(w)}</li>" for w in r["why"]) + "</ul>")
+            rec = fake_lossless_tip(r)
+            if rec:
+                out.append(f"<p>💡 <b>{T('Recomendación')}:</b> {rec}</p>")
         out.append(T("<hr><p><small>Cómo leerlo: el eje vertical es la frecuencia (kHz) y el color es el volumen (dBFS). "
                      "Un corte horizontal brusco indica compresión con pérdida (MP3, AAC…) o un archivo convertido desde ella. "
                      "El análisis se hace sobre la mezcla mono. Es una estimación, no una prueba definitiva.</small></p>"))

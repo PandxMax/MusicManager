@@ -5,7 +5,7 @@ faulthandler.dump_traceback_later(480, exit=True)   # si algo se cuelga, muestra
 sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 from PyQt6.QtCore import QSettings, QTimer, Qt, QByteArray, QBuffer, QIODevice, QRectF
 from PyQt6.QtGui import QImage, QColor, QPainter, QLinearGradient, QFont
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QWidget
 
 OUT = os.path.abspath("shots")
 os.makedirs(OUT, exist_ok=True)
@@ -403,6 +403,42 @@ try:
     wait(300)
 except Exception:
     print("FALLO recortar", ascii(traceback.format_exc()), flush=True)
+# FLAC falso (viene de MP3): recomendación en el espectrograma + reparar recortes
+try:
+    fk = os.path.join(root, "FlacFalso")
+    os.makedirs(fk, exist_ok=True)
+    tmp3 = os.path.join(fk, "tmp.mp3")
+    subprocess.run([ff, "-loglevel", "error", "-f", "lavfi", "-i", "anoisesrc=d=12:c=pink:a=0.9", "-ac", "2",
+                    "-c:a", "libmp3lame", "-b:a", "128k", "-y", tmp3], check=True)
+    fl = os.path.join(fk, "01. Cancion convertida.flac")
+    subprocess.run([ff, "-loglevel", "error", "-i", tmp3, "-c:a", "flac", "-y", fl], check=True)
+    os.remove(tmp3)
+    w.load_folder(fk)
+    wait(800)
+    w.list.clearSelection()
+    w.list.item(0).setSelected(True)
+    w.on_select()
+    w.open_spectrum()
+    wait(9000)
+    shot(w, "s_espectro_falso")
+    try:
+        sp = w.spec_pane.findChild(QWidget, None)
+    except Exception:
+        pass
+    import repair
+    jobs = [(fl, os.path.join(fk, "01. Cancion convertida (reparada).flac"), False)]
+    rw = repair.RepairWorker(jobs)
+    res = []
+    rw.step.connect(lambda i, o, e: res.append((o, e)))
+    rw.run()
+    print("reparar:", ascii(res), flush=True)
+    w.close_spectrum()
+    w.list.clearSelection()
+    w.list.item(0).setSelected(True)
+    w.on_select()
+    smoke("open_repair", w.open_repair)
+except Exception:
+    print("FALLO flac falso", ascii(traceback.format_exc()), flush=True)
 # copiar / pegar metadatos
 try:
     w.load_folder(first)

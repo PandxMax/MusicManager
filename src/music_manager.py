@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.08"
+APP_VERSION = "2.09"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.09', [
+        'Nuevo: Herramientas → Audio y calidad → «Reparar recortes (clipping)». Reconstruye los golpes fuertes «aplastados» que suenan ásperos; conserva etiquetas y portada; se guarda como copia «(reparada)» o reemplaza el original.',
+        'Espectrograma: cuando una canción sale «Sospechosa» (FLAC que en realidad viene de un MP3), aparece la recomendación de convertirla a MP3 320 kbps —cuánto espacio ahorrarías— con un botón «Convertir a MP3…». Solo en esos casos.',
+    ]),
     ('2.08', [
         'Redimensionar portada: si la portada no es cuadrada (por ejemplo 712×1000), se abre una ventanita para recortarla en cuadrado. Mueves el recuadro hasta la parte que quieres, lo agrandas o achicas con las esquinas o la rueda del ratón y eliges el tamaño final (500, 600, 800, 1000 o 1200 px). Las portadas que ya son cuadradas se redimensionan solas como antes.',
         'Con varias portadas no cuadradas, puedes recortar una a mano y marcar «recortar centradas las demás», o saltar alguna.',
@@ -1588,7 +1592,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.08 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.09 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -7859,6 +7863,8 @@ class Main(QMainWindow):
                 ("🎚 Ajustes de la canción…", self.open_fx,
                  "Graves, agudos, tempo, tono, velocidad, bucle, eco… y guardar como canción nueva o reemplazar"),
                 ("🔊 Normalizar volumen…", self.open_normalize, "Deja todas las canciones seleccionadas con el mismo volumen"),
+                ("🩹 Reparar recortes (clipping)…", self.open_repair,
+                 "Reconstruye los golpes fuertes «aplastados» que suenan ásperos o distorsionados"),
                 ("🔄 Convertir formato…", self.convert_selected, "Convierte las canciones seleccionadas a otro formato")]),
             ("Etiquetas y portadas", [
                 ("🎧 Identificar por sonido (AcoustID)…", self.open_acoustid,
@@ -7932,6 +7938,33 @@ class Main(QMainWindow):
         self.show_whats_new()
         if int(self.cfg.value("auto_update", 1) or 0):
             self.check_updates(manual=False)
+
+    def open_repair(self):
+        import repair
+        paths = [p for p in self.selected_paths() if p and os.path.isfile(p)]
+        if not paths:
+            cp = self.current_path()
+            paths = [cp] if cp and os.path.isfile(cp) else []
+        if not paths:
+            QMessageBox.information(self, T("Reparar recortes (clipping)"), T("Selecciona una o varias canciones."))
+            return
+        dlg = repair.RepairDialog(self, paths)
+        i18n.retranslate(dlg)
+        dlg.show()
+        self._repair = dlg
+
+    def convert_paths(self, paths, fmt="MP3", kbps=320):
+        """Abre «Convertir formato» con el formato y la calidad ya elegidos (lo usa la recomendación del espectrograma)."""
+        import convert
+        dlg = convert.ConvertDialog(list(paths), self, on_done=lambda: self.load_folder(self.current_dir))
+        if fmt in convert.FORMATS:
+            dlg.fmt.setCurrentText(fmt)
+            i = dlg.q.findData(kbps)
+            if i >= 0:
+                dlg.q.setCurrentIndex(i)
+        i18n.retranslate(dlg)
+        dlg.show()
+        self._conv = dlg
 
     def convert_selected(self):
         paths = self.selected_paths()

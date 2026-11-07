@@ -619,3 +619,8 @@ VERSIÓN 2.07
 VERSIÓN 2.08
 ------------
  - Redimensionar portadas no cuadradas: ventanita para recortarlas en cuadrado (500–1200 px).
+
+VERSIÓN 2.09
+------------
+ - Herramientas → Audio y calidad → Reparar recortes (clipping).
+ - Espectrograma: en los FLAC que vienen de un MP3, recomendación de convertir a MP3 320 con botón.
