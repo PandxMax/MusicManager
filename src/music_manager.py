@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.09"
+APP_VERSION = "2.10"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.10', [
+        'Eliminar varias carpetas ya no congela el programa: se mandan todas juntas a la papelera en una sola operación (mucho más rápido) y en segundo plano. Desaparecen de la lista y los árboles al instante y el programa sigue respondiendo mientras tanto.',
+    ]),
     ('2.09', [
         'Nuevo: Herramientas → Audio y calidad → «Reparar recortes (clipping)». Reconstruye los golpes fuertes «aplastados» que suenan ásperos; conserva etiquetas y portada; se guarda como copia «(reparada)» o reemplaza el original.',
         'Espectrograma: cuando una canción sale «Sospechosa» (FLAC que en realidad viene de un MP3), aparece la recomendación de convertirla a MP3 320 kbps —cuánto espacio ahorrarías— con un botón «Convertir a MP3…». Solo en esos casos.',
@@ -1592,7 +1595,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.09 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.10 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -7229,23 +7232,42 @@ class Main(QMainWindow):
         ask = int(self.cfg.value("confirm_delete", 1) or 0) or not send2trash  # sin papelera siempre se pregunta
         if ask and QMessageBox.question(self, "Eliminar", f"¿Eliminar {how}?\n\n{txt}") != QMessageBox.StandardButton.Yes:
             return
+        if getattr(self, "_deleting", None) is not None and self._deleting.isRunning():
+            self.statusBar().showMessage(T("Espera: todavía se están eliminando los anteriores…"))
+            return
+        paths = [os.path.normpath(p) for p in paths]
         self.release_if(paths)
+        self._watch_paused_until = time.monotonic() + 3600   # sin vigilar carpetas mientras se borra
+        # se ocultan ya de la lista y los árboles (el borrado real sigue en segundo plano, sin trabar el programa)
+        gone = {os.path.normcase(p) for p in paths}
+        for r in range(self.list.count()):
+            it = self.list.item(r)
+            if os.path.normcase(os.path.normpath(it.data(PATH_ROLE) or "")) in gone:
+                it.setHidden(True)
+        for t in (self.tree, self.tree2):
+            for it in t.all_items():
+                pth = it.data(0, PATH_ROLE)
+                if pth and os.path.normcase(os.path.normpath(pth)) in gone:
+                    it.setHidden(True)
+        self.statusBar().showMessage(T(f"Eliminando {len(paths)} elemento(s)…"))
+        w = DeleteWorker(paths, send2trash)
+        w.done.connect(lambda ok, errors, paths=paths: self.delete_done(paths, ok, errors))
+        self._deleting = w
+        w.start()
+
+    def delete_done(self, paths, ok, errors):
+        self._watch_paused_until = 0
         for p in paths:
-            try:
-                p = os.path.normpath(p)
-                if send2trash:
-                    send2trash(p)
-                elif os.path.isdir(p):
-                    shutil.rmtree(p)
-                else:
-                    os.remove(p)
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"{p}\n{e}")
-                continue
-            for d in (self.pending, self.meta, self.tags_cache, self.suggestions):
-                d.pop(p, None)
-            self.chosen.discard(p)
+            if not os.path.exists(p):
+                for d in (self.pending, self.meta, self.tags_cache, self.suggestions):
+                    d.pop(p, None)
+                self.chosen.discard(p)
         self.after_fs_change()
+        self.update_watch()
+        self.statusBar().showMessage(T(f"{ok} elemento(s) eliminado(s).") if not errors else
+                                     T(f"{ok} eliminado(s), {len(errors)} con error."))
+        if errors:
+            QMessageBox.warning(self, T("Eliminar"), "\n".join(errors[:15]))
 
     def delete_selected(self):
         self.delete_paths(self.active_tree.selected_dirs())
@@ -8938,6 +8960,44 @@ class Main(QMainWindow):
                 self.on_select()
 
         QTimer.singleShot(0, advance)
+
+
+class DeleteWorker(QThread):
+    """Elimina (a la papelera) en segundo plano: varias carpetas grandes ya no congelan el programa.
+    Se manda todo junto a la papelera en una sola operación, que es mucho más rápido que una por una."""
+    done = pyqtSignal(int, list)
+
+    def __init__(self, paths, trash):
+        super().__init__()
+        self.paths, self.trash = paths, trash
+
+    def run(self):
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.ole32.CoInitialize(None)
+            except Exception:
+                pass
+        ok, errors = 0, []
+        todo = [p for p in self.paths if os.path.exists(p)]
+        if self.trash and todo:
+            try:
+                self.trash(todo)   # todo de una vez
+                todo = [p for p in todo if os.path.exists(p)]
+            except Exception:
+                pass
+        for p in todo:   # lo que quede (o sin papelera): uno por uno
+            try:
+                if self.trash:
+                    self.trash(p)
+                elif os.path.isdir(p):
+                    shutil.rmtree(p)
+                else:
+                    os.remove(p)
+            except Exception as e:
+                errors.append(f"{os.path.basename(p)}: {e}")
+        ok = sum(1 for p in self.paths if not os.path.exists(p))
+        self.done.emit(ok, errors)
 
 
 class DialogPolish(QObject):

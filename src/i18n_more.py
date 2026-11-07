@@ -1464,3 +1464,13 @@ ROWS += [
      "Spectrogram: when a song is “Suspicious” (a FLAC that actually comes from an MP3), it recommends converting it to MP3 320 kbps — how much space you'd save — with a “Convert to MP3…” button. Only in those cases.",
      "Спектрограмма: для «подозрительных» FLAC (сделанных из MP3) предлагается MP3 320 kbps с кнопкой «Конвертировать в MP3…»."),
 ]
+ROWS += [
+    ("Espera: todavía se están eliminando los anteriores…", "Wait: the previous items are still being deleted…", "Подождите: предыдущие ещё удаляются…"),
+    ("Eliminando %s elemento(s)…", "Deleting %s item(s)…", "Удаление %s элементов…"),
+    ("%s elemento(s) eliminado(s).", "%s item(s) deleted.", "Удалено: %s."),
+    ("%s eliminado(s), %s con error.", "%s deleted, %s with errors.", "Удалено %s, ошибок: %s."),
+    ("Eliminar", "Delete", "Удалить"),
+    ("Eliminar varias carpetas ya no congela el programa: se mandan todas juntas a la papelera en una sola operación (mucho más rápido) y en segundo plano. Desaparecen de la lista y los árboles al instante y el programa sigue respondiendo mientras tanto.",
+     "Deleting several folders no longer freezes the program: they're all sent to the Recycle Bin in a single operation (much faster) in the background. They vanish from the list and trees instantly and the program stays responsive.",
+     "Удаление нескольких папок больше не замораживает программу: всё отправляется в корзину одной операцией в фоне."),
+]

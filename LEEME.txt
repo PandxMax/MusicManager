@@ -624,3 +624,7 @@ VERSIÓN 2.09
 ------------
  - Herramientas → Audio y calidad → Reparar recortes (clipping).
  - Espectrograma: en los FLAC que vienen de un MP3, recomendación de convertir a MP3 320 con botón.
+
+VERSIÓN 2.10
+------------
+ - Eliminar varias carpetas sin congelar el programa (papelera en una sola operación, en segundo plano).
