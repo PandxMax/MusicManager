@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.04"
+APP_VERSION = "2.05"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.05', [
+        'Barra de arriba más despejada: solo queda el botón «Espectro». «Buscar etiquetas en MusicBrainz» y «Buscar etiquetas en Discogs» están ahora en Herramientas → Etiquetas y portadas.',
+    ]),
     ('2.04', [
         'Arreglo: si había algo escrito en «Buscar canción», al cambiar de carpeta las canciones parecían desaparecer (solo se veían las que coincidían). Ahora, como en el Explorador, la búsqueda se quita sola al cambiar de carpeta.',
         'Mientras hay una búsqueda activa, encima de la lista se ve «Mostrando X de Y canciones · búsqueda «…»» con un botón «Quitar búsqueda»; si ninguna coincide, también se avisa.',
@@ -1574,7 +1577,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.04 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.05 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3906,9 +3909,8 @@ class Main(QMainWindow):
         navbar.addWidget(self.path_lbl, 1)
         navbar.addSpacing(8)
         self.btn_spec = None
-        for src, text, tip in (("spec", "📊 Espectro", "Espectrograma y análisis de calidad de las canciones seleccionadas"),
-                               ("musicbrainz", "🎼 MusicBrainz", "Buscar las etiquetas de esta canción en MusicBrainz (gratis)"),
-                               ("discogs", "💿 Discogs", "Buscar las etiquetas de esta canción en Discogs (necesita tu token)")):
+        for src, text, tip in (("spec", "📊 Espectro", "Espectrograma y análisis de calidad de las canciones seleccionadas"),):
+            # MusicBrainz y Discogs están ahora en Herramientas → Etiquetas y portadas
             b_ = QPushButton(text)
             b_.setObjectName("chipbtn")
             b_.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -7672,6 +7674,10 @@ class Main(QMainWindow):
                  "Reconoce las canciones seleccionadas escuchando su audio, aunque no tengan nombre ni etiquetas"),
                 ("💿 Emparejar álbum con MusicBrainz…", self.open_album_match,
                  "Coloca cada archivo en su pista del álbum y corrige título, pista, disco, año e intérprete del álbum"),
+                ("🎼 Buscar etiquetas en MusicBrainz…", lambda: self.open_tag_source("musicbrainz"),
+                 "Buscar las etiquetas de esta canción en MusicBrainz (gratis)"),
+                ("💿 Buscar etiquetas en Discogs…", lambda: self.open_tag_source("discogs"),
+                 "Buscar las etiquetas de esta canción en Discogs (necesita tu token)"),
                 ("✨ Portadas automáticas (alta calidad)", self.auto_cover,
                  "Busca en iTunes/Deezer la portada de las canciones seleccionadas"),
                 ("🏷 Géneros en lote…", self.open_batch_genres,

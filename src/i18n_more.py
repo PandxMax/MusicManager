@@ -1379,3 +1379,10 @@ ROWS += [
      "While a search is active, a bar above the list shows “Showing X of Y songs · search “…”” with a “Clear search” button; if nothing matches, you're told too.",
      "Пока поиск активен, над списком показывается «Показано X из Y» и кнопка «Сбросить поиск»."),
 ]
+ROWS += [
+    ("🎼 Buscar etiquetas en MusicBrainz…", "🎼 Search tags on MusicBrainz…", "🎼 Искать теги в MusicBrainz…"),
+    ("💿 Buscar etiquetas en Discogs…", "💿 Search tags on Discogs…", "💿 Искать теги в Discogs…"),
+    ("Barra de arriba más despejada: solo queda el botón «Espectro». «Buscar etiquetas en MusicBrainz» y «Buscar etiquetas en Discogs» están ahora en Herramientas → Etiquetas y portadas.",
+     "Cleaner top bar: only the “Spectrum” button remains. “Search tags on MusicBrainz” and “Search tags on Discogs” are now in Tools → Tags and covers.",
+     "Верхняя панель чище: осталась только кнопка «Спектр». MusicBrainz и Discogs теперь в Инструменты → Теги и обложки."),
+]

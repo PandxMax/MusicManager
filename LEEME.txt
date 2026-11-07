@@ -602,3 +602,7 @@ VERSIÓN 2.04
 ------------
  - Arreglo: la búsqueda se quita al cambiar de carpeta (las canciones ya no «desaparecen»).
  - Aviso «Mostrando X de Y canciones» con botón «Quitar búsqueda» mientras buscas.
+
+VERSIÓN 2.05
+------------
+ - MusicBrainz y Discogs pasan a Herramientas → Etiquetas y portadas; arriba solo queda «Espectro».
