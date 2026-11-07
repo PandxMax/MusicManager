@@ -615,3 +615,7 @@ VERSIÓN 2.07
 ------------
  - Arrastrar muchas canciones: se mueven todas (aunque tengas Shift o Ctrl apretado al empezar).
  - Lo cortado (Ctrl+X) queda medio transparente hasta pegarlo, como en el Explorador.
+
+VERSIÓN 2.08
+------------
+ - Redimensionar portadas no cuadradas: ventanita para recortarlas en cuadrado (500–1200 px).

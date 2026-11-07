@@ -1417,3 +1417,22 @@ ROWS += [
      "Cut (Ctrl+X) looks like in Explorer: cut songs and folders turn semi-transparent until you paste them.",
      "Вырезанные (Ctrl+X) песни и папки становятся полупрозрачными, как в Проводнике."),
 ]
+ROWS += [
+    ("Recortar portada en cuadrado", "Crop cover to a square", "Обрезать обложку до квадрата"),
+    ("Esta portada no es cuadrada (%s×%s px). Mueve el recuadro hasta la parte que quieres conservar; agrándalo o achícalo con las esquinas o la rueda del ratón.",
+     "This cover isn't square (%s×%s px). Move the box to the part you want to keep; make it bigger or smaller with the corners or the mouse wheel.",
+     "Обложка не квадратная (%s×%s px). Передвиньте рамку на нужную часть; меняйте размер углами или колёсиком."),
+    ("Tamaño final:", "Final size:", "Итоговый размер:"), ("Centrar", "Center", "По центру"),
+    ("Se recorta un cuadrado de %s×%s px y queda en %s×%s px.", "A %s×%s px square is cropped and saved as %s×%s px.", "Вырезается квадрат %s×%s px, итог %s×%s px."),
+    ("Ojo: el trozo es más pequeño que el tamaño final, se verá algo menos nítido.", "Note: the cropped part is smaller than the final size, so it will look a bit less sharp.",
+     "Внимание: фрагмент меньше итогового размера, будет чуть менее чётким."),
+    ("Recortar centradas las otras %s portadas que no son cuadradas (sin preguntar)", "Crop the other %s non-square covers centered (without asking)",
+     "Обрезать по центру остальные %s неквадратные обложки (без вопросов)"),
+    ("Saltar esta", "Skip this one", "Пропустить"), ("Cancelar todo", "Cancel all", "Отменить всё"), ("✂ Recortar y poner", "✂ Crop and apply", "✂ Обрезать и применить"),
+    ("Redimensionar portada: si la portada no es cuadrada (por ejemplo 712×1000), se abre una ventanita para recortarla en cuadrado. Mueves el recuadro hasta la parte que quieres, lo agrandas o achicas con las esquinas o la rueda del ratón y eliges el tamaño final (500, 600, 800, 1000 o 1200 px). Las portadas que ya son cuadradas se redimensionan solas como antes.",
+     "Resize cover: if the cover isn't square (e.g. 712×1000), a small window opens to crop it to a square. Move the box to the part you want, resize it with the corners or mouse wheel, and pick the final size (500, 600, 800, 1000 or 1200 px). Square covers are resized automatically as before.",
+     "Изменение размера обложки: неквадратную обложку можно обрезать до квадрата в небольшом окне; квадратные уменьшаются автоматически."),
+    ("Con varias portadas no cuadradas, puedes recortar una a mano y marcar «recortar centradas las demás», o saltar alguna.",
+     "With several non-square covers, you can crop one by hand and tick “crop the rest centered”, or skip some.",
+     "Для нескольких неквадратных обложек можно обрезать одну вручную, а остальные — по центру."),
+]

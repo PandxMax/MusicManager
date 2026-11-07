@@ -364,6 +364,45 @@ try:
     w.clip = None
 except Exception:
     print("FALLO cortar", ascii(traceback.format_exc()), flush=True)
+# portada no cuadrada: ventanita para recortar
+try:
+    rect_dir = os.path.join(root, "Rectangular")
+    os.makedirs(rect_dir, exist_ok=True)
+    rp = os.path.join(rect_dir, "01. Portada larga.mp3")
+    shutil.copy2(src0, rp)
+    im = QImage(712, 1000, QImage.Format.Format_RGB32)
+    pp = QPainter(im)
+    g = QLinearGradient(0, 0, 0, 1000)
+    g.setColorAt(0, QColor("#1e3c72"))
+    g.setColorAt(1, QColor("#e94057"))
+    pp.fillRect(im.rect(), g)
+    pp.setPen(QColor("white"))
+    f = QFont("Segoe UI", 60)
+    f.setBold(True)
+    pp.setFont(f)
+    pp.drawText(QRectF(0, 0, 712, 1000), Qt.AlignmentFlag.AlignCenter, "SONIC\nX")
+    pp.end()
+    ba = QByteArray()
+    bf = QBuffer(ba)
+    bf.open(QIODevice.OpenModeFlag.WriteOnly)
+    im.save(bf, "JPG", 90)
+    id3 = ID3(rp)
+    id3.delall("APIC")
+    id3.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=bytes(ba)))
+    id3.save(rp)
+    w.load_folder(rect_dir)
+    wait(800)
+    w.list.clearSelection()
+    w.list.item(0).setSelected(True)
+    w.on_select()
+    import covercrop
+    out = covercrop.crop_square(im, 0, 144, 712, 1000)
+    print("recorte:", mm.cover_dims(out), flush=True)
+    grab_modal("s_recortar")
+    w.resize_covers(1000)
+    wait(300)
+except Exception:
+    print("FALLO recortar", ascii(traceback.format_exc()), flush=True)
 # copiar / pegar metadatos
 try:
     w.load_folder(first)

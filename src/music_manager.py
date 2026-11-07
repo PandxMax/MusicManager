@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.07"
+APP_VERSION = "2.08"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.08', [
+        'Redimensionar portada: si la portada no es cuadrada (por ejemplo 712×1000), se abre una ventanita para recortarla en cuadrado. Mueves el recuadro hasta la parte que quieres, lo agrandas o achicas con las esquinas o la rueda del ratón y eliges el tamaño final (500, 600, 800, 1000 o 1200 px). Las portadas que ya son cuadradas se redimensionan solas como antes.',
+        'Con varias portadas no cuadradas, puedes recortar una a mano y marcar «recortar centradas las demás», o saltar alguna.',
+    ]),
     ('2.07', [
         'Arrastrar muchas canciones (20, 50…) a una carpeta: ahora se mueven TODAS. Antes, si al empezar a arrastrar tenías Shift o Ctrl apretado (por ejemplo justo después de elegirlas con Shift+clic), la selección se recortaba y solo se pasaban unas cuantas.',
         'Cortar (Ctrl+X) se ve como en el Explorador: las canciones y carpetas cortadas quedan medio transparentes hasta que las pegas.',
@@ -1584,7 +1588,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.07 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.08 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -7047,32 +7051,62 @@ class Main(QMainWindow):
         self.statusBar().showMessage(f"Género «{text}» puesto (pendiente de guardar).")
 
     def resize_covers(self, side):
+        """Cuadradas (1000×1000, 600×600…): se reducen solas. Las que no son cuadradas (700×1200…): se abre una
+        ventanita para elegir qué parte recortar en cuadrado."""
         if not self.cur_paths:
             QMessageBox.information(self, "Redimensionar", "Selecciona una o varias canciones.")
             return
+        import covercrop
         self.apply_form()
-        done, skipped, last = 0, 0, ""
+        done, skipped, last, odd = 0, 0, "", []
         for p in self.cur_paths:
             pend = self.pending.get(p, {})
             data = pend["_cover"] if "_cover" in pend else inspect_file(p)["cover"]
             if not data:
                 skipped += 1
                 continue
+            w, h = cover_dims(data)
+            if not covercrop.is_square(w, h):
+                odd.append((p, data))   # no es cuadrada: se recorta después, eligiendo la parte
+                continue
             new = prepare_cover(data, side)
             if new is None or new == data:  # sin portada válida o ya es más pequeña
                 skipped += 1
                 continue
-            b, a = cover_dims(data), cover_dims(new)
-            last = f"{b[0]}×{b[1]} → {a[0]}×{a[1]} px"
+            a = cover_dims(new)
+            last = f"{w}×{h} → {a[0]}×{a[1]} px"
             self.pending.setdefault(p, {})["_cover"] = new
             done += 1
+        cropped, auto_side = 0, None
+        for i, (p, data) in enumerate(odd):
+            if auto_side:   # «recortar centradas las demás»
+                img = QImage.fromData(data)
+                x, y, s_ = covercrop.centered_square(img.width(), img.height())
+                self.pending.setdefault(p, {})["_cover"] = covercrop.crop_square(img, x, y, s_, auto_side)
+                cropped += 1
+                continue
+            dlg = covercrop.CropDialog(self, data, side, os.path.basename(p), len(odd) - i - 1)
+            i18n.retranslate(dlg)
+            dlg.exec()
+            if dlg.cancel_all:
+                break
+            if dlg.result_bytes:
+                self.pending.setdefault(p, {})["_cover"] = dlg.result_bytes
+                cropped += 1
+                if dlg.apply_all:
+                    auto_side = dlg.side()
+            else:
+                skipped += 1
         self.mark_items()
         self.show_current(self.current_path(), len(self.cur_paths))
-        msg = f"{done} portada(s) redimensionada(s) a máx. {side} px (pendiente de guardar)"
+        msg = f"{done} portada(s) redimensionada(s) a máx. {side} px"
         if done == 1:
-            msg += f": {last}"
+            msg += f" ({last})"
+        if cropped:
+            msg += f" · {cropped} recortada(s) en cuadrado"
+        msg += " (pendiente de guardar)"
         if skipped:
-            msg += f". {skipped} sin cambios (sin portada o ya eran más pequeñas)"
+            msg += f". {skipped} sin cambios (sin portada, ya eran más pequeñas o las saltaste)"
         self.statusBar().showMessage(msg + ".")
 
     def toggle_orient(self):
