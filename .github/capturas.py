@@ -329,6 +329,41 @@ try:
     print("movido:", os.path.exists(os.path.join(dst, "00. Prueba renombrada.mp3")), flush=True)
 except Exception:
     print("FALLO archivos", ascii(traceback.format_exc()), flush=True)
+# mover muchas canciones a la vez (como arrastrarlas al árbol)
+try:
+    lote = os.path.join(root, "Lote")
+    os.makedirs(lote, exist_ok=True)
+    src0 = os.path.join(first, sorted(os.listdir(first))[0])
+    for i in range(45):
+        shutil.copy2(src0, os.path.join(lote, f"{i:02d}. Cancion de prueba {i}.mp3"))
+    dest = os.path.join(root, "Destino")
+    os.makedirs(dest, exist_ok=True)
+    w.refresh_trees()
+    w.load_folder(lote)
+    wait(2500)   # que empiecen las miniaturas, como en la vida real
+    w.list.selectAll()
+    sel = w.selected_all_paths()
+    print("seleccionadas:", len(sel), flush=True)
+    w.tree.dropped.emit(sel, dest)
+    wait(6000)
+    print("movidas:", len(os.listdir(dest)), "quedan:", len(os.listdir(lote)), flush=True)
+except Exception:
+    print("FALLO lote", ascii(traceback.format_exc()), flush=True)
+# cortar: quedan medio transparentes
+try:
+    w.load_folder(first)
+    wait(800)
+    w.list.clearSelection()
+    for r in (0, 1):
+        w.list.item(r).setSelected(True)
+    w.clip_set("cut")
+    w.list.clearSelection()
+    wait(500)
+    shot(w, "s_cortar")
+    w.set_cut_marks([])
+    w.clip = None
+except Exception:
+    print("FALLO cortar", ascii(traceback.format_exc()), flush=True)
 # copiar / pegar metadatos
 try:
     w.load_folder(first)

@@ -1409,3 +1409,11 @@ ROWS += [
      "New: copy and paste tags. Right-click a song → “Copy tags” (Ctrl+Shift+C); then select other songs → “Paste tags…” (Ctrl+Shift+V) and tick what to paste: artist, album, genre, year, cover… (title and track come unticked). Also in the Edit menu.",
      "Новое: копирование и вставка тегов (Ctrl+Shift+C / Ctrl+Shift+V), с выбором полей и обложки."),
 ]
+ROWS += [
+    ("Arrastrar muchas canciones (20, 50…) a una carpeta: ahora se mueven TODAS. Antes, si al empezar a arrastrar tenías Shift o Ctrl apretado (por ejemplo justo después de elegirlas con Shift+clic), la selección se recortaba y solo se pasaban unas cuantas.",
+     "Dragging many songs (20, 50…) to a folder: now ALL of them move. Before, if Shift or Ctrl was held when you started dragging (e.g. right after selecting with Shift+click), the selection got trimmed and only a few moved.",
+     "Перетаскивание многих песен: теперь перемещаются ВСЕ, даже если удерживался Shift или Ctrl."),
+    ("Cortar (Ctrl+X) se ve como en el Explorador: las canciones y carpetas cortadas quedan medio transparentes hasta que las pegas.",
+     "Cut (Ctrl+X) looks like in Explorer: cut songs and folders turn semi-transparent until you paste them.",
+     "Вырезанные (Ctrl+X) песни и папки становятся полупрозрачными, как в Проводнике."),
+]

@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.06"
+APP_VERSION = "2.07"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,10 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.07', [
+        'Arrastrar muchas canciones (20, 50…) a una carpeta: ahora se mueven TODAS. Antes, si al empezar a arrastrar tenías Shift o Ctrl apretado (por ejemplo justo después de elegirlas con Shift+clic), la selección se recortaba y solo se pasaban unas cuantas.',
+        'Cortar (Ctrl+X) se ve como en el Explorador: las canciones y carpetas cortadas quedan medio transparentes hasta que las pegas.',
+    ]),
     ('2.06', [
         'Nuevo: copiar y pegar metadatos. Clic derecho en una canción → «Copiar metadatos» (Ctrl+Shift+C); luego eliges otras canciones → «Pegar metadatos…» (Ctrl+Shift+V) y marcas qué pegar: intérprete, álbum, género, año, portada… (título y pista vienen desmarcados). También en el menú Edición.',
     ]),
@@ -1580,7 +1584,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.06 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.07 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2481,6 +2485,16 @@ class GlyphButton(QPushButton):
 
 class TreeEditDelegate(QStyledItemDelegate):
     """Cuadro para renombrar carpetas en el árbol: del alto de la fila, con borde de color y el nombre seleccionado."""
+    def paint(self, p, option, index):
+        tree = self.parent()
+        if index.data(PATH_ROLE) in getattr(tree, "cut_paths", ()):
+            p.save()
+            p.setOpacity(0.42)
+            super().paint(p, option, index)
+            p.restore()
+            return
+        super().paint(p, option, index)
+
     def createEditor(self, parent, option, index):
         ed = super().createEditor(parent, option, index)
         if isinstance(ed, QLineEdit):
@@ -3219,6 +3233,15 @@ class SongDelegate(QStyledItemDelegate):
         return super().sizeHint(option, index)
 
     def paint(self, p, option, index):
+        if index.data(PATH_ROLE) in getattr(self.lst, "cut_paths", ()):
+            p.save()
+            p.setOpacity(0.42)   # cortado (Ctrl+X): se ve medio transparente, como en el Explorador
+            self._paint(p, option, index)
+            p.restore()
+            return
+        self._paint(p, option, index)
+
+    def _paint(self, p, option, index):
         ed = getattr(self, "editing", None)
         if ed is not None and ed.isValid() and ed == QPersistentModelIndex(index):
             # renombrando: la tarjeta de color se queda igual (mismo tamaño); solo se oculta el nombre, que se
@@ -3425,10 +3448,12 @@ class SongList(QListWidget):
             self._selecting = True
             self._auto.start()
             it = self._press_item
-            if (it is not None and it.isSelected() and len(self.selectedItems()) > 1
-                    and not (e.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier))):
-                # pulsas sobre una de varias ya elegidas: no se deshace la selección (así se arrastran todas)
+            if it is not None and it.isSelected() and len(self.selectedItems()) > 1:
+                # pulsas sobre una de varias ya elegidas (aunque tengas Shift o Ctrl apretado): la selección no se toca
+                # hasta saber si es un clic o un arrastre; así se arrastran TODAS las elegidas
                 self._keep_multi = it
+                self._keep_sel = list(self.selectedItems())
+                self._keep_ev = e.clone() if hasattr(e, "clone") else None
                 self._selecting = False
                 return
         else:
@@ -3448,7 +3473,14 @@ class SongList(QListWidget):
                 super().mouseMoveEvent(e)
                 return
             item, self._press, self._press_item = self._press_item, None, None
-            self._keep_multi = None
+            snap = getattr(self, "_keep_sel", None) if self._keep_multi is not None else None
+            self._keep_multi, self._keep_sel, self._keep_ev = None, None, None
+            if snap:   # por si algo cambió la selección entre el clic y el arrastre: se vuelven a marcar todas
+                for x in snap:
+                    try:
+                        x.setSelected(True)
+                    except RuntimeError:
+                        pass
             self.begin_drag(item)
             return
         super().mouseMoveEvent(e)
@@ -3471,10 +3503,16 @@ class SongList(QListWidget):
         keep = getattr(self, "_keep_multi", None)
         self._keep_multi = None
         if keep is not None and e.button() == Qt.MouseButton.LeftButton:
-            # fue un clic (no un arrastre): ahora sí queda elegida solo esa
-            self.clearSelection()
-            keep.setSelected(True)
-            self.setCurrentItem(keep)
+            # fue un clic (no un arrastre)
+            pe = getattr(self, "_keep_ev", None)
+            self._keep_ev = None
+            if pe is not None and pe.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
+                super().mousePressEvent(pe)   # con Ctrl/Shift: se comporta como siempre (quitar / ampliar)
+                super().mouseReleaseEvent(e)
+            else:   # sin teclas: ahora sí queda elegida solo esa
+                self.clearSelection()
+                keep.setSelected(True)
+                self.setCurrentItem(keep)
             self.selection_done.emit()
             return
         super().mouseReleaseEvent(e)
@@ -7065,12 +7103,22 @@ class Main(QMainWindow):
             self.statusBar().showMessage("No hay nada seleccionado (o es una carpeta principal que no se puede cortar).")
             return
         self.clip = {"mode": mode, "paths": paths}
+        self.set_cut_marks(paths if mode == "cut" else [])
         md = QMimeData()
         md.setUrls([QUrl.fromLocalFile(p) for p in paths])
         QApplication.clipboard().setMimeData(md)
         self.statusBar().showMessage(
             f"{len(paths)} elemento(s) {'cortado(s)' if mode == 'cut' else 'copiado(s)'}. "
             "Elige la carpeta de destino y pega (Ctrl+V).")
+
+    def set_cut_marks(self, paths):
+        """Lo cortado se ve medio transparente hasta que se pega (o se copia/corta otra cosa)."""
+        cut = set(paths or [])
+        for w_ in (self.list, self.tree, self.tree2):
+            w_.cut_paths = cut
+            w_.viewport().update()
+        if hasattr(self, "details") and getattr(self.details, "enabled", False):
+            self.list.viewport().update()
 
     def paste_target(self):
         fw = QApplication.focusWidget()
@@ -7096,6 +7144,7 @@ class Main(QMainWindow):
         if mode == "cut":
             self.move_items(paths, target)
             self.clip = None
+            self.set_cut_marks([])
             QApplication.clipboard().clear()
         else:
             self.copy_items(paths, target)

@@ -610,3 +610,8 @@ VERSIÓN 2.05
 VERSIÓN 2.06
 ------------
  - Copiar y pegar metadatos (Ctrl+Shift+C / Ctrl+Shift+V), eligiendo qué campos y la portada.
+
+VERSIÓN 2.07
+------------
+ - Arrastrar muchas canciones: se mueven todas (aunque tengas Shift o Ctrl apretado al empezar).
+ - Lo cortado (Ctrl+X) queda medio transparente hasta pegarlo, como en el Explorador.

@@ -106,6 +106,15 @@ class DetailsDelegate(QStyledItemDelegate):
         editor.setGeometry(QRect(x, option.rect.y() + 1, w, option.rect.height() - 2))
 
     def paint(self, p, option, index):
+        if index.data(Qt.ItemDataRole.UserRole) in getattr(self.ctl.list, "cut_paths", ()):
+            p.save()
+            p.setOpacity(0.42)   # cortado (Ctrl+X)
+            self._paint(p, option, index)
+            p.restore()
+            return
+        self._paint(p, option, index)
+
+    def _paint(self, p, option, index):
         opt = QStyleOptionViewItem(option)
         self.initStyleOption(opt, index)
         text_all, icon = opt.text, opt.icon
