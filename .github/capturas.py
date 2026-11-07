@@ -439,6 +439,29 @@ try:
     smoke("open_repair", w.open_repair)
 except Exception:
     print("FALLO flac falso", ascii(traceback.format_exc()), flush=True)
+# eliminar varias carpetas grandes (en segundo plano)
+try:
+    dels = []
+    for k in range(3):
+        d = os.path.join(root, f"Borrar {k}")
+        os.makedirs(d, exist_ok=True)
+        for i in range(40):
+            shutil.copy2(src0, os.path.join(d, f"{i:02d}.mp3"))
+        dels.append(d)
+    w.refresh_trees()
+    wait(800)
+    w.cfg.setValue("confirm_delete", 0)
+    t0 = time.time()
+    w.delete_paths(dels)
+    t1 = time.time()
+    for _ in range(300):
+        if not any(os.path.exists(d) for d in dels):
+            break
+        wait(100)
+    print("borrar: la llamada tardó %.2f s, todo borrado en %.1f s, quedan: %d" % (t1 - t0, time.time() - t0,
+          sum(os.path.exists(d) for d in dels)), flush=True)
+except Exception:
+    print("FALLO borrar", ascii(traceback.format_exc()), flush=True)
 # copiar / pegar metadatos
 try:
     w.load_folder(first)
