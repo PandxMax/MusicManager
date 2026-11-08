@@ -1479,3 +1479,11 @@ ROWS += [
      "Searching big folders (thousands of songs, with subfolders): results no longer show up with gaps or “hidden”, and you can scroll down to see them all. The search waits until you stop typing and the covers of the matches load first.",
      "Поиск в больших папках: результаты больше не появляются с пробелами, можно прокрутить вниз; обложки найденного загружаются первыми."),
 ]
+ROWS += [
+    ("📂 Ir a la carpeta", "📂 Go to folder", "📂 Перейти в папку"),
+    ("🗂 Mostrar en el Explorador de Windows", "🗂 Show in Windows Explorer", "🗂 Показать в Проводнике"),
+    ("Carpeta: %s", "Folder: %s", "Папка: %s"),
+    ("Nuevo: clic derecho en una canción → «Ir a la carpeta». Ideal tras buscar (o con «Incluir subcarpetas»): abre la carpeta donde está la canción, quita la búsqueda y la deja marcada y a la vista. También «Mostrar en el Explorador de Windows».",
+     "New: right-click a song → “Go to folder”. Great after searching (or with “Include subfolders”): opens the folder where the song is, clears the search and leaves it selected and in view. Also “Show in Windows Explorer”.",
+     "Новое: правый клик → «Перейти в папку» и «Показать в Проводнике»."),
+]

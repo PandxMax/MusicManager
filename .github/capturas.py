@@ -459,6 +459,12 @@ try:
     print("busqueda grande:", len(vis), "visibles; primeras posiciones:", [(r.x(), r.y()) for r in rects[:6]],
           "scroll max:", w.list.verticalScrollBar().maximum(), flush=True)
     shot(w, "s_busqueda_grande")
+    tgt = vis[3].data(mm.PATH_ROLE)
+    w.go_to_folder(tgt)
+    wait(1200)
+    print("ir a carpeta:", ascii(os.path.basename(w.current_dir or "")), "busqueda:", ascii(w.search.text()),
+          "seleccion ok:", w.selected_paths() == [tgt], flush=True)
+    shot(w, "s_ir_carpeta")
     w.search.clear()
     wait(500)
     w.chk_sub.setChecked(False)

@@ -632,3 +632,9 @@ VERSIÓN 2.10
 VERSIÓN 2.11
 ------------
  - Buscar en carpetas grandes: resultados sin huecos, se puede bajar; portadas de lo encontrado primero.
+
+VERSIÓN 2.12
+------------
+ - Clic derecho en una canción → «Ir a la carpeta»: abre la carpeta donde está (útil tras buscar o con
+   «Incluir subcarpetas»), quita la búsqueda y deja la canción marcada y a la vista.
+ - Clic derecho → «Mostrar en el Explorador de Windows»: abre el Explorador con el archivo seleccionado.

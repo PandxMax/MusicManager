@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.11"
+APP_VERSION = "2.12"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.12', [
+        'Nuevo: clic derecho en una canción → «Ir a la carpeta». Ideal tras buscar (o con «Incluir subcarpetas»): abre la carpeta donde está la canción, quita la búsqueda y la deja marcada y a la vista. También «Mostrar en el Explorador de Windows».',
+    ]),
     ('2.11', [
         'Buscar en carpetas grandes (miles de canciones, con subcarpetas): los resultados ya no salen con huecos ni «escondidos», y se puede bajar para ver todos. La búsqueda espera a que dejes de escribir (no se recalcula letra por letra) y las portadas de lo encontrado se cargan primero.',
     ]),
@@ -1598,7 +1601,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.11 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.12 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -7375,6 +7378,11 @@ class Main(QMainWindow):
             m.addAction("✂️ Cortar (Ctrl+X)", lambda: self.clip_set("cut"))
             m.addAction("📋 Copiar (Ctrl+C)", lambda: self.clip_set("copy"))
             m.addAction("📥 Pegar aquí (Ctrl+V)", self.paste_here)
+            sel1 = self.selected_paths()
+            if len(sel1) == 1:   # útil sobre todo al buscar o con «Incluir subcarpetas»
+                m.addAction(T("📂 Ir a la carpeta"), lambda p=sel1[0]: self.go_to_folder(p))
+                m.addAction(T("🗂 Mostrar en el Explorador de Windows"), lambda p=sel1[0]: self.show_in_explorer(p))
+                m.addSeparator()
             m.addAction("✏️ Renombrar (F2)", self.rename_selected)
             m.addAction(T("🧹 Quitar paréntesis del nombre…"), lambda: self.open_strip_parens(self.selected_paths()))
             m.addSeparator()
@@ -8135,6 +8143,36 @@ class Main(QMainWindow):
         paths = self._lib_paths()
         if paths:
             self._show_tool(libtools.NormalizeDialog(self, paths))
+
+    def go_to_folder(self, path):
+        """Desde una búsqueda (o con «Incluir subcarpetas»): abre la carpeta donde está la canción, sin búsqueda,
+        y la deja marcada y a la vista."""
+        if self.search.text():
+            self.search.blockSignals(True)
+            self.search.clear()
+            self.search.blockSignals(False)
+            self.apply_filter("")
+        if self.chk_sub.isChecked():
+            self.chk_sub.blockSignals(True)
+            self.chk_sub.setChecked(False)   # solo esa carpeta, como en el Explorador
+            self.chk_sub.blockSignals(False)
+        folder = os.path.dirname(path)
+        self.reveal_file(path)
+        def center():
+            r = self.row_index.get(path)
+            if r is not None and self.list.item(r) is not None:
+                self.list.scrollToItem(self.list.item(r), QAbstractItemView.ScrollHint.PositionAtCenter)
+        center()
+        QTimer.singleShot(150, center)   # otra vez cuando termine de colocar las tarjetas
+        QTimer.singleShot(600, center)
+        self.statusBar().showMessage(T(f"Carpeta: {folder}"))
+
+    def show_in_explorer(self, path):
+        if sys.platform == "win32":
+            import subprocess
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+        else:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.dirname(path)))
 
     def reveal_file(self, path):
         """Abre la carpeta de esa canción en la lista y la deja seleccionada."""
