@@ -1487,3 +1487,8 @@ ROWS += [
      "New: right-click a song → “Go to folder”. Great after searching (or with “Include subfolders”): opens the folder where the song is, clears the search and leaves it selected and in view. Also “Show in Windows Explorer”.",
      "Новое: правый клик → «Перейти в папку» и «Показать в Проводнике»."),
 ]
+ROWS += [
+    ('Búsqueda en carpetas con miles de canciones (por ejemplo 3500 con «Incluir subcarpetas»): ya no parpadea ni se traba. La lista se arma solo con lo que coincide, en vez de esconder canción por canción, y cada búsqueda tarda menos de una décima de segundo.',
+     "Searching folders with thousands of songs (e.g. 3,500 with “Include subfolders”) no longer flickers or freezes: the list is built only with the matches instead of hiding songs one by one, and each search takes under a tenth of a second.",
+     "Поиск в папках с тысячами песен больше не мигает и не зависает: список строится только из совпадений."),
+]

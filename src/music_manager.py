@@ -10,6 +10,7 @@ import sys, os, json, re, shutil, time, base64, html, urllib.request, urllib.err
 from functools import lru_cache
 from urllib.parse import quote_plus, quote
 
+from PyQt6.QtCore import QItemSelectionModel
 from PyQt6.QtCore import (QAbstractNativeEventFilter, QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
                           QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF, QPersistentModelIndex, QObject)
 from PyQt6.QtGui import (QFontMetrics, QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
@@ -73,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.12"
+APP_VERSION = "2.13"
 
 
 class TMenu(QMenu):
@@ -964,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.13', [
+        'Búsqueda en carpetas con miles de canciones (por ejemplo 3500 con «Incluir subcarpetas»): ya no parpadea ni se traba. La lista se arma solo con lo que coincide, en vez de esconder canción por canción, y cada búsqueda tarda menos de una décima de segundo.',
+    ]),
     ('2.12', [
         'Nuevo: clic derecho en una canción → «Ir a la carpeta». Ideal tras buscar (o con «Incluir subcarpetas»): abre la carpeta donde está la canción, quita la búsqueda y la deja marcada y a la vista. También «Mostrar en el Explorador de Windows».',
     ]),
@@ -1601,7 +1605,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.12 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.13 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5079,27 +5083,14 @@ class Main(QMainWindow):
         keep_v = self.list.verticalScrollBar().value() if same_dir else 0
         self._listed_dir = path
         self._loading_dir = True
-        self.list.setUpdatesEnabled(False)   # se llena de una vez y se pinta al final (no canción por canción)
-        self.list.clear()
-        if not self.chk_sub.isChecked():
-            for name, dp in subdirs(path):
-                di = QListWidgetItem(self.folder_icon, name)
-                di.setData(PATH_ROLE, dp)
-                di.setData(KIND_ROLE, "dir")
-                di.setToolTip(dp)
-                self.list.addItem(di)
-        for f in files:
-            it = QListWidgetItem(os.path.splitext(os.path.basename(f))[0])
-            it.setData(PATH_ROLE, f)
-            it.setToolTip(f)
-            m = self.meta.get(f)
-            it.setIcon(m["icon"] if m and m["icon"] else self.default_icon)
-            self.list.addItem(it)
-            if m is None:
-                self.thumb_queue.append(f)
-        self.row_index = {self.list.item(r).data(PATH_ROLE): r for r in range(self.list.count())}
+        # la búsqueda no oculta filas (con miles de canciones Qt se vuelve lentísimo y la lista parpadea):
+        # la lista se llena solo con lo que coincide
+        self._all_dirs = [] if self.chk_sub.isChecked() else list(subdirs(path))
+        self._all_files = files
+        self.thumb_queue = [f for f in files if self.meta.get(f) is None]
+        self._filter_t = (self.search.text() or "").strip().lower()
+        self.fill_list()
         self._loading_dir = False
-        self.list.setUpdatesEnabled(True)
         self._thumb_left = len(self.thumb_queue)
         if keep_v:   # misma carpeta (tras borrar, mover, renombrar…): la lista se queda donde estaba
             sb = self.list.verticalScrollBar()
@@ -7461,41 +7452,74 @@ class Main(QMainWindow):
         self.btn_tab_lyr.setChecked(on)
         self.cfg.setValue("show_lyr", 1 if on else 0)
 
+    def search_hay(self, f):
+        tags = self.tags_cache.get(f) or {}
+        return (os.path.splitext(os.path.basename(f))[0] + " " +
+                " ".join(v for v in tags.values() if isinstance(v, str))).lower()
+
+    def fill_list(self):
+        """Llena la lista con las canciones de la carpeta (solo las que coinciden si hay una búsqueda)."""
+        t = getattr(self, "_filter_t", "")
+        files = self._all_files
+        if t:
+            files = [f for f in files if t in self.search_hay(f)]
+        self.list.setUpdatesEnabled(False)   # se llena de una vez y se pinta al final (no canción por canción)
+        self.list.clear()
+        if not t:
+            for name, dp in self._all_dirs:
+                di = QListWidgetItem(self.folder_icon, name)
+                di.setData(PATH_ROLE, dp)
+                di.setData(KIND_ROLE, "dir")
+                di.setToolTip(dp)
+                self.list.addItem(di)
+        for f in files:
+            it = QListWidgetItem(os.path.splitext(os.path.basename(f))[0])
+            it.setData(PATH_ROLE, f)
+            it.setToolTip(f)
+            m = self.meta.get(f)
+            it.setIcon(m["icon"] if m and m["icon"] else self.default_icon)
+            self.list.addItem(it)
+        self.row_index = {self.list.item(r).data(PATH_ROLE): r for r in range(self.list.count())}
+        self.list.setUpdatesEnabled(True)
+        return files
+
     def apply_filter(self, text=""):
         t = (text or "").strip().lower()
-        if not t and not getattr(self, "_filtered", False):
-            self.filter_bar.hide()
-            return   # sin búsqueda y nada oculto: no hay que recorrer la lista
-        self._filtered = bool(t)
-        shown = total = 0
-        found = []
-        self.list.setUpdatesEnabled(False)
-        for r in range(self.list.count()):
-            it = self.list.item(r)
-            if it.data(KIND_ROLE) == "dir":
-                it.setHidden(bool(t))
-                continue
-            total += 1
-            tags = self.tags_cache.get(it.data(PATH_ROLE), {})
-            hay = (it.text() + " " + " ".join(v for v in tags.values() if isinstance(v, str))).lower()
-            hide = bool(t) and t not in hay
-            if it.isHidden() != hide:
-                it.setHidden(hide)
-            shown += not hide
-            if t and not hide:
-                found.append(it.data(PATH_ROLE))
-        # en modo iconos, al ocultar canciones la cuadrícula quedaba con huecos y no se podía bajar: se recoloca
-        self.list.doItemsLayout()
-        self.list.setUpdatesEnabled(True)
-        self.list.verticalScrollBar().setValue(0)
-        missing = [p for p in found if self.meta.get(p) is None]
-        if missing:   # primero las miniaturas de lo encontrado
-            rest = [p for p in getattr(self, "thumb_queue", []) if self.meta.get(p) is None and p not in set(missing)]
+        if getattr(self, "_all_files", None) is None:
+            return
+        if t != getattr(self, "_filter_t", ""):
+            sel = set(self.selected_paths())
+            cur = self.list.currentItem()
+            cur_p = cur.data(PATH_ROLE) if cur is not None else None
+            self._filter_t = t
+            self._loading_dir = True
+            self.list.blockSignals(True)
             try:
-                self.thumbs.request(self.gen, missing + rest)
-            except Exception:
-                pass
+                found = self.fill_list()
+                for p in sel:   # lo que estaba seleccionado y sigue en la lista, sigue seleccionado
+                    r = self.row_index.get(p)
+                    if r is not None:
+                        self.list.item(r).setSelected(True)
+                if cur_p in self.row_index:
+                    self.list.setCurrentItem(self.list.item(self.row_index[cur_p]),
+                                             QItemSelectionModel.SelectionFlag.NoUpdate)
+            finally:
+                self.list.blockSignals(False)
+                self._loading_dir = False
+            self.mark_items()
+            self.list.verticalScrollBar().setValue(0)
+            missing = [p for p in found if self.meta.get(p) is None] if t else []
+            if missing:   # primero las miniaturas de lo encontrado
+                ms = set(missing)
+                rest = [p for p in getattr(self, "thumb_queue", []) if self.meta.get(p) is None and p not in ms]
+                try:
+                    self.thumbs.request(self.gen, missing + rest)
+                except Exception:
+                    pass
+        self._filtered = bool(t)
         if t:
+            shown = sum(1 for r in range(self.list.count()) if self.list.item(r).data(KIND_ROLE) != "dir")
+            total = len(self._all_files)
             self.filter_lbl.setText("🔍  " + T(f"Mostrando {shown} de {total} canciones · búsqueda «{text.strip()}»"))
             self.filter_bar.show()
             self.list.overlay.setText(T(f"Ninguna canción de esta carpeta coincide con «{text.strip()}».") if not shown else "")

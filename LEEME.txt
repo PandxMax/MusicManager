@@ -638,3 +638,8 @@ VERSIÓN 2.12
  - Clic derecho en una canción → «Ir a la carpeta»: abre la carpeta donde está (útil tras buscar o con
    «Incluir subcarpetas»), quita la búsqueda y deja la canción marcada y a la vista.
  - Clic derecho → «Mostrar en el Explorador de Windows»: abre el Explorador con el archivo seleccionado.
+
+VERSIÓN 2.13
+------------
+ - Buscar en carpetas con miles de canciones ya no parpadea ni se traba: la lista se arma solo con lo
+   que coincide (antes se escondían una por una las demás, y con 3000+ canciones eso era muy lento).

@@ -1,3 +1,4 @@
+import time
 """Hace capturas de pantalla del programa en GitHub Actions (Windows) para revisar el diseño sin abrirlo.
 Crea una pequeña biblioteca de prueba (tonos de 4 s con etiquetas y portadas) y guarda PNG en la carpeta «shots»."""
 import os, sys, json, time, tempfile, subprocess, shutil, faulthandler
@@ -445,13 +446,30 @@ try:
     for k in range(6):
         d = os.path.join(big, f"Sub {k}")
         os.makedirs(d, exist_ok=True)
-        for i in range(60):
-            nm = f"{i:02d}. Artista {k} - " + ("Tame Impala tema" if (i * 7 + k) % 23 == 0 else "Otra cancion") + f" {i}.mp3"
-            shutil.copy2(src0, os.path.join(d, nm))
+        for i in range(600):
+            nm = f"{i:03d}. Artista {k} - " + ("Tame Impala tema" if (i * 7 + k) % 23 == 0 else "Otra cancion") + f" {i}.mp3"
+            try:
+                os.link(src0, os.path.join(d, nm))
+            except OSError:
+                shutil.copy2(src0, os.path.join(d, nm))
     w.chk_sub.setChecked(True)
     w.set_view_mode("icons")
     w.load_folder(big)
     wait(1500)
+    print("grande:", w.list.count(), "canciones", flush=True)
+    for q in ("t", "ta", "tam", "tame", "tam", "tame"):
+        t0 = time.perf_counter()
+        w.apply_filter(q)
+        QApplication.processEvents()
+        print("filtro", q, w.list.count(), "en", round((time.perf_counter() - t0) * 1000), "ms", flush=True)
+    t0 = time.perf_counter()
+    w.apply_filter("")
+    QApplication.processEvents()
+    print("quitar filtro", w.list.count(), "en", round((time.perf_counter() - t0) * 1000), "ms", flush=True)
+    w.search.setText("otra")
+    wait(1200)
+    print("busqueda amplia:", w.list.count(), "scroll max:", w.list.verticalScrollBar().maximum(), flush=True)
+    shot(w, "s_busqueda_amplia")
     w.search.setText("tame")
     wait(1200)
     vis = [w.list.item(r) for r in range(w.list.count()) if not w.list.item(r).isHidden()]
