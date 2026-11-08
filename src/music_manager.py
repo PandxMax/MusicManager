@@ -73,7 +73,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.10"
+APP_VERSION = "2.11"
 
 
 class TMenu(QMenu):
@@ -964,6 +964,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.11', [
+        'Buscar en carpetas grandes (miles de canciones, con subcarpetas): los resultados ya no salen con huecos ni «escondidos», y se puede bajar para ver todos. La búsqueda espera a que dejes de escribir (no se recalcula letra por letra) y las portadas de lo encontrado se cargan primero.',
+    ]),
     ('2.10', [
         'Eliminar varias carpetas ya no congela el programa: se mandan todas juntas a la papelera en una sola operación (mucho más rápido) y en segundo plano. Desaparecen de la lista y los árboles al instante y el programa sigue respondiendo mientras tanto.',
     ]),
@@ -1595,7 +1598,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.10 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.11 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3722,7 +3725,11 @@ class Main(QMainWindow):
         self.search.setPlaceholderText("🔍 Buscar canción…")
         self.search.setClearButtonEnabled(True)
         self.search.setFixedWidth(210)
-        self.search.textChanged.connect(self.apply_filter)
+        self._search_timer = QTimer(self)   # se busca un instante después de dejar de escribir (no letra por letra)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(220)
+        self._search_timer.timeout.connect(lambda: self.apply_filter(self.search.text()))
+        self.search.textChanged.connect(lambda t: self._search_timer.start() if t else self.apply_filter(""))
         self.chk_sub = QCheckBox("Incluir subcarpetas")
         self.chk_sub.toggled.connect(lambda: self.load_folder(self.current_dir))
         self._corner = QWidget()
@@ -5107,8 +5114,8 @@ class Main(QMainWindow):
         self.list.overlay.setText("Aquí no hay música todavía.\n\nElige otra carpeta a la izquierda o pega archivos con Ctrl+V.")
         self.list.overlay.setGeometry(self.list.viewport().rect())
         self.list.overlay.setVisible(self.list.count() == 0)
-        self.apply_filter(self.search.text())
         self.thumbs.request(self.gen, self.thumb_queue)
+        self.apply_filter(self.search.text())
         self.statusBar().showMessage(f"{os.path.basename(os.path.normpath(path)) or path} · {len(files)} canciones")
         if self._resort_pending and not self._thumb_left:
             self._resort_pending = False
@@ -7453,6 +7460,8 @@ class Main(QMainWindow):
             return   # sin búsqueda y nada oculto: no hay que recorrer la lista
         self._filtered = bool(t)
         shown = total = 0
+        found = []
+        self.list.setUpdatesEnabled(False)
         for r in range(self.list.count()):
             it = self.list.item(r)
             if it.data(KIND_ROLE) == "dir":
@@ -7462,8 +7471,22 @@ class Main(QMainWindow):
             tags = self.tags_cache.get(it.data(PATH_ROLE), {})
             hay = (it.text() + " " + " ".join(v for v in tags.values() if isinstance(v, str))).lower()
             hide = bool(t) and t not in hay
-            it.setHidden(hide)
+            if it.isHidden() != hide:
+                it.setHidden(hide)
             shown += not hide
+            if t and not hide:
+                found.append(it.data(PATH_ROLE))
+        # en modo iconos, al ocultar canciones la cuadrícula quedaba con huecos y no se podía bajar: se recoloca
+        self.list.doItemsLayout()
+        self.list.setUpdatesEnabled(True)
+        self.list.verticalScrollBar().setValue(0)
+        missing = [p for p in found if self.meta.get(p) is None]
+        if missing:   # primero las miniaturas de lo encontrado
+            rest = [p for p in getattr(self, "thumb_queue", []) if self.meta.get(p) is None and p not in set(missing)]
+            try:
+                self.thumbs.request(self.gen, missing + rest)
+            except Exception:
+                pass
         if t:
             self.filter_lbl.setText("🔍  " + T(f"Mostrando {shown} de {total} canciones · búsqueda «{text.strip()}»"))
             self.filter_bar.show()

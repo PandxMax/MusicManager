@@ -628,3 +628,7 @@ VERSIÓN 2.09
 VERSIÓN 2.10
 ------------
  - Eliminar varias carpetas sin congelar el programa (papelera en una sola operación, en segundo plano).
+
+VERSIÓN 2.11
+------------
+ - Buscar en carpetas grandes: resultados sin huecos, se puede bajar; portadas de lo encontrado primero.

@@ -1474,3 +1474,8 @@ ROWS += [
      "Deleting several folders no longer freezes the program: they're all sent to the Recycle Bin in a single operation (much faster) in the background. They vanish from the list and trees instantly and the program stays responsive.",
      "Удаление нескольких папок больше не замораживает программу: всё отправляется в корзину одной операцией в фоне."),
 ]
+ROWS += [
+    ("Buscar en carpetas grandes (miles de canciones, con subcarpetas): los resultados ya no salen con huecos ni «escondidos», y se puede bajar para ver todos. La búsqueda espera a que dejes de escribir (no se recalcula letra por letra) y las portadas de lo encontrado se cargan primero.",
+     "Searching big folders (thousands of songs, with subfolders): results no longer show up with gaps or “hidden”, and you can scroll down to see them all. The search waits until you stop typing and the covers of the matches load first.",
+     "Поиск в больших папках: результаты больше не появляются с пробелами, можно прокрутить вниз; обложки найденного загружаются первыми."),
+]

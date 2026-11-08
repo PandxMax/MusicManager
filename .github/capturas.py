@@ -439,6 +439,31 @@ try:
     smoke("open_repair", w.open_repair)
 except Exception:
     print("FALLO flac falso", ascii(traceback.format_exc()), flush=True)
+# buscar en una carpeta grande con subcarpetas (modo iconos)
+try:
+    big = os.path.join(root, "Grande")
+    for k in range(6):
+        d = os.path.join(big, f"Sub {k}")
+        os.makedirs(d, exist_ok=True)
+        for i in range(60):
+            nm = f"{i:02d}. Artista {k} - " + ("Tame Impala tema" if (i * 7 + k) % 23 == 0 else "Otra cancion") + f" {i}.mp3"
+            shutil.copy2(src0, os.path.join(d, nm))
+    w.chk_sub.setChecked(True)
+    w.set_view_mode("icons")
+    w.load_folder(big)
+    wait(1500)
+    w.search.setText("tame")
+    wait(1200)
+    vis = [w.list.item(r) for r in range(w.list.count()) if not w.list.item(r).isHidden()]
+    rects = [w.list.visualItemRect(x) for x in vis]
+    print("busqueda grande:", len(vis), "visibles; primeras posiciones:", [(r.x(), r.y()) for r in rects[:6]],
+          "scroll max:", w.list.verticalScrollBar().maximum(), flush=True)
+    shot(w, "s_busqueda_grande")
+    w.search.clear()
+    wait(500)
+    w.chk_sub.setChecked(False)
+except Exception:
+    print("FALLO busqueda grande", ascii(traceback.format_exc()), flush=True)
 # eliminar varias carpetas grandes (en segundo plano)
 try:
     dels = []
