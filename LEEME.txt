@@ -664,3 +664,17 @@ VERSIÓN 2.15
    Hay buscador. Al tocar una canción suena, y «siguiente/anterior» siguen esa lista.
    Abajo se ve lo que suena; tocándolo vuelves al reproductor. Esc = atrás / cerrar.
  - Volver al editor: botón de arriba a la derecha (al pasar el ratón), Esc o clic derecho.
+
+VERSIÓN 2.16
+------------
+ - Modo reproductor con el diseño de la app del celular, manteniendo el fondo que mezcla y difumina
+   los colores de la portada:
+     arriba «REPRODUCIENDO · 1483 de 3786», flecha para volver al editor y menú ⋮;
+     portada en tarjeta, título, artista y calidad (MP3 · 44.1 kHz · 320 kbps · Alta);
+     barra de avance con la onda de la canción, tiempo transcurrido y restante;
+     aleatorio, anterior, botón blanco grande, siguiente, repetir;
+     abajo: Cola · Letra · Ajustes · Editar · Calidad.
+ - «Cola» abre todas las canciones, carpetas, artistas y géneros, ahora con la portada de cada
+   canción, de cada carpeta y de cada artista.
+ - «Editar» y «Calidad» vuelven al editor con la canción marcada (Calidad abre el espectrograma).
+ - Doble clic en la portada = reproducir/pausa. Rueda del ratón = volumen.

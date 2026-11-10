@@ -425,6 +425,32 @@ def draw_glyph(p, kind, rect, col):
         solid()
         for x, h in ((4, 7), (9.5, 14), (15, 10)):
             p.drawRoundedRect(QRectF(x, 20 - h, 4.5, h), 2, 2)
+    elif k == "morev":   # tres puntos en vertical (menú)
+        solid()
+        for y in (5.5, 12, 18.5):
+            p.drawEllipse(QPointF(12, y), 1.9, 1.9)
+    elif k == "mic":   # micrófono (letra)
+        solid()
+        p.drawRoundedRect(QRectF(9, 3.5, 6, 10.5), 3, 3)
+        p.setPen(stroke)
+        p.setBrush(nofill)
+        path = QPainterPath()
+        path.moveTo(6, 11)
+        path.cubicTo(6, 18.5, 18, 18.5, 18, 11)
+        p.drawPath(path)
+        line((12, 16.8), (12, 20.5))
+    elif k == "wave":   # barras de onda (calidad / espectro)
+        p.setPen(_pen(col, 2.0))
+        for x, h in ((4, 4), (7.2, 10), (10.4, 16), (13.6, 8), (16.8, 13), (20, 5)):
+            p.drawLine(QPointF(x, 12 - h / 2), QPointF(x, 12 + h / 2))
+    elif k == "queue":   # lista con una nota (cola)
+        line((3.5, 6), (15, 6))
+        line((3.5, 11), (15, 11))
+        line((3.5, 16), (10.5, 16))
+        solid()
+        p.drawEllipse(QPointF(15.5, 18), 2.6, 2.3)
+        p.drawRect(QRectF(17.1, 7.5, 1.8, 10.5))
+        p.drawPolygon(_poly([(17.1, 7.5), (21.2, 9), (21.2, 11), (17.1, 9.6)]))
     elif k == "gear":
         p.drawEllipse(QPointF(12, 12), 3, 3)
         for i in range(8):

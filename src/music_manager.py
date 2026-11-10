@@ -74,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.15"
+APP_VERSION = "2.16"
 
 
 class TMenu(QMenu):
@@ -965,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.16', [
+        'Modo reproductor con el diseño de la app del celular: portada en tarjeta, «REPRODUCIENDO · 1483 de 3786», título, artista, calidad (MP3 · 44.1 kHz · 320 kbps · Alta), barra de avance con la onda, controles con el botón blanco grande y la barra Cola · Letra · Ajustes · Editar · Calidad; el fondo sigue mezclando y difuminando los colores de la portada. «Cola» abre todas las canciones, carpetas, artistas y géneros, ahora con la portada de cada canción y de cada carpeta.',
+    ]),
     ('2.15', [
         'Modo reproductor: ya no se traba (la ventanita se redibujaba entera muchas veces por segundo; ahora el fondo se dibuja una sola vez). Nuevo: el primer botón de abajo abre la Biblioteca con «Canciones» (todas las de la carpeta que estabas editando, incluidas todas sus subcarpetas, con la cantidad cargada), «Carpetas», «Artistas» y «Géneros», con buscador. Al tocar una canción suena y «siguiente» sigue esa lista.',
     ]),
@@ -1611,7 +1614,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.15 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.16 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5427,7 +5430,7 @@ class Main(QMainWindow):
             return
         import miniplayer
         if self.mini is None:
-            self.mini = miniplayer.MiniPlayer(self, inspect_file, tech_info, read_tags, AUDIO_EXT)
+            self.mini = miniplayer.MiniPlayer(self, inspect_file, tech_info, read_tags, AUDIO_EXT, find_folder_image)
         if self.mini.isVisible():
             return
         self._mini_was_max = self.isMaximized()
@@ -7689,6 +7692,8 @@ class Main(QMainWindow):
         self.cfg.setValue("split_cols2", (self.top_split if self.meta_open else self.fold_split).saveState())
         if self.player is not None:
             self.player.stop()
+        if getattr(self, "mini", None) is not None:
+            self.mini.shutdown()
         try:
             self.thumbs.stop()
         except Exception:

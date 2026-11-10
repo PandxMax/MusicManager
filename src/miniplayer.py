@@ -1,7 +1,7 @@
 """Modo reproductor: el editor se esconde y queda solo un reproductor pequeño que se puede mover a cualquier parte
-de la pantalla. La portada se funde (difuminado) con un fondo del color de la canción, como en los reproductores del
-celular; debajo van el título, la onda de la canción para avanzar con los controles encima, los tiempos, la calidad
-del archivo y una barra con accesos rápidos."""
+de la pantalla. Tiene el diseño del reproductor de la app del celular (portada en tarjeta, título, calidad, barra de
+avance, controles y barra de acciones: Cola, Letra, Ajustes, Editar, Calidad) con un fondo que mezcla y difumina los
+colores de la portada. «Cola» abre la biblioteca: canciones, carpetas, artistas y géneros, con sus portadas."""
 import os
 import re
 import html
@@ -76,22 +76,61 @@ def make_noise():
 
 
 def pick_colors(img):
-    """Color del fondo: el de la parte de abajo de la portada (así la portada se funde sin cortes), oscurecido para
-    que el texto blanco se lea bien. Devuelve (color de arriba, color de abajo)."""
+    """Colores del fondo sacados de la portada (como en la app del celular): el color que domina, más apagado
+    arriba, y uno más oscuro para el medio. Devuelve (arriba, medio)."""
     if img is None or img.isNull():
-        return QColor(46, 38, 72), QColor(16, 13, 26)
-    small = img.scaled(24, 24, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-    r = g = b = n = 0
-    for y in range(16, 24):
-        for x in range(24):
+        return QColor(42, 35, 64), QColor(21, 19, 31)
+    small = img.scaled(20, 20, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    r = g = b = wsum = 0.0
+    for y in range(20):
+        for x in range(20):
             c = small.pixelColor(x, y)
-            r, g, b, n = r + c.red(), g + c.green(), b + c.blue(), n + 1
-    base = QColor(r // n, g // n, b // n)
+            _h, s, v, _a = c.getHsvF()
+            w = 0.12 + s * v * 1.6   # los colores vivos pesan más que los grises
+            r, g, b, wsum = r + c.red() * w, g + c.green() * w, b + c.blue() * w, wsum + w
+    base = QColor(int(r / wsum), int(g / wsum), int(b / wsum))
     h, s, l, _ = base.getHslF()
     h = max(h, 0.0)
-    l2 = min(max(l, 0.13), 0.30)
-    s2 = min(s, 0.72)
-    return QColor.fromHslF(h, s2, l2), QColor.fromHslF(h, min(1.0, s2 * 1.05), l2 * 0.42)
+    top = QColor.fromHslF(h, min(s * 1.1, 0.72), min(max(l, 0.20), 0.36))
+    mid = QColor.fromHslF(h, min(s, 0.55), min(max(l * 0.45, 0.07), 0.15))
+    return top, mid
+
+
+QUALITY = {0: ("Hi-Res", QColor(0xB3, 0x88, 0xFF)), 1: ("Sin pérdida", QColor(0x2E, 0xCC, 0x71)),
+           2: ("Alta", QColor(0x4F, 0xC3, 0xF7)), 3: ("Media", QColor(0xF3, 0x9C, 0x12)), 4: ("Baja", QColor(0xE7, 0x4C, 0x3C))}
+
+
+def quality_of(info):
+    """(formato, detalle, nivel) como en la app del celular: Hi-Res, Sin pérdida, Alta (≥256 kbps), Media, Baja."""
+    info = info or {}
+    codec = str(info.get("codec") or "—")
+    bits = re.search(r"(\d+)\s*bits", str(info.get("enc", "")))
+    bits = int(bits.group(1)) if bits else 0
+    sr = re.match(r"([\d.]+)", str(info.get("freq", "")))
+    sr = float(sr.group(1)) if sr else 0.0
+    kb = re.match(r"(\d+)", str(info.get("bitrate", "")))
+    kb = int(kb.group(1)) if kb else 0
+    lossless = codec.upper() in ("FLAC", "ALAC", "WAV", "AIFF")
+    parts = []
+    if lossless and bits:
+        parts.append(f"{bits} bit")
+    if sr:
+        parts.append(f"{sr:g} kHz")
+    if kb:
+        parts.append(f"{kb} kbps")
+    if lossless and (bits > 16 or sr > 48):
+        lvl = 0
+    elif lossless:
+        lvl = 1
+    elif kb >= 256:
+        lvl = 2
+    elif kb >= 160:
+        lvl = 3
+    elif kb > 0:
+        lvl = 4
+    else:
+        lvl = 5
+    return ("" if codec == "—" else codec.upper()), " · ".join(parts), lvl
 
 
 def parse_lyrics(text):
@@ -109,12 +148,13 @@ def parse_lyrics(text):
 
 
 class IconBtn(QPushButton):
-    """Botón redondo dibujado: «plain» (icono blanco), «dark» (círculo negro, como los controles de la imagen)
-    o «glass» (círculo oscuro translúcido, para los botones sobre la portada)."""
+    """Botón redondo dibujado: «plain» (icono blanco) o «white» (círculo blanco con el icono oscuro y un brillo
+    alrededor, como el botón grande de reproducir de la app del celular)."""
 
     def __init__(self, kind, size=36, style="plain", pad=0.27, parent=None):
         super().__init__(parent)
         self.kind, self.style_, self.pad, self.active = kind, style, pad, False
+        self.glow = QColor(255, 255, 255)
         self.setFixedSize(size, size)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFlat(True)
@@ -136,22 +176,27 @@ class IconBtn(QPushButton):
         r = QRectF(self.rect()).adjusted(1, 1, -1, -1)
         hov, down = self.underMouse(), self.isDown()
         p.setPen(Qt.PenStyle.NoPen)
-        if self.style_ == "dark":
-            p.setBrush(QColor(52, 52, 58) if down else QColor(30, 30, 34) if hov else QColor(6, 6, 8, 240))
+        if self.style_ == "white":
+            g = QRadialGradient(r.center(), r.width() / 2)   # brillo suave del color de la canción
+            gc = QColor(self.glow)
+            gc.setAlpha(120)
+            g.setColorAt(0.62, gc)
+            gc.setAlpha(0)
+            g.setColorAt(1.0, gc)
+            p.setBrush(QBrush(g))
             p.drawEllipse(r)
-            col = QColor(255, 255, 255)
-        elif self.style_ == "glass":
-            p.setBrush(QColor(0, 0, 0, 140 if hov else 85))
+            r = r.adjusted(r.width() * 0.11, r.height() * 0.11, -r.width() * 0.11, -r.height() * 0.11)
+            p.setBrush(QColor(225, 225, 230) if down else QColor(244, 244, 248) if hov else QColor(255, 255, 255))
             p.drawEllipse(r)
-            col = QColor(255, 255, 255, 245 if (hov or self.active) else 215)
+            col = QColor(20, 20, 28)
         else:
             if hov:
                 p.setBrush(QColor(255, 255, 255, 30))
                 p.drawEllipse(r)
-            col = QColor(255, 255, 255) if (self.active or hov) else QColor(255, 255, 255, 170)
-        if self.active and self.style_ != "dark":
-            p.setBrush(QColor(255, 255, 255, 235))
-            p.drawEllipse(QPointF(r.center().x(), r.bottom() - 2.5), 2, 2)
+            col = QColor(255, 255, 255) if (self.active or hov or self.kind in ("prev", "next")) else QColor(255, 255, 255, 165)
+            if self.active:
+                p.setBrush(QColor(255, 255, 255, 235))
+                p.drawEllipse(QPointF(r.center().x(), r.bottom() - 2.5), 2, 2)
         pad = r.width() * self.pad
         gr = r.adjusted(pad, pad, -pad, -pad)
         if down:
@@ -164,10 +209,10 @@ class IconBtn(QPushButton):
 
 
 class WaveSeek(QWidget):
-    """La onda de la canción: lo ya escuchado en blanco, lo que falta más tenue. Clic o arrastrar = ir a ese punto.
-    Los controles de reproducción van encima, en el centro."""
+    """Barra de avance con la forma de la canción (la onda): lo escuchado en blanco, lo que falta tenue, y un punto
+    donde va la canción. Clic o arrastrar = ir a ese punto."""
     seek = pyqtSignal(int)
-    BW, GAP = 5, 3
+    BW, GAP = 3, 2
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -175,39 +220,30 @@ class WaveSeek(QWidget):
         self.drag, self.hover = None, None
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedHeight(116)
-        self.btns = []
+        self.setFixedHeight(42)
 
     def set_levels(self, lv):
         self.levels = list(lv or [])
         self.update()
 
     def set_pos(self, pos, dur):
-        """Solo se repinta cuando cambia el número de barras ya escuchadas (no en cada aviso del reproductor:
-        repintar la ventanita transparente decenas de veces por segundo la ponía lenta)."""
+        """Solo se repinta cuando el punto avanza al menos un píxel (no en cada aviso del reproductor)."""
         self.pos, self.dur = pos or 0, dur or 0
-        n = self.geo()[0]
-        k = int((self.pos / self.dur if self.dur else 0.0) * n + 0.5)
+        _, x0, tw = self.geo()
+        k = int(x0 + tw * (self.pos / self.dur if self.dur else 0.0))
         if k != getattr(self, "_k", None) or self.drag is not None:
             self._k = k
             self.update()
 
     def geo(self):
-        n = max(16, int((self.width() + self.GAP) // (self.BW + self.GAP)))
+        w = self.width() - 12
+        n = max(16, int((w + self.GAP) // (self.BW + self.GAP)))
         tw = n * self.BW + (n - 1) * self.GAP
         return n, (self.width() - tw) / 2.0, tw
 
     def frac_at(self, x):
         _, x0, tw = self.geo()
         return min(1.0, max(0.0, (x - x0) / max(1.0, tw)))
-
-    def resizeEvent(self, e):
-        tot = sum(b.width() for b in self.btns) + 4 * (len(self.btns) - 1)
-        x = (self.width() - tot) // 2
-        for b in self.btns:
-            b.move(x, (self.height() - b.height()) // 2)
-            x += b.width() + 4
-        super().resizeEvent(e)
 
     def paintEvent(self, _):
         p = QPainter(self)
@@ -217,19 +253,25 @@ class WaveSeek(QWidget):
         lv = resample(self.levels, n)
         frac = self.drag if self.drag is not None else (self.pos / self.dur if self.dur else 0.0)
         hov = self.frac_at(self.hover) if self.hover is not None and self.drag is None else None
-        cy, maxh = self.height() / 2.0, self.height() - 6
+        cy, maxh = self.height() / 2.0, self.height() - 8
         for i, v in enumerate(lv):
             x = x0 + i * (self.BW + self.GAP)
             c = (x + self.BW / 2 - x0) / tw
-            bh = max(6.0, maxh * (0.14 + 0.86 * v))
+            bh = max(4.0, maxh * (0.12 + 0.88 * v))
             if c <= frac:
-                col = QColor(255, 255, 255, 240)
+                col = QColor(255, 255, 255, 235)
             elif hov is not None and c <= hov:
-                col = QColor(255, 255, 255, 150)
+                col = QColor(255, 255, 255, 130)
             else:
-                col = QColor(255, 255, 255, 80)
+                col = QColor(255, 255, 255, 64)
             p.setBrush(col)
             p.drawRoundedRect(QRectF(x, cy - bh / 2, self.BW, bh), self.BW / 2, self.BW / 2)
+        if self.dur:   # el punto (como la bolita de la barra del celular)
+            fx = x0 + tw * frac
+            p.setBrush(QColor(0, 0, 0, 70))
+            p.drawEllipse(QPointF(fx, cy + 1), 8.5, 8.5)
+            p.setBrush(QColor(255, 255, 255))
+            p.drawEllipse(QPointF(fx, cy), 7.5, 7.5)
 
     def mousePressEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton and self.dur:
@@ -258,48 +300,120 @@ class WaveSeek(QWidget):
         self.update()
 
 
-class Pill(QLabel):
-    """Tiempos en una pastilla negra con las puntas redondas (como en la imagen)."""
+class QualityRow(QWidget):
+    """[MP3]  44.1 kHz · 320 kbps  (Alta)  — igual que en la app del celular."""
 
-    def __init__(self, text=""):
-        super().__init__(text)
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("QLabel { color: white; background: transparent; padding: 4px 11px; font-size: 12px; "
-                           "font-weight: 800; }")
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.fmt, self.detail, self.lvl = "", "", 5
+        self.setFixedHeight(24)
 
-    def paintEvent(self, e):
+    def set(self, fmt, detail, lvl):
+        self.fmt, self.detail, self.lvl = fmt, detail, lvl
+        self.update()
+
+    def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(0, 0, 0, 220))
-        r = QRectF(self.rect())
-        p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
-        p.end()
-        super().paintEvent(e)
+        fb = QFont(self.font())
+        fb.setPixelSize(11)
+        fb.setBold(True)
+        fd = QFont(self.font())
+        fd.setPixelSize(12)
+        mb, md = QFontMetrics(fb), QFontMetrics(fd)
+        parts = []
+        if self.fmt:
+            parts.append(("chip", self.fmt, mb.horizontalAdvance(self.fmt) + 14))
+        if self.detail:
+            parts.append(("text", self.detail, md.horizontalAdvance(self.detail) + 16))
+        if self.lvl in QUALITY:
+            lab = T(QUALITY[self.lvl][0])
+            parts.append(("lvl", lab, mb.horizontalAdvance(lab) + 18))
+        total = sum(w for _k, _t, w in parts)
+        x = (self.width() - total) / 2
+        h = self.height()
+        for kind, text, w in parts:
+            if kind == "chip":
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(QColor(255, 255, 255, 36))
+                p.drawRoundedRect(QRectF(x, 3, w, h - 6), 5, 5)
+                p.setPen(QColor("white"))
+                p.setFont(fb)
+                p.drawText(QRectF(x, 0, w, h), Qt.AlignmentFlag.AlignCenter, text)
+            elif kind == "text":
+                p.setPen(QColor(255, 255, 255, 170))
+                p.setFont(fd)
+                p.drawText(QRectF(x, 0, w, h), Qt.AlignmentFlag.AlignCenter, text)
+            else:
+                col = QUALITY[self.lvl][1]
+                bg = QColor(col)
+                bg.setAlpha(48)
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(bg)
+                p.drawRoundedRect(QRectF(x, 2, w, h - 4), (h - 4) / 2, (h - 4) / 2)
+                p.setPen(col.lighter(115))
+                p.setFont(fb)
+                p.drawText(QRectF(x, 0, w, h), Qt.AlignmentFlag.AlignCenter, text)
+            x += w + 4
 
 
-class BottomBar(QWidget):
+class ActionBtn(QPushButton):
+    """Botón de la barra de abajo: icono y texto debajo (Cola, Letra, Ajustes, Editar, Calidad)."""
+
+    def __init__(self, kind, label):
+        super().__init__()
+        self.kind, self.label, self.active = kind, label, False
+        self.setFixedSize(58, 50)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFlat(True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+
+    def set_active(self, on):
+        self.active = bool(on)
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        if self.underMouse() or self.active:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(255, 255, 255, 40 if self.active else 24))
+            p.drawRoundedRect(r, 14, 14)
+        ic = QRectF(r.center().x() - 11, r.top() + 5 + (0.6 if self.isDown() else 0), 22, 22)
+        p.save()
+        icons.draw_glyph(p, self.kind, ic, QColor(255, 255, 255, 235 if (self.active or self.underMouse()) else 215))
+        p.restore()
+        f = QFont(self.font())
+        f.setPixelSize(10)
+        p.setFont(f)
+        p.setPen(QColor(255, 255, 255, 220 if self.active else 165))
+        p.drawText(QRectF(r.left(), r.top() + 29, r.width(), 16), Qt.AlignmentFlag.AlignCenter,
+                   QFontMetrics(f).elidedText(self.label, Qt.TextElideMode.ElideRight, int(r.width())))
+
+
+class ActionBar(QWidget):
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(0, 0, 0, 95))
-        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
+        p.setBrush(QColor(255, 255, 255, 20))
+        p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 22, 22)
 
 
 class Panel(QWidget):
-    """Letra o cola de reproducción encima de la portada, sobre un vidrio oscuro."""
+    """Letra encima de la portada, sobre un vidrio oscuro."""
 
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(0, 0, 0, 165))
+        p.setBrush(QColor(0, 0, 0, 190))
         p.drawRoundedRect(QRectF(self.rect()), 18, 18)
 
 
-KIND_R, KEY_R, TITLE_R, SUB_R, RIGHT_R = (Qt.ItemDataRole.UserRole + i for i in range(5))
+KIND_R, KEY_R, TITLE_R, SUB_R, RIGHT_R, REP_R = (Qt.ItemDataRole.UserRole + i for i in range(6))
 
 
 class LibraryWorker(QThread):
@@ -341,18 +455,20 @@ class LibraryWorker(QThread):
 
 
 class RowDelegate(QStyledItemDelegate):
-    """Fila de la biblioteca: icono redondo, título, subtítulo y (a la derecha) cuántas canciones."""
+    """Fila de la biblioteca: portada (o icono), título, subtítulo y, a la derecha, cuántas canciones."""
+    H = 56
 
     def __init__(self, page):
         super().__init__(page)
         self.page = page
 
     def sizeHint(self, opt, idx):
-        return QSize(max(10, opt.rect.width()), 46)
+        return QSize(max(10, opt.rect.width()), self.H)
 
     def paint(self, p, opt, idx):
         p.save()
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         r = QRectF(opt.rect).adjusted(2, 1, -4, -1)
         kind = idx.data(KIND_R)
         playing = kind == "song" and idx.data(KEY_R) == self.page.main.playing_path
@@ -360,15 +476,39 @@ class RowDelegate(QStyledItemDelegate):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(255, 255, 255, 34 if playing else 20))
             p.drawRoundedRect(r, 12, 12)
-        ic = QRectF(r.left() + 6, r.center().y() - 16, 32, 32)
+        ic = QRectF(r.left() + 5, r.center().y() - 21, 42, 42)
+        pm = self.page.pix.get(idx.data(REP_R)) if idx.data(REP_R) else None
+        path = QPainterPath()
+        if kind == "artist":
+            path.addEllipse(ic)
+        else:
+            path.addRoundedRect(ic, 8, 8)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(255, 255, 255, 235) if playing else QColor(255, 255, 255, 28))
-        p.drawEllipse(ic)
-        glyph = "eqbars" if playing else {"song": "note", "folder": "folder", "artist": "person",
-                                           "genre": "tag", "info": "info"}.get(kind, "note")
-        p.save()
-        icons.draw_glyph(p, glyph, ic.adjusted(8, 8, -8, -8), QColor(18, 18, 22) if playing else QColor(255, 255, 255, 215))
-        p.restore()
+        if pm is not None and not pm.isNull():
+            p.save()
+            p.setClipPath(path)
+            src = QRectF(pm.rect())
+            side = min(src.width(), src.height())
+            p.drawPixmap(ic, pm, QRectF(src.center().x() - side / 2, src.center().y() - side / 2, side, side))
+            p.restore()
+            if kind == "folder":   # carpetita sobre la portada, para distinguirla de una canción
+                b = QRectF(ic.right() - 17, ic.bottom() - 17, 19, 19)
+                p.setBrush(QColor(0, 0, 0, 185))
+                p.drawRoundedRect(b, 5, 5)
+                p.save()
+                icons.draw_glyph(p, "folder", b.adjusted(3, 3, -3, -3), QColor(255, 255, 255, 230))
+                p.restore()
+        else:
+            p.fillPath(path, QColor(255, 255, 255, 26))
+            glyph = {"song": "note", "folder": "folder", "artist": "person", "genre": "tag", "info": "info"}.get(kind, "note")
+            p.save()
+            icons.draw_glyph(p, glyph, ic.adjusted(11, 11, -11, -11), QColor(255, 255, 255, 200))
+            p.restore()
+        if playing:   # sonando: barritas encima de la portada
+            p.fillPath(path, QColor(0, 0, 0, 120))
+            p.save()
+            icons.draw_glyph(p, "eqbars", ic.adjusted(11, 11, -11, -11), QColor(255, 255, 255))
+            p.restore()
         right = idx.data(RIGHT_R) or ""
         f = QFont(opt.font)
         f.setPixelSize(11)
@@ -379,7 +519,7 @@ class RowDelegate(QStyledItemDelegate):
             p.setPen(QColor(255, 255, 255, 150))
             p.drawText(QRectF(r.right() - rw - 6, r.top(), rw, r.height()),
                        Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, right)
-        tx = ic.right() + 10
+        tx = ic.right() + 11
         tw = r.right() - rw - 8 - tx
         title, sub = idx.data(TITLE_R) or "", idx.data(SUB_R) or ""
         ft = QFont(opt.font)
@@ -390,11 +530,11 @@ class RowDelegate(QStyledItemDelegate):
         p.setFont(ft)
         p.setPen(QColor(255, 255, 255))
         if sub:
-            p.drawText(QRectF(tx, r.top() + 5, tw, 19), Qt.AlignmentFlag.AlignVCenter,
+            p.drawText(QRectF(tx, r.top() + 8, tw, 19), Qt.AlignmentFlag.AlignVCenter,
                        QFontMetrics(ft).elidedText(title, Qt.TextElideMode.ElideRight, int(tw)))
             p.setFont(fs)
             p.setPen(QColor(255, 255, 255, 150))
-            p.drawText(QRectF(tx, r.top() + 23, tw, 17), Qt.AlignmentFlag.AlignVCenter,
+            p.drawText(QRectF(tx, r.top() + 27, tw, 17), Qt.AlignmentFlag.AlignVCenter,
                        QFontMetrics(fs).elidedText(sub, Qt.TextElideMode.ElideRight, int(tw)))
         else:
             p.drawText(QRectF(tx, r.top(), tw, r.height()), Qt.AlignmentFlag.AlignVCenter,
@@ -418,7 +558,7 @@ class NowStrip(QWidget):
         self.lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         mini = page.mini
-        self.b_play = IconBtn("play", 38, "dark", 0.30)
+        self.b_play = IconBtn("play", 44, "white", 0.27)
         self.b_play.clicked.connect(mini.main.toggle_play)
         self.b_next = IconBtn("next", 34, pad=0.28)
         self.b_next.clicked.connect(lambda: mini.main.step_play(1))
@@ -481,6 +621,20 @@ class LibraryPage(QWidget):
         self.base, self.files, self.tags, self.loaded = None, [], {}, False
         self.worker, self.tab, self.stack = None, "songs", []
         self.read_pct = 0
+        self.pix, self.rep = {}, {}   # portadas pequeñas ya cargadas · canción que representa a cada carpeta
+        import thumbs
+        self.thumbs = thumbs.ThumbWorker(160, mini.inspect_file, mini.read_fn, mini.folder_img_fn)
+        self.thumbs.ready.connect(self.on_thumb)
+        self.thumbs.start()
+        self._tgen = 1
+        self._vis = QTimer(self)
+        self._vis.setSingleShot(True)
+        self._vis.setInterval(60)
+        self._vis.timeout.connect(self.request_visible)
+        self._repaint = QTimer(self)
+        self._repaint.setSingleShot(True)
+        self._repaint.setInterval(90)
+        self._repaint.timeout.connect(lambda: self.list.viewport().update())
         v = QVBoxLayout(self)
         v.setContentsMargins(14, 14, 14, 8)
         v.setSpacing(8)
@@ -556,10 +710,54 @@ class LibraryPage(QWidget):
             "QScrollBar::add-line, QScrollBar::sub-line { height: 0; }"
             "QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }")
         self.list.itemClicked.connect(self.on_click)
+        self.list.verticalScrollBar().valueChanged.connect(lambda _v: self._vis.start())
         v.addWidget(self.list, 1)
         self.strip = NowStrip(self)
         v.addWidget(self.strip)
         self.chips["songs"].setChecked(True)
+
+    # ------------------------------------------------------------ portadas de la lista
+    def request_visible(self):
+        """Pide las portadas de las filas que se ven (y unas cuantas más abajo), las primeras primero."""
+        n = self.list.count()
+        if not n or not self.isVisible():
+            return
+        vp = self.list.viewport()
+        first = self.list.indexAt(QPoint(8, 4)).row()
+        last = self.list.indexAt(QPoint(8, vp.height() - 4)).row()
+        first = max(0, first)
+        last = n - 1 if last < 0 else last
+        want = []
+        meta = getattr(self.main, "meta", {}) or {}
+        for i in range(first, min(n, last + 14)):
+            p = self.list.item(i).data(REP_R)
+            if not p or p in self.pix or p in want:
+                continue
+            m = meta.get(p)
+            if m and m.get("icon") is not None:   # el editor ya la tenía
+                self.pix[p] = m["icon"].pixmap(84, 84)
+                continue
+            want.append(p)
+        if want:
+            self._tgen += 1
+            self.thumbs.request(self._tgen, want)
+        else:
+            self.list.viewport().update()
+
+    def on_thumb(self, gen, path, img, lyrics, tags):
+        if img is not None and not img.isNull():
+            self.pix[path] = QPixmap.fromImage(img.scaled(84, 84, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                                                          Qt.TransformationMode.SmoothTransformation))
+        else:
+            self.pix[path] = None
+        if not self._repaint.isActive():
+            self._repaint.start()
+
+    def shutdown(self):
+        for w in list(getattr(self, "_workers", ())):
+            w.requestInterruption()
+            w.wait(2000)
+        self.thumbs.stop()
 
     def paintEvent(self, _):
         p = QPainter(self)
@@ -576,6 +774,7 @@ class LibraryPage(QWidget):
         p.fillRect(r, QBrush(g))
 
     def showEvent(self, e):
+        self._vis.start()
         self.strip.update_now()
         QTimer.singleShot(0, self.strip.update_now)   # cuando ya tiene su ancho (para recortar bien los textos)
         super().showEvent(e)
@@ -632,7 +831,7 @@ class LibraryPage(QWidget):
 
     def index_folders(self):
         """Cuántas canciones hay en cada carpeta (contando sus subcarpetas) y qué subcarpetas tiene cada una."""
-        self.fcount, self.children, self.direct = {}, {}, {}
+        self.fcount, self.children, self.direct, self.rep = {}, {}, {}, {}
         base = os.path.normpath(self.base)
         for f in self.files:
             d = os.path.dirname(f)
@@ -640,6 +839,7 @@ class LibraryPage(QWidget):
             cur = d
             while True:
                 self.fcount[cur] = self.fcount.get(cur, 0) + 1
+                self.rep.setdefault(cur, f)   # la portada de la carpeta = la de su primera canción
                 if os.path.normpath(cur) == base:
                     break
                 par = os.path.dirname(cur)
@@ -709,7 +909,7 @@ class LibraryPage(QWidget):
         sub = " · ".join(x for x in (a, al) if x)
         if not sub or show_folder:
             sub = sub or os.path.basename(os.path.dirname(f))
-        return ("song", f, title, sub, "")
+        return ("song", f, title, sub, "", f)
 
     def update_sub(self):
         n = len(self.files)
@@ -759,7 +959,7 @@ class LibraryPage(QWidget):
                 subs = sorted(self.children.get(folder, ()), key=lambda d: os.path.basename(d).lower())
                 self._shown_groups = len(subs)
                 for d in subs:
-                    rows.append(("folder", d, os.path.basename(d), "", str(self.fcount.get(d, 0))))
+                    rows.append(("folder", d, os.path.basename(d), "", str(self.fcount.get(d, 0)), self.rep.get(d)))
                 rows += [self.song_row(f) for f in self.direct.get(folder, [])]
             else:
                 idx = 1 if self.tab == "artists" else 3
@@ -767,9 +967,11 @@ class LibraryPage(QWidget):
                 self._shown_groups = len(gr)
                 for name in sorted(gr, key=lambda n: (n == "", n.lower())):
                     rows.append(("artist" if idx == 1 else "genre", name,
-                                 name or (T("(sin artista)") if idx == 1 else T("(sin género)")), "", str(len(gr[name]))))
+                                 name or (T("(sin artista)") if idx == 1 else T("(sin género)")), "", str(len(gr[name])),
+                                 gr[name][0]))
                 if not self.loaded:
-                    rows.insert(0, ("info", "", T("Leyendo etiquetas…"), T(f"{self.read_pct} % — la lista se completa sola"), ""))
+                    rows.insert(0, ("info", "", T("Leyendo etiquetas…"), T(f"{self.read_pct} % — la lista se completa sola"),
+                                    "", None))
         if q:
             rows = [r for r in rows if r[0] == "info" or q in r[2].lower() or q in r[3].lower()
                     or (r[0] == "song" and q in os.path.basename(r[1]).lower())]
@@ -777,8 +979,9 @@ class LibraryPage(QWidget):
         self._shown_rows = sum(1 for r in rows if r[0] != "info")
         self.list.setUpdatesEnabled(False)
         self.list.clear()
-        for kind, key, title, sub, right in rows:
+        for kind, key, title, sub, right, rp in rows:
             it = QListWidgetItem()
+            it.setData(REP_R, rp)
             it.setData(KIND_R, kind)
             it.setData(KEY_R, key)
             it.setData(TITLE_R, title)
@@ -789,6 +992,7 @@ class LibraryPage(QWidget):
             self.list.addItem(it)
         self.list.setUpdatesEnabled(True)
         self.update_sub()
+        self._vis.start()
         if not self.files:
             empty = QListWidgetItem()
             empty.setData(KIND_R, "info")
@@ -798,13 +1002,15 @@ class LibraryPage(QWidget):
 
 
 class MiniPlayer(QWidget):
+    """Diseño como el reproductor de la app del celular (portada en tarjeta, título, calidad, barra de avance,
+    controles y barra de acciones), con el fondo que mezcla y difumina los colores de la portada."""
     BASE_W = 330
-    BOTTOM = 340   # alto de la parte de abajo (título, onda, controles, barra)
+    EXTRA = 386   # alto que no es la portada (barra de arriba, textos, onda, controles, acciones)
 
-    def __init__(self, main, inspect_file=None, tech_fn=None, read_fn=None, exts=None):
+    def __init__(self, main, inspect_file=None, tech_fn=None, read_fn=None, exts=None, folder_img_fn=None):
         super().__init__(None, Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.main, self.inspect_file, self.tech_fn = main, inspect_file, tech_fn
-        self.read_fn = read_fn
+        self.read_fn, self.folder_img_fn = read_fn, folder_img_fn
         self.exts = set(exts or {".mp3", ".flac", ".ogg", ".oga", ".opus", ".m4a", ".mp4"})
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setWindowTitle("Music Manager")
@@ -815,140 +1021,141 @@ class MiniPlayer(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.path, self.img = None, None
         self.col, self.col2 = pick_colors(None)
-        self.blur, self._layer, self._layer_key = None, None, None
-        self._bg, self._bg_key = None, None
+        self.blur, self._bg, self._bg_key = None, None, None
         self.noise = make_noise()
         self.lrc, self.lrc_idx, self.plain = [], -1, ""
         self._press, self._moved, self._drag_off = None, False, None
+        self.tech_text = ""
         self.top = bool(int(main.cfg.value("mini_top", 0) or 0))
         if self.top:
             self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
 
         scr = QGuiApplication.primaryScreen()
         ah = scr.availableGeometry().height() if scr is not None else 900
-        self.W = max(250, min(self.BASE_W, ah - self.BOTTOM - 2 * M - 8))
-        self.H = self.W + self.BOTTOM
+        self.W = max(270, min(self.BASE_W, ah - 2 * M - 8 - self.EXTRA + 52))
+        self.S = self.W - 52                       # lado de la portada
+        self.H = self.S + self.EXTRA
         self.setFixedSize(self.W + 2 * M, self.H + 2 * M)
+        self.cover_rect = QRectF(M + 26, M + 8 + 46 + 6, self.S, self.S)
 
         v = QVBoxLayout(self)
-        v.setContentsMargins(M + 18, M + self.W - 16, M + 18, M + 14)
-        v.setSpacing(4)
+        v.setContentsMargins(M + 12, M + 8, M + 12, M + 12)
+        v.setSpacing(0)
+        # ---- barra de arriba
+        topw = QWidget()
+        topw.setFixedHeight(46)
+        th = QHBoxLayout(topw)
+        th.setContentsMargins(0, 0, 0, 0)
+        self.b_down = IconBtn("chevron_d", 40, pad=0.25)
+        self.b_down.setToolTip(T("Volver al editor (Esc)"))
+        self.b_down.clicked.connect(self.main.exit_mini)
+        cap = QVBoxLayout()
+        cap.setSpacing(0)
+        self.cap1 = QLabel(T("REPRODUCIENDO"))
+        self.cap1.setStyleSheet("QLabel { color: rgba(255,255,255,160); font-size: 11px; letter-spacing: 2px; "
+                                "background: transparent; }")
+        self.cap2 = QLabel("")
+        self.cap2.setStyleSheet("QLabel { color: rgba(255,255,255,220); font-size: 12px; font-weight: 600; "
+                                "background: transparent; }")
+        for l in (self.cap1, self.cap2):
+            l.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            l.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            cap.addWidget(l)
+        self.b_more = IconBtn("morev", 40, pad=0.27)
+        self.b_more.setToolTip(T("Más opciones"))
+        self.b_more.clicked.connect(lambda: self.show_menu(self.b_more.mapToGlobal(QPoint(0, self.b_more.height()))))
+        th.addWidget(self.b_down)
+        th.addLayout(cap, 1)
+        th.addWidget(self.b_more)
+        v.addWidget(topw)
+        v.addSpacing(6 + self.S + 18)   # la portada se dibuja en el fondo (así no se redibuja a cada rato)
+        # ---- título, artista y calidad
         self.title = QLabel("—")
-        self.title.setStyleSheet("QLabel { color: white; font-size: 19px; font-weight: 800; background: transparent; }")
+        self.title.setStyleSheet("QLabel { color: white; font-size: 20px; font-weight: 800; background: transparent; }")
         self.sub = QLabel("")
-        self.sub.setStyleSheet("QLabel { color: rgba(255,255,255,215); font-size: 13px; font-weight: 600; "
-                               "background: transparent; }")
+        self.sub.setStyleSheet("QLabel { color: rgba(255,255,255,205); font-size: 14px; background: transparent; }")
         for l in (self.title, self.sub):
             l.setAlignment(Qt.AlignmentFlag.AlignCenter)
             l.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         v.addWidget(self.title)
-        v.addWidget(self.sub)
-        v.addSpacing(6)
-
-        row = QHBoxLayout()
-        row.setSpacing(4)
-        self.b_lyr = IconBtn("lyrics", 34)
-        self.b_lyr.setToolTip(T("Letra (o clic en la portada)"))
-        self.b_lyr.clicked.connect(lambda: self.show_panel("lyrics"))
-        self.badge = QLabel("")
-        self.badge.setStyleSheet("QLabel { color: rgba(255,255,255,225); font-size: 11px; font-weight: 800; "
-                                 "background: transparent; }")
-        self.b_shuffle = IconBtn("shuffle", 34)
-        self.b_shuffle.setToolTip(T("Aleatorio"))
-        self.b_shuffle.clicked.connect(self.toggle_shuffle)
-        self.b_repeat = IconBtn("loop", 34)
-        self.b_repeat.setToolTip(T("Repetir: no / todas / una"))
-        self.b_repeat.clicked.connect(self.cycle_repeat)
-        row.addWidget(self.b_lyr)
-        row.addSpacing(10)
-        row.addWidget(self.badge)
-        row.addStretch(1)
-        row.addWidget(self.b_shuffle)
-        row.addSpacing(8)
-        row.addWidget(self.b_repeat)
-        v.addLayout(row)
         v.addSpacing(2)
-
+        v.addWidget(self.sub)
+        v.addSpacing(8)
+        self.quality = QualityRow()
+        v.addWidget(self.quality)
+        v.addSpacing(8)
+        # ---- barra de avance (la onda) y tiempos
         self.wave = WaveSeek()
         self.wave.seek.connect(self.do_seek)
-        self.b_rew = IconBtn("rew", 44, "dark", 0.29, self.wave)
-        self.b_prev = IconBtn("prev", 54, "dark", 0.30, self.wave)
-        self.b_play = IconBtn("play", 68, "dark", 0.30, self.wave)
-        self.b_next = IconBtn("next", 54, "dark", 0.30, self.wave)
-        self.b_ffw = IconBtn("ffw", 44, "dark", 0.29, self.wave)
-        self.wave.btns = [self.b_rew, self.b_prev, self.b_play, self.b_next, self.b_ffw]
-        self.b_rew.setToolTip(T("Retroceder 10 s"))
-        self.b_prev.setToolTip(T("Anterior"))
-        self.b_play.setToolTip(T("Reproducir / pausa (Espacio)"))
-        self.b_next.setToolTip(T("Siguiente"))
-        self.b_ffw.setToolTip(T("Adelantar 10 s"))
-        self.b_rew.clicked.connect(lambda: self.skip(-10000))
-        self.b_ffw.clicked.connect(lambda: self.skip(10000))
-        self.b_prev.clicked.connect(lambda: self.main.step_play(-1))
-        self.b_next.clicked.connect(lambda: self.main.step_play(1))
-        self.b_play.clicked.connect(self.main.toggle_play)
         v.addWidget(self.wave)
-
         tr_ = QHBoxLayout()
-        self.t_pos, self.t_dur = Pill("0:00"), Pill("0:00")
+        tr_.setContentsMargins(4, 0, 4, 0)
+        self.t_pos, self.t_left = QLabel("0:00"), QLabel("-0:00")
+        for l in (self.t_pos, self.t_left):
+            l.setStyleSheet("QLabel { color: rgba(255,255,255,190); font-size: 12px; background: transparent; }")
         tr_.addWidget(self.t_pos)
         tr_.addStretch(1)
-        tr_.addWidget(self.t_dur)
+        tr_.addWidget(self.t_left)
         v.addLayout(tr_)
-        self.tech = QLabel("")
-        self.tech.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.tech.setStyleSheet("QLabel { color: rgba(255,255,255,230); font-size: 11px; font-weight: 800; "
-                                "letter-spacing: 1px; background: transparent; }")
-        v.addWidget(self.tech)
+        v.addSpacing(2)
+        # ---- controles
+        ctr = QHBoxLayout()
+        ctr.setContentsMargins(0, 0, 0, 0)
+        self.b_shuffle = IconBtn("shuffle", 42, pad=0.25)
+        self.b_shuffle.setToolTip(T("Aleatorio"))
+        self.b_shuffle.clicked.connect(self.toggle_shuffle)
+        self.b_prev = IconBtn("prev", 54, pad=0.25)
+        self.b_prev.setToolTip(T("Anterior"))
+        self.b_prev.clicked.connect(lambda: self.main.step_play(-1))
+        self.b_play = IconBtn("play", 88, "white", 0.27)
+        self.b_play.setToolTip(T("Reproducir / pausa (Espacio)"))
+        self.b_play.clicked.connect(self.main.toggle_play)
+        self.b_next = IconBtn("next", 54, pad=0.25)
+        self.b_next.setToolTip(T("Siguiente"))
+        self.b_next.clicked.connect(lambda: self.main.step_play(1))
+        self.b_repeat = IconBtn("loop", 42, pad=0.25)
+        self.b_repeat.setToolTip(T("Repetir: no / todas / una"))
+        self.b_repeat.clicked.connect(self.cycle_repeat)
+        for i, b in enumerate((self.b_shuffle, self.b_prev, self.b_play, self.b_next, self.b_repeat)):
+            if i:
+                ctr.addStretch(1)
+            ctr.addWidget(b)
+        v.addLayout(ctr)
         v.addStretch(1)
-
-        self.bar = BottomBar()
-        self.bar.setFixedHeight(52)
+        # ---- barra de acciones
+        self.bar = ActionBar()
+        self.bar.setFixedHeight(56)
         bh = QHBoxLayout(self.bar)
-        bh.setContentsMargins(14, 0, 14, 0)
-        self.b_editor = IconBtn("grid", 40, pad=0.25)
-        self.b_editor.setToolTip(T("Biblioteca: todas las canciones, carpetas, artistas y géneros"))
-        self.b_editor.clicked.connect(self.toggle_library)
-        self.b_fx = IconBtn("eqbars", 40, pad=0.26)
-        self.b_fx.setToolTip(T("Ajustes de la canción: graves, agudos, tempo, tono, velocidad, bucle, eco…"))
-        self.b_fx.clicked.connect(self.main.open_fx)
-        self.b_vol = IconBtn("vol2", 40, pad=0.25)
-        self.b_vol.setToolTip(T("Clic: silenciar · rueda del ratón: volumen"))
-        self.b_vol.clicked.connect(self.main.toggle_mute)
-        self.b_list = IconBtn("menu", 40, pad=0.26)
-        self.b_list.setToolTip(T("Cola de reproducción"))
-        self.b_list.clicked.connect(lambda: self.show_panel("queue"))
-        for b in (self.b_editor, self.b_fx, self.b_vol, self.b_list):
-            bh.addWidget(b)
-            if b is not self.b_list:
+        bh.setContentsMargins(6, 3, 6, 3)
+        bh.setSpacing(0)
+        self.a_queue = ActionBtn("queue", T("Cola"))
+        self.a_queue.setToolTip(T("Todas las canciones, carpetas, artistas y géneros"))
+        self.a_queue.clicked.connect(self.toggle_library)
+        self.a_lyr = ActionBtn("mic", T("Letra"))
+        self.a_lyr.setToolTip(T("Letra de la canción (L)"))
+        self.a_lyr.clicked.connect(self.toggle_lyrics)
+        self.a_fx = ActionBtn("eqbars", T("Ajustes"))
+        self.a_fx.setToolTip(T("Ajustes de la canción: graves, agudos, tempo, tono, velocidad, bucle, eco…"))
+        self.a_fx.clicked.connect(self.main.open_fx)
+        self.a_edit = ActionBtn("edit", T("Editar"))
+        self.a_edit.setToolTip(T("Editar los datos y la portada de esta canción en el editor"))
+        self.a_edit.clicked.connect(self.edit_song)
+        self.a_q = ActionBtn("wave", T("Calidad"))
+        self.a_q.setToolTip(T("Espectrograma y análisis de calidad de esta canción"))
+        self.a_q.clicked.connect(self.quality_song)
+        for i, b in enumerate((self.a_queue, self.a_lyr, self.a_fx, self.a_edit, self.a_q)):
+            if i:
                 bh.addStretch(1)
+            bh.addWidget(b)
         v.addWidget(self.bar)
 
-        # botones sobre la portada (aparecen al pasar el ratón)
-        self.b_pin = IconBtn("pin", 30, "glass", 0.24, self)
-        self.b_pin.setToolTip(T("Siempre encima de las demás ventanas"))
-        self.b_pin.clicked.connect(lambda: self.set_top(not self.top))
-        self.b_pin.set_active(self.top)
-        self.b_min = IconBtn("minus", 30, "glass", 0.24, self)
-        self.b_min.setToolTip(T("Minimizar"))
-        self.b_min.clicked.connect(self.showMinimized)
-        self.b_full = IconBtn("expand", 30, "glass", 0.24, self)
-        self.b_full.setToolTip(T("Volver al editor (Esc)"))
-        self.b_full.clicked.connect(self.main.exit_mini)
-        self.b_pin.move(M + 14, M + 14)
-        self.b_full.move(M + self.W - 14 - 30, M + 14)
-        self.b_min.move(M + self.W - 14 - 30 - 36, M + 14)
-        self.top_btns = (self.b_pin, self.b_min, self.b_full)
-        for b in self.top_btns:
-            b.hide()
-
-        # letra / cola encima de la portada
+        # ---- letra encima de la portada
         self.panel = Panel(self)
-        self.panel.setGeometry(M + 12, M + 52, self.W - 24, self.W - 80)
+        self.panel.setGeometry(self.cover_rect.toRect())
         pv = QVBoxLayout(self.panel)
         pv.setContentsMargins(14, 10, 8, 10)
         pv.setSpacing(4)
-        self.p_head = QLabel("")
+        self.p_head = QLabel(T("LETRA"))
         self.p_head.setStyleSheet("QLabel { color: rgba(255,255,255,165); font-size: 10px; font-weight: 800; "
                                   "letter-spacing: 1px; background: transparent; }")
         pv.addWidget(self.p_head)
@@ -958,26 +1165,12 @@ class MiniPlayer(QWidget):
         self.lyr.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.lyr.setStyleSheet("QTextBrowser { background: transparent; color: rgba(255,255,255,175); font-size: 14px; "
                                "border: none; }")
-        self.queue = QListWidget()
-        self.queue.setFrameShape(QFrame.Shape.NoFrame)
-        self.queue.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.queue.setStyleSheet(
-            "QListWidget { background: transparent; color: rgba(255,255,255,205); font-size: 12px; border: none; outline: none; }"
-            "QListWidget::item { padding: 6px 4px; border-radius: 8px; }"
-            "QListWidget::item:hover { background: rgba(255,255,255,24); }"
-            "QListWidget::item:selected { background: rgba(255,255,255,42); color: white; }"
-            "QScrollBar:vertical { background: transparent; width: 6px; }"
-            "QScrollBar::handle:vertical { background: rgba(255,255,255,80); border-radius: 3px; min-height: 30px; }"
-            "QScrollBar::add-line, QScrollBar::sub-line { height: 0; }")
-        self.queue.itemDoubleClicked.connect(self.play_from_queue)
         pv.addWidget(self.lyr, 1)
-        pv.addWidget(self.queue, 1)
         self.panel.hide()
-        self.panel_kind = None
 
-        # biblioteca (todas las canciones, carpetas, artistas, géneros): ocupa todo menos la barra de abajo
+        # ---- biblioteca («Cola»): ocupa todo menos la barra de acciones
         self.lib = LibraryPage(self)
-        self.lib.setGeometry(M, M, self.W, self.H - 14 - 52 - 8)
+        self.lib.setGeometry(M, M, self.W, self.H - 12 - 56 - 8)
         self.lib.hide()
 
         self._save_pos = QTimer(self)
@@ -986,15 +1179,13 @@ class MiniPlayer(QWidget):
         self._save_pos.timeout.connect(lambda: self.main.cfg.setValue("mini_pos", f"{self.x()},{self.y()}"))
         self._toast = QTimer(self)
         self._toast.setSingleShot(True)
-        self._toast.timeout.connect(self.show_tech)
-        self.tech_text = ""
+        self._toast.timeout.connect(self.update_caption)
 
         pl = main.player
         if pl is not None:
             pl.positionChanged.connect(self.on_pos)
             pl.durationChanged.connect(self.on_dur)
             pl.playbackStateChanged.connect(self.on_state)
-        main.vol.valueChanged.connect(self.sync_vol)
 
     # ------------------------------------------------------------ colocar en pantalla
     def place_initial(self, main_geo):
@@ -1026,54 +1217,16 @@ class MiniPlayer(QWidget):
         if vis:
             self.move(pos)
             self.show()
-        self.b_pin.set_active(self.top)
 
-    # ------------------------------------------------------------ dibujo
+    # ------------------------------------------------------------ fondo (se dibuja una vez por canción)
     def card(self):
         return QRectF(M, M, self.W, self.H)
 
-    def cover_layer(self):
-        """La portada nítida que se va volviendo transparente hacia abajo y se funde con el fondo."""
-        dpr = self.devicePixelRatioF()
-        key = (id(self.img), self.W, dpr)
-        if self._layer_key == key:
-            return self._layer
-        side = self.W
-        pm = QPixmap(int(side * dpr), int(side * dpr))
-        pm.setDevicePixelRatio(dpr)
-        pm.fill(Qt.GlobalColor.transparent)
-        q = QPainter(pm)
-        q.setRenderHint(QPainter.RenderHint.Antialiasing)
-        q.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        if self.img is not None and not self.img.isNull():
-            sc = self.img.scaled(int(side * dpr), int(side * dpr), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                                 Qt.TransformationMode.SmoothTransformation)
-            sx, sy = (sc.width() - side * dpr) / 2, (sc.height() - side * dpr) / 2
-            q.drawImage(QRectF(0, 0, side, side), sc, QRectF(sx, sy, side * dpr, side * dpr))
-        else:   # sin portada: degradado con una nota
-            g = QRadialGradient(QPointF(side * 0.35, side * 0.3), side * 0.9)
-            g.setColorAt(0, QColor(150, 110, 255))
-            g.setColorAt(1, QColor(46, 38, 72))
-            q.fillRect(QRectF(0, 0, side, side), QBrush(g))
-            icons.draw_glyph(q, "note", QRectF(side * 0.33, side * 0.22, side * 0.34, side * 0.34), QColor(255, 255, 255, 120))
-            q.resetTransform()
-        q.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
-        g = QLinearGradient(0, 0, 0, side)
-        g.setColorAt(0.0, QColor(0, 0, 0, 255))
-        g.setColorAt(0.50, QColor(0, 0, 0, 255))
-        g.setColorAt(0.78, QColor(0, 0, 0, 120))
-        g.setColorAt(1.0, QColor(0, 0, 0, 0))
-        q.fillRect(QRectF(0, 0, side, side), QBrush(g))
-        q.end()
-        self._layer, self._layer_key = pm, key
-        return pm
-
     def bg_pixmap(self):
-        """Todo el fondo (sombra, colores, portada difuminada, grano) se dibuja UNA vez en una imagen; al repintar
-        solo se copia el trozo necesario. Antes se redibujaba entero en cada aviso del reproductor y se trababa."""
+        """Sombra, degradado con los colores de la portada, la portada muy difuminada que se mezcla con el fondo,
+        grano y la portada nítida en su tarjeta. Todo en una imagen: al repintar solo se copia el trozo necesario."""
         dpr = self.devicePixelRatioF()
-        dim = self.b_full.isVisible() or self.panel.isVisible() or self.lib.isVisible()
-        key = (id(self.img), self.W, self.H, dpr, dim)
+        key = (id(self.img), self.W, self.H, dpr)
         if self._bg_key == key and self._bg is not None:
             return self._bg
         pm = QPixmap(int(self.width() * dpr), int(self.height() * dpr))
@@ -1084,7 +1237,7 @@ class MiniPlayer(QWidget):
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         r = self.card()
         p.setPen(Qt.PenStyle.NoPen)
-        for i in range(M, 0, -1):   # sombra suave alrededor
+        for i in range(M, 0, -1):   # sombra suave alrededor de la ventanita
             p.setBrush(QColor(0, 0, 0, 7))
             p.drawRoundedRect(r.adjusted(-i * 0.8, -i * 0.5, i * 0.8, i * 1.0), RADIUS + i, RADIUS + i)
         path = QPainterPath()
@@ -1092,26 +1245,58 @@ class MiniPlayer(QWidget):
         p.setClipPath(path)
         g = QLinearGradient(0, r.top(), 0, r.bottom())
         g.setColorAt(0.0, self.col)
-        g.setColorAt(0.55, self.col)
-        g.setColorAt(1.0, self.col2)
+        g.setColorAt(0.48, self.col2)
+        g.setColorAt(1.0, QColor(14, 14, 20))
         p.fillRect(r, QBrush(g))
-        if self.blur is not None:   # la portada muy difuminada mezclada con el color: el fondo no queda plano
-            p.setOpacity(0.30)
-            p.drawPixmap(r.toRect(), self.blur)
+        if self.blur is not None:   # la portada enorme y difuminada, que se desvanece hacia abajo (la «mezcla»)
+            lay = QPixmap(pm.size())
+            lay.setDevicePixelRatio(dpr)
+            lay.fill(Qt.GlobalColor.transparent)
+            q = QPainter(lay)
+            q.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            q.drawPixmap(QRectF(r.left() - 40, r.top() - 30, r.width() + 80, r.height() * 0.95), self.blur,
+                         QRectF(self.blur.rect()))
+            q.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
+            fade = QLinearGradient(0, r.top(), 0, r.top() + r.height() * 0.78)
+            fade.setColorAt(0.0, QColor(0, 0, 0, 255))
+            fade.setColorAt(0.45, QColor(0, 0, 0, 200))
+            fade.setColorAt(1.0, QColor(0, 0, 0, 0))
+            q.fillRect(QRectF(0, 0, self.width(), self.height()), QBrush(fade))
+            q.end()
+            p.setOpacity(0.62)
+            p.drawPixmap(0, 0, lay)
             p.setOpacity(1.0)
-        g2 = QLinearGradient(0, r.top() + self.W * 0.7, 0, r.bottom())
-        g2.setColorAt(0, QColor(0, 0, 0, 0))
-        g2.setColorAt(1, QColor(0, 0, 0, 80))
+        g2 = QLinearGradient(0, r.top(), 0, r.bottom())   # un poco más oscuro arriba y abajo: el texto se lee bien
+        g2.setColorAt(0.0, QColor(0, 0, 0, 70))
+        g2.setColorAt(0.25, QColor(0, 0, 0, 10))
+        g2.setColorAt(0.6, QColor(0, 0, 0, 30))
+        g2.setColorAt(1.0, QColor(0, 0, 0, 110))
         p.fillRect(r, QBrush(g2))
-        p.drawPixmap(QPointF(r.left(), r.top()), self.cover_layer())
-        if dim:   # oscurece un poco arriba para que se vean los botones
-            g3 = QLinearGradient(0, r.top(), 0, r.top() + 80)
-            g3.setColorAt(0, QColor(0, 0, 0, 110))
-            g3.setColorAt(1, QColor(0, 0, 0, 0))
-            p.fillRect(QRectF(r.left(), r.top(), r.width(), 80), QBrush(g3))
         p.setOpacity(0.045)   # grano
         p.drawTiledPixmap(r.toRect(), self.noise)
         p.setOpacity(1.0)
+        # portada en su tarjeta, con sombra
+        cr = self.cover_rect
+        for i in range(14, 0, -1):
+            p.setBrush(QColor(0, 0, 0, 9))
+            p.drawRoundedRect(cr.adjusted(-i * 0.7, -i * 0.3, i * 0.7, i * 1.1), 18 + i, 18 + i)
+        cp = QPainterPath()
+        cp.addRoundedRect(cr, 18, 18)
+        p.save()
+        p.setClipPath(cp)
+        if self.img is not None:
+            sc = self.img.scaled(int(cr.width() * dpr), int(cr.height() * dpr), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                                 Qt.TransformationMode.SmoothTransformation)
+            sx, sy = (sc.width() - cr.width() * dpr) / 2, (sc.height() - cr.height() * dpr) / 2
+            p.drawImage(cr, sc, QRectF(sx, sy, cr.width() * dpr, cr.height() * dpr))
+        else:
+            rg = QRadialGradient(QPointF(cr.left() + cr.width() * 0.35, cr.top() + cr.height() * 0.3), cr.width())
+            rg.setColorAt(0, QColor(70, 62, 100))
+            rg.setColorAt(1, QColor(34, 34, 46))
+            p.fillRect(cr, QBrush(rg))
+            icons.draw_glyph(p, "note", cr.adjusted(cr.width() * 0.33, cr.height() * 0.33, -cr.width() * 0.33,
+                                                    -cr.height() * 0.33), QColor(255, 255, 255, 80))
+        p.restore()
         p.setClipping(False)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.setPen(QColor(255, 255, 255, 22))
@@ -1132,13 +1317,13 @@ class MiniPlayer(QWidget):
         self.img = img if img is not None and not img.isNull() else None
         self.col, self.col2 = pick_colors(self.img)
         if self.img is not None:
-            tiny = self.img.scaled(6, 10, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            mid = tiny.scaled(36, 60, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            self.blur = QPixmap.fromImage(mid.scaled(self.W, self.H, Qt.AspectRatioMode.IgnoreAspectRatio,
+            tiny = self.img.scaled(8, 8, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            mid = tiny.scaled(40, 40, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.blur = QPixmap.fromImage(mid.scaled(240, 240, Qt.AspectRatioMode.IgnoreAspectRatio,
                                                      Qt.TransformationMode.SmoothTransformation))
         else:
             self.blur = None
-        self._layer_key = None
+        self.b_play.glow = QColor(self.col).lighter(150)
         self._bg_key = None
 
     def track_changed(self, path):
@@ -1146,28 +1331,34 @@ class MiniPlayer(QWidget):
         m = self.main
         if not path:
             self.title.setText(T("Nada sonando"))
-            self.sub.setText(T("Pulsa reproducir o vuelve al editor para elegir"))
+            self.sub.setText(T("Toca «Cola» para elegir una canción"))
             self.set_cover(None)
-            self.tech_text, self.badge_text = "", ""
-            self.badge.setText("")
-            self.show_tech()
+            self.quality.set("", "", 5)
             self.wave.set_levels([])
+            self.update_caption()
+            self.sync_all()
             self.update()
             return
         title = m.val(path, "title") or os.path.splitext(os.path.basename(path))[0]
-        sub = " - ".join(x for x in (m.val(path, "artist"), m.val(path, "album")) if x)
+        artist = m.val(path, "artist") or T("Artista desconocido")
         wmax = self.W - 40
         self.title.setText(self.title.fontMetrics().elidedText(title, Qt.TextElideMode.ElideRight, wmax))
         self.title.setToolTip(title)
-        self.sub.setText(self.sub.fontMetrics().elidedText(sub, Qt.TextElideMode.ElideRight, wmax))
-        self.sub.setToolTip(sub)
+        self.sub.setText(self.sub.fontMetrics().elidedText(artist, Qt.TextElideMode.ElideRight, wmax))
+        album = m.val(path, "album")
+        self.sub.setToolTip(" - ".join(x for x in (artist, album) if x))
         data = None
         try:
             data = m.cover_data_of(path)
         except Exception:
             pass
         self.set_cover(QImage.fromData(data) if data else None)
-        self.fill_tech(path)
+        info = {}
+        try:
+            info = self.tech_fn(path) if self.tech_fn else {}
+        except Exception:
+            info = {}
+        self.quality.set(*quality_of(info))
         try:
             pend = m.pending.get(path, {})
             text = pend.get("lyrics")
@@ -1177,18 +1368,29 @@ class MiniPlayer(QWidget):
             text = ""
         self.lrc, self.plain = parse_lyrics(text or "")
         self.lrc_idx = -1
-        if self.panel_kind == "lyrics":
+        if self.panel.isVisible():
             self.render_lyrics()
-        elif self.panel_kind == "queue":
-            self.fill_queue()
         viz = getattr(m, "viz", None)
         arr = getattr(viz, "data", None)
         lv = envelope(arr) if arr is not None else []
         self.wave.set_levels(lv or placeholder_wave(path))
+        self.update_caption()
         self.sync_all()
         self.lib.list.viewport().update()
         self.lib.strip.update_now()
         self.update()
+
+    def update_caption(self):
+        """«1483 de 3786»: qué número es la canción en la lista que se está recorriendo."""
+        self.cap1.setText(T("REPRODUCIENDO"))
+        txt = ""
+        try:
+            seq, _ = self.main.play_seq()
+            if self.path in seq:
+                txt = T(f"{seq.index(self.path) + 1} de {len(seq)}")
+        except Exception:
+            pass
+        self.cap2.setText(txt)
 
     def set_viz(self, path, arr):
         """Llega el análisis del audio de la canción que suena: la onda pasa a ser la real."""
@@ -1197,100 +1399,21 @@ class MiniPlayer(QWidget):
             if lv:
                 self.wave.set_levels(lv)
 
-    def fill_tech(self, path):
-        info = {}
-        try:
-            info = self.tech_fn(path) if self.tech_fn else {}
-        except Exception:
-            info = {}
-        info = info or {}
-        bits = re.search(r"(\d+)\s*bits", str(info.get("enc", "")))
-        freq = str(info.get("freq", "—"))
-        br = str(info.get("bitrate", "—"))
-        codec = str(info.get("codec", "—"))
-        parts = []
-        if bits:
-            parts.append(f"{bits.group(1)} BIT")
-        for x in (freq, br, codec):
-            if x and x != "—":
-                parts.append(x.upper())
-        self.tech_text = "  ".join(parts)
-        khz = re.match(r"([\d.]+)", freq)
-        kb = re.match(r"(\d+)", br)
-        if bits and khz:
-            self.badge_text = f"{bits.group(1)}/{khz.group(1)}K"
-        elif kb:
-            self.badge_text = f"{kb.group(1)}K"
-        else:
-            self.badge_text = ""
-        self.badge.setText(self.badge_text)
-        self.badge.setToolTip(" · ".join(x for x in (info.get("enc_full") or info.get("enc", ""), freq, br,
-                                                      info.get("ch", "")) if x and x != "—"))
-        self.show_tech()
-
-    def show_tech(self):
-        self.tech.setText(self.tech_text)
-
     def toast(self, text):
-        self.tech.setText(text)
-        self._toast.start(1300)
+        """Mensaje cortito arriba (volumen, aleatorio…) en lugar del «1483 de 3786»."""
+        self.cap2.setText(text)
+        self._toast.start(1400)
 
-    # ------------------------------------------------------------ letra y cola
-    def show_panel(self, kind):
-        if kind and self.lib.isVisible():
-            self.close_library()
-        if self.panel_kind == kind:
-            kind = None
-        self.panel_kind = kind
-        self.b_lyr.set_active(kind == "lyrics")
-        self.b_list.set_active(kind == "queue")
-        if kind is None:
-            self.panel.hide()
-            self.update()
-            return
-        self.lyr.setVisible(kind == "lyrics")
-        self.queue.setVisible(kind == "queue")
-        if kind == "lyrics":
-            self.p_head.setText(T("LETRA"))
-            self.render_lyrics()
-        else:
-            self.fill_queue()
-        self.panel.show()
-        self.panel.raise_()
-        for b in self.top_btns:
-            b.raise_()
-        self.update()
-
-    # ------------------------------------------------------------ biblioteca
-    def toggle_library(self):
+    # ------------------------------------------------------------ letra
+    def toggle_lyrics(self):
         if self.lib.isVisible():
             self.close_library()
-        else:
-            self.open_library()
-
-    def open_library(self):
-        if self.panel_kind:
-            self.show_panel(self.panel_kind)   # cierra la letra / cola
-        base = self.main.current_dir or str(self.main.cfg.value("last_dir", "") or "")
-        self.lib.open_for(base)
-        self.lib.show()
-        self.lib.raise_()
-        for b in self.top_btns:
-            b.hide()
-        self.b_editor.set_active(True)
-        self.update()
-
-    def close_library(self):
-        self.lib.hide()
-        self.b_editor.set_active(False)
-        self.setFocus()
-        self.update()
-
-    def play_from_library(self, path, seq):
-        m = self.main
-        m.pl_active = False
-        m.mini_seq = list(seq)   # «siguiente» y «anterior» recorren esta lista
-        m.play_file(path)
+        on = not self.panel.isVisible()
+        self.panel.setVisible(on)
+        self.a_lyr.set_active(on)
+        if on:
+            self.render_lyrics()
+            self.panel.raise_()
 
     def render_lyrics(self):
         if self.lrc:
@@ -1312,56 +1435,78 @@ class MiniPlayer(QWidget):
         else:
             self.lyr.setHtml("<p style='text-align:center; margin-top:50px'>" + html.escape(T("Esta canción no tiene letra.")) + "</p>")
 
-    def fill_queue(self):
-        seq, from_pl = self.main.play_seq()
-        self._q_from_pl = from_pl
-        self.queue.clear()
-        cur, cur_item = self.main.playing_path, None
-        for n, p in enumerate(seq, 1):
-            t = self.main.val(p, "title") or os.path.splitext(os.path.basename(p))[0]
-            a = self.main.val(p, "artist")
-            it = QListWidgetItem(f"{n}.  {t}" + (f"  ·  {a}" if a else ""))
-            it.setData(Qt.ItemDataRole.UserRole, p)
-            it.setToolTip(p)
-            if p == cur:
-                f = it.font()
-                f.setBold(True)
-                it.setFont(f)
-                it.setForeground(QColor("white"))
-                it.setText("▶  " + it.text())
-                cur_item = it
-            self.queue.addItem(it)
-        head = T("COLA DE REPRODUCCIÓN") if from_pl else T("CANCIONES DE LA CARPETA")
-        self.p_head.setText(f"{head}  ·  {len(seq)}")
-        if cur_item is not None:
-            self.queue.setCurrentItem(cur_item)
-            self.queue.scrollToItem(cur_item, QListWidget.ScrollHint.PositionAtCenter)
-
-    def play_from_queue(self, it):
-        p = it.data(Qt.ItemDataRole.UserRole)
-        if not p:
-            return
-        if getattr(self, "_q_from_pl", False):
-            self.main.play_file(p)
+    # ------------------------------------------------------------ biblioteca («Cola»)
+    def toggle_library(self):
+        if self.lib.isVisible():
+            self.close_library()
         else:
-            r = self.main.row_index.get(p)
-            if r is not None:
-                self.main.play_item(self.main.list.item(r), user=False)
-        self.fill_queue()
+            self.open_library()
+
+    def open_library(self):
+        if self.panel.isVisible():
+            self.toggle_lyrics()
+        base = self.main.current_dir or str(self.main.cfg.value("last_dir", "") or "")
+        self.lib.open_for(base)
+        self.lib.show()
+        self.lib.raise_()
+        self.a_queue.set_active(True)
+
+    def close_library(self):
+        self.lib.hide()
+        self.a_queue.set_active(False)
+        self.setFocus()
+
+    def play_from_library(self, path, seq):
+        m = self.main
+        m.pl_active = False
+        m.mini_seq = list(seq)   # «siguiente» y «anterior» recorren esta lista
+        m.play_file(path)
+
+    # ------------------------------------------------------------ acciones
+    def edit_song(self):
+        p = self.path
+        self.main.exit_mini()
+        if p and os.path.isfile(p):
+            self.main.go_to_folder(p)
+
+    def quality_song(self):
+        p = self.path
+        self.main.exit_mini()
+        if p and os.path.isfile(p):
+            self.main.go_to_folder(p)
+            QTimer.singleShot(300, self.main.open_spectrum)
+
+    def show_menu(self, gpos):
+        m = QMenu(self)
+        m.addAction(T("Volver al editor"), self.main.exit_mini)
+        a = m.addAction(T("Siempre encima de las demás ventanas"))
+        a.setCheckable(True)
+        a.setChecked(self.top)
+        a.triggered.connect(lambda on: self.set_top(on))
+        m.addAction(T("Minimizar"), self.showMinimized)
+        m.addSeparator()
+        mute = False
+        try:
+            mute = self.main.audio.isMuted()
+        except Exception:
+            pass
+        m.addAction(T("Quitar silencio") if mute else T("Silenciar"), self.main.toggle_mute)
+        m.addAction(T(f"Volumen: {self.main.vol.value()} % (rueda del ratón)")).setEnabled(False)
+        m.addSeparator()
+        m.addAction(T("Cerrar el programa"), self.main.quit_from_mini)
+        m.exec(gpos)
 
     # ------------------------------------------------------------ reproductor
-    def player_dur(self):
-        pl = self.main.player
-        return pl.duration() if pl is not None else 0
-
     def on_pos(self, ms):
         if not self.isVisible():
             return
-        dur = self.player_dur()
+        pl = self.main.player
+        dur = pl.duration() if pl is not None else 0
         self.wave.set_pos(ms, dur)
-        txt = fmt(ms)
-        if txt != self.t_pos.text():   # solo cuando cambia el segundo
-            self.t_pos.setText(txt)
+        a, b = fmt(ms), "-" + fmt(max(0, dur - ms))
+        if a != self.t_pos.text():   # solo cuando cambia el segundo
+            self.t_pos.setText(a)
+            self.t_left.setText(b)
         if self.lrc:
             idx = -1
             for i, (t, _) in enumerate(self.lrc):
@@ -1371,29 +1516,21 @@ class MiniPlayer(QWidget):
                     break
             if idx != self.lrc_idx:
                 self.lrc_idx = idx
-                if self.panel_kind == "lyrics":
+                if self.panel.isVisible():
                     self.render_lyrics()
 
     def on_dur(self, ms):
-        self.t_dur.setText(fmt(ms))
         pl = self.main.player
-        self.wave.set_pos(pl.position() if pl is not None else 0, ms)
+        pos = pl.position() if pl is not None else 0
+        self.wave.set_pos(pos, ms)
+        self.t_pos.setText(fmt(pos))
+        self.t_left.setText("-" + fmt(max(0, ms - pos)))
 
     def on_state(self, st):
         from PyQt6.QtMultimedia import QMediaPlayer
         self.b_play.set_kind("pause" if st == QMediaPlayer.PlaybackState.PlayingState else "play")
         if self.lib.isVisible():
             self.lib.strip.update_now()
-
-    def sync_vol(self, x=None):
-        if x is None:
-            x = self.main.vol.value()
-        muted = False
-        try:
-            muted = self.main.audio.isMuted()
-        except Exception:
-            pass
-        self.b_vol.set_kind("vol0" if muted or x == 0 else ("vol1" if x < 34 else "vol2" if x < 67 else "vol3"))
 
     def sync_modes(self):
         self.b_shuffle.set_active(bool(self.main.shuffle))
@@ -1405,9 +1542,7 @@ class MiniPlayer(QWidget):
         pl = self.main.player
         if pl is not None:
             self.on_dur(pl.duration())
-            self.on_pos(pl.position())
             self.on_state(pl.playbackState())
-        self.sync_vol()
         self.sync_modes()
 
     def toggle_shuffle(self):
@@ -1461,16 +1596,12 @@ class MiniPlayer(QWidget):
             self.move(gp - self._drag_off)
 
     def mouseReleaseEvent(self, e):
-        if self._press is not None and not self._moved and not self.lib.isVisible():
-            pos = e.position()
-            cover = QRectF(M, M + 50, self.W, self.W - 70)
-            if cover.contains(pos):
-                self.show_panel("lyrics")   # clic en la portada = letra (otro clic la cierra)
         self._press, self._drag_off = None, None
         super().mouseReleaseEvent(e)
 
     def mouseDoubleClickEvent(self, e):
-        pass
+        if self.cover_rect.contains(e.position()) and not self.lib.isVisible():
+            self.main.toggle_play()   # doble clic en la portada = reproducir / pausa (como en el celular)
 
     def wheelEvent(self, e):
         d = e.angleDelta().y()
@@ -1489,51 +1620,33 @@ class MiniPlayer(QWidget):
             self.change_vol(5)
         elif k == Qt.Key.Key_Down:
             self.change_vol(-5)
-        elif k == Qt.Key.Key_Escape and self.lib.isVisible():
-            self.lib.go_back()
         elif k == Qt.Key.Key_Escape:
-            if self.panel_kind:
-                self.show_panel(self.panel_kind)
+            if self.lib.isVisible():
+                self.lib.go_back()
+            elif self.panel.isVisible():
+                self.toggle_lyrics()
             else:
                 self.main.exit_mini()
         elif k == Qt.Key.Key_L:
-            self.show_panel("lyrics")
+            self.toggle_lyrics()
         else:
             super().keyPressEvent(e)
 
-    def enterEvent(self, e):
-        if self.lib.isVisible():
-            return super().enterEvent(e)
-        for b in self.top_btns:
-            b.show()
-            b.raise_()
-        self.update()
-        super().enterEvent(e)
-
-    def leaveEvent(self, e):
-        if not self.rect().contains(self.mapFromGlobal(QCursor.pos())):
-            for b in self.top_btns:
-                b.hide()
-            self.update()
-        super().leaveEvent(e)
-
     def contextMenuEvent(self, e):
-        m = QMenu(self)
-        m.addAction(T("Volver al editor"), self.main.exit_mini)
-        m.addAction(T("Biblioteca"), self.toggle_library)
-        a = m.addAction(T("Siempre encima"))
-        a.setCheckable(True)
-        a.setChecked(self.top)
-        a.triggered.connect(lambda on: self.set_top(on))
-        m.addAction(T("Minimizar"), self.showMinimized)
-        m.addSeparator()
-        m.addAction(T("Cerrar el programa"), self.main.quit_from_mini)
-        m.exec(e.globalPos())
+        self.show_menu(e.globalPos())
 
     def showEvent(self, e):
         self.sync_all()
+        self.update_caption()
         super().showEvent(e)
 
     def closeEvent(self, e):   # Alt+F4 o cerrar desde la barra de tareas: vuelve al editor
         e.ignore()
         self.main.exit_mini()
+
+    def shutdown(self):
+        """Al cerrar el programa: detiene los hilos de la biblioteca."""
+        try:
+            self.lib.shutdown()
+        except Exception:
+            pass

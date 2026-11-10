@@ -1544,3 +1544,19 @@ ROWS += [('Modo reproductor: ya no se traba (la ventanita se redibujaba entera m
   "Player mode no longer lags (the little window was redrawn completely many times per second; now the background is drawn once). New: the first bottom button opens the Library with “Songs” (all songs of the folder you were editing, including all its subfolders, with the number loaded), “Folders”, “Artists” and “Genres”, with search. Tapping a song plays it and “next” follows that list.",
   "Режим плеера больше не тормозит. Новое: библиотека — песни, папки, исполнители и жанры.")]
 ROWS += [("%s resultados", "%s results", "результатов: %s")]
+ROWS += [
+    ("Cola", "Queue", "Очередь"), ("Editar", "Edit", "Изменить"), ("Alta", "High", "Высокое"),
+    ("Media", "Medium", "Среднее"), ("Baja", "Low", "Низкое"), ("%s de %s", "%s of %s", "%s из %s"),
+    ("Toca «Cola» para elegir una canción", "Tap “Queue” to choose a song", "Нажмите «Очередь», чтобы выбрать песню"),
+    ("Todas las canciones, carpetas, artistas y géneros", "All songs, folders, artists and genres",
+     "Все песни, папки, исполнители и жанры"),
+    ("Letra de la canción (L)", "Song lyrics (L)", "Текст песни (L)"),
+    ("Editar los datos y la portada de esta canción en el editor", "Edit this song's data and cover in the editor",
+     "Изменить данные и обложку этой песни в редакторе"),
+    ("Espectrograma y análisis de calidad de esta canción", "Spectrogram and quality analysis of this song",
+     "Спектрограмма и анализ качества этой песни"),
+    ("Volumen: %s % (rueda del ratón)", "Volume: %s % (mouse wheel)", "Громкость: %s % (колесо мыши)"),
+]
+ROWS += [('Modo reproductor con el diseño de la app del celular: portada en tarjeta, «REPRODUCIENDO · 1483 de 3786», título, artista, calidad (MP3 · 44.1 kHz · 320 kbps · Alta), barra de avance con la onda, controles con el botón blanco grande y la barra Cola · Letra · Ajustes · Editar · Calidad; el fondo sigue mezclando y difuminando los colores de la portada. «Cola» abre todas las canciones, carpetas, artistas y géneros, ahora con la portada de cada canción y de cada carpeta.',
+  "Player mode with the phone app design: cover card, “NOW PLAYING · 1483 of 3786”, title, artist, quality (MP3 · 44.1 kHz · 320 kbps · High), waveform progress bar, controls with the big white button and the Queue · Lyrics · Settings · Edit · Quality bar; the background still blends the cover colors. “Queue” opens all songs, folders, artists and genres, now with each song and folder cover.",
+  "Режим плеера в стиле мобильного приложения; «Очередь» открывает библиотеку с обложками.")]

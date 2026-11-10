@@ -569,7 +569,7 @@ try:
 except Exception:
     print("FALLO idioma", ascii(traceback.format_exc()), flush=True)
 
-# modo reproductor (ventanita aparte con la portada difuminada)
+# modo reproductor (diseño como la app del celular, con el fondo difuminado)
 try:
     w.chk_sub.setChecked(False)
     w.search.clear()
@@ -585,24 +585,17 @@ try:
     wait(2500)
     mp = w.mini
     print("mini:", mp.isVisible(), "editor visible:", w.isVisible(), "tam:", mp.width(), mp.height(),
-          "titulo:", ascii(mp.title.text()), "sub:", ascii(mp.sub.text()), "tech:", ascii(mp.tech.text()),
-          "badge:", ascii(mp.badge.text()), "onda:", len(mp.wave.levels), flush=True)
+          "titulo:", ascii(mp.title.text()), "sub:", ascii(mp.sub.text()), "cap:", ascii(mp.cap2.text()),
+          "calidad:", ascii((mp.quality.fmt, mp.quality.detail, mp.quality.lvl)), "onda:", len(mp.wave.levels), flush=True)
+    for wd in (mp.title, mp.quality, mp.wave, mp.b_play, mp.bar):
+        print("  geo", type(wd).__name__, wd.geometry().getRect(), flush=True)
     shot(mp, "s_mini")
-    for b in mp.top_btns:
-        b.show()
-    mp.update()
-    shot(mp, "s_mini_hover")
-    for b in mp.top_btns:
-        b.hide()
-    mp.show_panel("lyrics")
+    mp.toggle_lyrics()
     shot(mp, "s_mini_letra")
-    mp.show_panel("queue")
-    shot(mp, "s_mini_cola")
-    print("cola:", mp.queue.count(), flush=True)
-    mp.show_panel("queue")
+    mp.toggle_lyrics()
     QTest.mouseClick(mp.b_next, Qt.MouseButton.LeftButton)
     wait(1200)
-    print("siguiente:", ascii(mp.title.text()), flush=True)
+    print("siguiente:", ascii(mp.title.text()), ascii(mp.cap2.text()), flush=True)
     QTest.mouseClick(mp.wave, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(mp.wave.width() - 20, 10))
     wait(300)
     mp.change_vol(-10)
@@ -627,53 +620,44 @@ try:
         mp.on_pos(1000 + i * 15)
     QApplication.processEvents()
     print("200 avisos de posicion:", round((time.perf_counter() - t0) * 1000), "ms", flush=True)
-    # biblioteca: carpeta principal con muchas subcarpetas
+    # biblioteca («Cola»): carpeta principal con muchas subcarpetas
     w.exit_mini()
     w.load_folder(root)
     wait(800)
     w.enter_mini()
     wait(500)
     t0 = time.perf_counter()
-    mp.open_library()
-    wait(150)
-    shot(mp, "s_lib_cargando")
+    QTest.mouseClick(mp.a_queue, Qt.MouseButton.LeftButton)
     for _ in range(240):
         wait(250)
         if mp.lib.loaded:
             break
+    wait(1500)
     print("biblioteca:", len(mp.lib.files), "canciones en", round(time.perf_counter() - t0, 1), "s; sub:",
-          ascii(mp.lib.h_sub.text()), flush=True)
+          ascii(mp.lib.h_sub.text()), "portadas:", len([1 for v in mp.lib.pix.values() if v is not None]), flush=True)
     shot(mp, "s_lib_canciones")
     mp.lib.set_tab("folders")
-    print("carpetas:", ascii(mp.lib.h_sub.text()), [ascii(mp.lib.list.item(i).data(mm.Qt.ItemDataRole.UserRole + 2))
-                                                     for i in range(min(8, mp.lib.list.count()))], flush=True)
+    wait(1500)
     shot(mp, "s_lib_carpetas")
     mp.lib.on_click(mp.lib.list.item(1))
-    print("dentro:", ascii(mp.lib.h_title.text()), ascii(mp.lib.h_sub.text()), mp.lib.list.count(), flush=True)
+    wait(800)
     shot(mp, "s_lib_carpeta_dentro")
     mp.lib.go_back()
     mp.lib.set_tab("artists")
+    wait(1200)
     shot(mp, "s_lib_artistas")
     arts = [mp.lib.list.item(i) for i in range(mp.lib.list.count())]
     tgt = next((it for it in arts if it.data(mm.Qt.ItemDataRole.UserRole + 1) == "Los Andes Trío"), arts[0])
     mp.lib.on_click(tgt)
-    print("artista:", ascii(mp.lib.h_title.text()), ascii(mp.lib.h_sub.text()), flush=True)
     mp.lib.on_click(mp.lib.list.item(1))
-    wait(800)
-    print("suena:", ascii(os.path.basename(w.playing_path or "")), "seq:", len(w.mini_seq or []), flush=True)
+    wait(1000)
+    print("suena:", ascii(os.path.basename(w.playing_path or "")), "seq:", len(w.mini_seq or []),
+          "cap:", ascii(mp.cap2.text()), flush=True)
     shot(mp, "s_lib_artista")
-    w.step_play(1)
-    wait(800)
-    print("siguiente en la lista:", ascii(os.path.basename(w.playing_path or "")), flush=True)
-    mp.lib.set_tab("genres")
-    shot(mp, "s_lib_generos")
-    mp.lib.set_tab("songs")
-    mp.lib.search.setText("tame")
+    QTest.mouseClick(mp.a_queue, Qt.MouseButton.LeftButton)
     wait(600)
-    print("buscar tame:", mp.lib.list.count(), ascii(mp.lib.h_sub.text()), flush=True)
-    shot(mp, "s_lib_buscar")
-    mp.close_library()
     shot(mp, "s_mini_tras_lib")
+    print("biblioteca cerrada:", not mp.lib.isVisible(), flush=True)
     QTest.keyClick(mp, Qt.Key.Key_Escape)
     wait(800)
     print("volver:", "editor visible:", w.isVisible(), "mini:", mp.isVisible(), flush=True)
