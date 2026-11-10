@@ -720,6 +720,15 @@ try:
         if mp.lib.loaded:
             break
     wait(1500)
+    mp.lib.list.verticalScrollBar().setValue(900)
+    mp.lib.open_for(force=True)
+    for _ in range(80):
+        wait(250)
+        if mp.lib.loaded:
+            break
+    print("scroll tras revisar:", mp.lib.list.verticalScrollBar().value(), "portadas en memoria:", len(mp.lib.pix), flush=True)
+    mp.lib.list.verticalScrollBar().setValue(0)
+    wait(600)
     print("biblioteca:", len(mp.lib.files), "canciones en", round(time.perf_counter() - t0, 1), "s; sub:",
           ascii(mp.lib.h_sub.text()), "portadas:", len([1 for v in mp.lib.pix.values() if v is not None]), flush=True)
     shot(mp, "s_lib_canciones")

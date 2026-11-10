@@ -709,3 +709,10 @@ VERSIÓN 2.19
  - Arriba del panel: flecha para esconderlo, botón de ventanita para pasar al modo reproductor y menú ⋮
    (estilo de portada, silenciar). El estilo de portada elegido vale para el panel y para la ventanita.
  - Volumen en el panel: rueda del ratón sobre el reproductor.
+
+VERSIÓN 2.20
+------------
+ - La Cola ya no salta al principio mientras la miras: solo se vuelve a llenar si cambió algo en las
+   carpetas, y conserva dónde estabas.
+ - Menos memoria con bibliotecas grandes (las portadas pequeñas de la Cola se sueltan y se recargan).
+ - El programa abre un poco más ligero (las portadas de la Cola se preparan cuando la abres).

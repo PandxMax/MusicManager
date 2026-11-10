@@ -723,8 +723,7 @@ class LibraryPage(QWidget):
         import thumbs
         self.thumbs = thumbs.ThumbWorker(160, mini.inspect_file, mini.read_fn, mini.folder_img_fn)
         self.thumbs.ready.connect(self.on_thumb)
-        self.thumbs.start()
-        self._tgen = 1
+        self._tgen = 1   # el hilo de portadas arranca la primera vez que hace falta (no al abrir el programa)
         self._vis = QTimer(self)
         self._vis.setSingleShot(True)
         self._vis.setInterval(60)
@@ -838,6 +837,8 @@ class LibraryPage(QWidget):
             want.append(p)
         if want:
             self._tgen += 1
+            if not self.thumbs.isRunning():
+                self.thumbs.start()
             self.thumbs.request(self._tgen, want)
         else:
             self.list.viewport().update()
@@ -848,6 +849,9 @@ class LibraryPage(QWidget):
                                                           Qt.TransformationMode.SmoothTransformation))
         else:
             self.pix[path] = None
+        if len(self.pix) > 700:   # con miles de canciones no se guardan todas en memoria: se sueltan las más viejas
+            for k in list(self.pix)[:150]:
+                del self.pix[k]
         if not self._repaint.isActive():
             self._repaint.start()
 
@@ -915,12 +919,16 @@ class LibraryPage(QWidget):
         if w is not self.worker:
             return
         self.scanning = False
+        same = st["files"] == self.files and st["children"] == self.children
         self.order, self.children, self.direct = st["order"], st["children"], st["direct"]
         self.files = st["files"]
+        if same:   # nada cambió en las carpetas: la lista se queda como está (no salta mientras la miras)
+            self.update_sub()
+            return
         self.index_folders()
         if self.stack:   # si la carpeta en la que estabas ya no existe, se vuelve atrás
             self.stack = [x for x in self.stack if x[0] != "folder" or x[1] in self.children]
-        self.render()
+        self.render(keep=True)
 
     def on_progress(self, w, n, total):
         if w is not self.worker:
@@ -931,8 +939,12 @@ class LibraryPage(QWidget):
     def on_done(self, w, tags):
         if w is not self.worker:
             return
+        same = tags == self.tags
         self.tags, self.loaded = tags, True
-        self.render()
+        if same:
+            self.update_sub()
+        else:
+            self.render(keep=True)
 
     def index_folders(self):
         """Cuántas canciones hay en cada carpeta (con sus subcarpetas) y qué portada la representa."""
@@ -1041,7 +1053,10 @@ class LibraryPage(QWidget):
         return ("folder", d, label or os.path.basename(os.path.normpath(d)) or d, "",
                 str(self.fcount.get(d, 0)), self.rep.get(d))
 
-    def render(self):
+    def render(self, keep=False):
+        """keep=True: se vuelve a llenar por una revisión en segundo plano; la lista se queda donde estaba."""
+        sb = self.list.verticalScrollBar()
+        old_v = sb.value() if keep else 0
         q = self.search.text().strip().lower()
         top = self.stack[-1] if self.stack else None
         rows = []
@@ -1104,6 +1119,9 @@ class LibraryPage(QWidget):
             empty.setFlags(Qt.ItemFlag.NoItemFlags)
             self.list.addItem(empty)
         self.list.setUpdatesEnabled(True)
+        if old_v:
+            self.list.doItemsLayout()
+            sb.setValue(min(old_v, sb.maximum()))
         self.update_sub()
         self._vis.start()
 

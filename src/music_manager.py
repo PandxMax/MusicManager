@@ -74,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.19"
+APP_VERSION = "2.20"
 
 
 class TMenu(QMenu):
@@ -965,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.20', [
+        'Mejoras internas del reproductor nuevo: la Cola ya no salta al principio mientras la miras (solo se vuelve a llenar si de verdad cambió algo en las carpetas, y conserva dónde estabas); usa menos memoria con bibliotecas grandes (las portadas pequeñas se sueltan y se recargan al volver); y el programa abre un poco más ligero (las portadas de la Cola se preparan recién cuando la abres).',
+    ]),
     ('2.19', [
         'El reproductor del editor (el panel de la derecha) ahora tiene el mismo diseño nuevo: portada difuminada, «REPRODUCIENDO · n de N», calidad, barra con la onda, controles y la barra Cola · Letra · Ajustes · Editar · Calidad, con la Cola (canciones, carpetas del árbol, artistas, géneros) dentro del panel. El estilo de portada elegido vale para los dos.',
     ]),
@@ -1623,7 +1626,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.19 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.20 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()

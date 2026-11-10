@@ -1592,3 +1592,6 @@ ROWS += [('El reproductor del editor (el panel de la derecha) ahora tiene el mis
   "The editor player (right panel) now has the same new design: blurred cover, “NOW PLAYING · n of N”, quality, waveform bar, controls and the Queue · Lyrics · Settings · Edit · Quality bar, with the Queue (songs, tree folders, artists, genres) inside the panel. The chosen cover style applies to both.",
   "Плеер в редакторе (панель справа) теперь в том же новом дизайне."),
  ("Modo reproductor (solo el reproductor)", "Player mode (player only)", "Режим плеера (только плеер)")]
+ROWS += [('Mejoras internas del reproductor nuevo: la Cola ya no salta al principio mientras la miras (solo se vuelve a llenar si de verdad cambió algo en las carpetas, y conserva dónde estabas); usa menos memoria con bibliotecas grandes (las portadas pequeñas se sueltan y se recargan al volver); y el programa abre un poco más ligero (las portadas de la Cola se preparan recién cuando la abres).',
+  "Internal improvements to the new player: the Queue no longer jumps to the top while you browse it (it is refilled only if something really changed in the folders, and it keeps your place); it uses less memory with big libraries; and the program starts a little lighter.",
+  "Внутренние улучшения нового плеера: очередь не прыгает, меньше памяти, быстрее запуск.")]
