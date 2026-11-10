@@ -1575,3 +1575,16 @@ ROWS += [
 ROWS += [('Modo reproductor: nueva portada grande difuminada (ocupa todo lo de arriba y se funde con el fondo, con el título encima, como en la imagen); en el menú ⋮ se elige «Portada grande difuminada» o «Portada normal». La Cola ahora refleja el árbol de carpetas: «Carpetas» muestra las mismas carpetas principales que el árbol (si agregas o quitas una, cambia), y «Canciones» tiene todas las canciones de todas esas carpetas.',
   "Player mode: new large blurred cover (fills the top and blends into the background, with the title on top, like in the example image); in the ⋮ menu choose “Large blurred cover” or “Normal cover”. The Queue now mirrors the folder tree: “Folders” shows the same main folders as the tree (add or remove one and it changes), and “Songs” has all songs from all those folders.",
   "Режим плеера: большая размытая обложка; «Очередь» отражает дерево папок.")]
+ROWS += [
+    ("Editor", "Editor", "Редактор"), ("Reproductor", "Player", "Плеер"),
+    ("Solo la portada: ventanita pequeña con anterior, pausa y siguiente", "Cover only: small window with previous, pause and next",
+     "Только обложка: маленькое окно с кнопками назад, пауза и вперёд"),
+    ("Solo la portada (ventanita pequeña)", "Cover only (small window)", "Только обложка (маленькое окно)"),
+    ("Portada difuminada (entera)", "Blurred cover (whole)", "Размытая обложка (целиком)"),
+    ("Portada difuminada extendida", "Blurred cover, extended", "Размытая обложка, растянутая"),
+    ("Portada normal (tarjeta)", "Normal cover (card)", "Обычная обложка (карточка)"),
+    ("Volver al reproductor completo (Esc)", "Back to the full player (Esc)", "Вернуться к полному плееру (Esc)"),
+]
+ROWS += [('Modo reproductor: la portada difuminada ahora sale entera, adaptada al ancho (sin recortarse); la versión extendida queda como opción en el menú ⋮, junto con la portada normal. Botón «← Editor» bien visible para volver. Nuevo modo «solo la portada»: una ventanita con la portada, anterior / pausa / siguiente y una barrita con la onda de la canción; se agranda o achica tirando de los bordes o de la esquina.',
+  "Player mode: the blurred cover is now shown whole, fitted to the width (not cropped); the extended version is an option in the ⋮ menu, along with the normal cover. A clear “← Editor” button to go back. New “cover only” mode: a small window with the cover, previous / pause / next and a little waveform bar; resize it by dragging the edges or the corner.",
+  "Режим плеера: обложка целиком, кнопка «← Редактор», новый режим «только обложка» с изменяемым размером.")]

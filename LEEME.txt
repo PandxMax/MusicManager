@@ -688,3 +688,14 @@ VERSIÓN 2.17
    agregaste). Dentro de cada una, sus subcarpetas (igual que el árbol) y sus canciones. Cada vez que
    abres la Cola se revisa de nuevo: si agregas o quitas carpetas o canciones, se refleja.
  - Cola → Canciones: todas las canciones de todas las carpetas del árbol.
+
+VERSIÓN 2.18
+------------
+ - Modo reproductor: la portada difuminada sale entera, adaptada al ancho (sin recortarse ni estirarse).
+   En el menú ⋮ se elige: «Portada difuminada (entera)», «Portada difuminada extendida» o
+   «Portada normal (tarjeta)».
+ - Botón «← Editor» arriba a la izquierda para volver al editor (también Esc).
+ - «Solo la portada» (botón de ventanita, arriba a la derecha): queda una ventanita con la portada,
+   anterior / pausa / siguiente y una barrita con la onda de la canción (clic para avanzar).
+   Se agranda o achica tirando de los bordes o de la esquina, y se mueve arrastrando.
+   Al pasar el ratón aparecen «← Editor» y «Reproductor» (volver al reproductor completo).

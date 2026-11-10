@@ -96,6 +96,56 @@ def pick_colors(img):
     return top, mid
 
 
+def bottom_colors(img):
+    """Color de la parte de abajo de la portada (para que la portada se funda sin cortes) y uno más oscuro."""
+    if img is None or img.isNull():
+        return QColor(46, 38, 72), QColor(16, 13, 26)
+    small = img.scaled(24, 24, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    r = g = b = n = 0
+    for y in range(17, 24):
+        for x in range(24):
+            c = small.pixelColor(x, y)
+            r, g, b, n = r + c.red(), g + c.green(), b + c.blue(), n + 1
+    base = QColor(r // n, g // n, b // n)
+    h, sat, l, _ = base.getHslF()
+    h = max(h, 0.0)
+    l2, s2 = min(max(l, 0.14), 0.36), min(sat, 0.70)
+    return QColor.fromHslF(h, s2, l2), QColor.fromHslF(h, min(1.0, s2), l2 * 0.40)
+
+
+class PillBtn(QPushButton):
+    """Botón con icono y texto (por ejemplo «← Editor»): se entiende a simple vista para qué sirve."""
+
+    def __init__(self, kind, text, parent=None):
+        super().__init__(parent)
+        self.kind, self.text_ = kind, text
+        f = QFont(self.font())
+        f.setPixelSize(12)
+        f.setBold(True)
+        self.f = f
+        self.setFixedSize(QFontMetrics(f).horizontalAdvance(text) + 40, 30)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFlat(True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        hov = self.underMouse()
+        p.setPen(QColor(255, 255, 255, 110 if hov else 60))
+        p.setBrush(QColor(255, 255, 255, 60) if hov else QColor(0, 0, 0, 95))
+        p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
+        p.save()
+        icons.draw_glyph(p, self.kind, QRectF(9, 8, 14, 14), QColor(255, 255, 255))
+        p.restore()
+        p.setFont(self.f)
+        p.setPen(QColor(255, 255, 255))
+        p.drawText(QRectF(27, 0, r.width() - 34, r.height()), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                   self.text_)
+
+
 QUALITY = {0: ("Hi-Res", QColor(0xB3, 0x88, 0xFF)), 1: ("Sin pérdida", QColor(0x2E, 0xCC, 0x71)),
            2: ("Alta", QColor(0x4F, 0xC3, 0xF7)), 3: ("Media", QColor(0xF3, 0x9C, 0x12)), 4: ("Baja", QColor(0xE7, 0x4C, 0x3C))}
 
@@ -214,13 +264,16 @@ class WaveSeek(QWidget):
     seek = pyqtSignal(int)
     BW, GAP = 3, 2
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, dense=False):
         super().__init__(parent)
         self.levels, self.pos, self.dur = [], 0, 0
         self.drag, self.hover = None, None
+        self.dense, self.accent = dense, QColor(255, 214, 90)
+        if dense:   # barrita compacta: onda seguida, lo escuchado de color y una línea donde va la canción
+            self.BW, self.GAP = 2, 1
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedHeight(42)
+        self.setFixedHeight(30 if dense else 42)
 
     def set_levels(self, lv):
         self.levels = list(lv or [])
@@ -236,7 +289,7 @@ class WaveSeek(QWidget):
             self.update()
 
     def geo(self):
-        w = self.width() - 12
+        w = self.width() - (2 if self.dense else 12)
         n = max(16, int((w + self.GAP) // (self.BW + self.GAP)))
         tw = n * self.BW + (n - 1) * self.GAP
         return n, (self.width() - tw) / 2.0, tw
@@ -254,6 +307,19 @@ class WaveSeek(QWidget):
         frac = self.drag if self.drag is not None else (self.pos / self.dur if self.dur else 0.0)
         hov = self.frac_at(self.hover) if self.hover is not None and self.drag is None else None
         cy, maxh = self.height() / 2.0, self.height() - 8
+        if self.dense:
+            maxh = self.height() - 2
+            rest = QColor(255, 255, 255, 105)
+            for i, v in enumerate(lv):
+                x = x0 + i * (self.BW + self.GAP)
+                c = (x + self.BW / 2 - x0) / tw
+                bh = max(2.0, maxh * (0.10 + 0.90 * v))
+                p.setBrush(self.accent if c <= frac else (QColor(255, 255, 255, 170) if hov is not None and c <= hov else rest))
+                p.drawRect(QRectF(x, cy - bh / 2, self.BW, bh))
+            if self.dur:
+                p.setBrush(QColor(255, 255, 255))
+                p.drawRoundedRect(QRectF(x0 + tw * frac - 1, 0, 2.5, self.height()), 1, 1)
+            return
         for i, v in enumerate(lv):
             x = x0 + i * (self.BW + self.GAP)
             c = (x + self.BW / 2 - x0) / tw
@@ -1042,6 +1108,330 @@ class LibraryPage(QWidget):
         self._vis.start()
 
 
+class CompactPlayer(QWidget):
+    """«Solo la portada»: una ventanita con la portada, anterior / pausa / siguiente y una barrita con la onda de la
+    canción. Se mueve arrastrando y se agranda o achica tirando de los bordes o las esquinas."""
+    CM = 10     # margen transparente (sombra)
+    EDGE = 7    # zona de los bordes para cambiar el tamaño
+
+    def __init__(self, mini):
+        super().__init__(None, Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+        self.mini, self.main = mini, mini.main
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setWindowTitle("Music Manager")
+        try:
+            self.setWindowIcon(self.main.windowIcon())
+        except Exception:
+            pass
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setMouseTracking(True)
+        self.setMinimumSize(240 + 2 * self.CM, 230 + 2 * self.CM)
+        self._bg, self._bg_key = None, None
+        self._press, self._moved = None, False
+        if mini.top:
+            self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.b_prev = IconBtn("prev", 42, pad=0.25, parent=self)
+        self.b_play = IconBtn("play", 64, "white", 0.27, parent=self)
+        self.b_next = IconBtn("next", 42, pad=0.25, parent=self)
+        self.b_prev.setToolTip(T("Anterior"))
+        self.b_play.setToolTip(T("Reproducir / pausa (Espacio)"))
+        self.b_next.setToolTip(T("Siguiente"))
+        self.b_prev.clicked.connect(lambda: self.main.step_play(-1))
+        self.b_next.clicked.connect(lambda: self.main.step_play(1))
+        self.b_play.clicked.connect(self.main.toggle_play)
+        self.wave = WaveSeek(self, dense=True)
+        self.wave.seek.connect(mini.do_seek)
+        self.t_pos, self.t_left = QLabel("0:00", self), QLabel("-0:00", self)
+        for l in (self.t_pos, self.t_left):
+            l.setStyleSheet("QLabel { color: rgba(255,255,255,225); font-size: 11px; font-weight: 700; background: transparent; }")
+            l.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.t_left.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.b_full = PillBtn("expand", T("Reproductor"), self)
+        self.b_full.setToolTip(T("Volver al reproductor completo (Esc)"))
+        self.b_full.clicked.connect(mini.leave_compact)
+        self.b_editor = PillBtn("arrow_l", T("Editor"), self)
+        self.b_editor.setToolTip(T("Volver al editor"))
+        self.b_editor.clicked.connect(self.main.exit_mini)
+        self.lbl = QLabel("", self)
+        self.lbl.setStyleSheet("QLabel { color: white; font-size: 12px; font-weight: 700; background: transparent; }")
+        self.lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.hover_w = (self.b_full, self.b_editor)
+        for w_ in self.hover_w:
+            w_.hide()
+        self.lbl.hide()
+        self._save = QTimer(self)
+        self._save.setSingleShot(True)
+        self._save.setInterval(400)
+        self._save.timeout.connect(self.save_geo)
+        pl = self.main.player
+        if pl is not None:
+            pl.positionChanged.connect(self.on_pos)
+            pl.durationChanged.connect(lambda _ms: self.sync())
+            pl.playbackStateChanged.connect(lambda _st: self.sync())
+        self.resize(280 + 2 * self.CM, 280 + 2 * self.CM)
+
+    # ------------------------------------------------------------ abrir / tamaño / posición
+    def save_geo(self):
+        if self.isVisible():
+            self.main.cfg.setValue("mini_c_geo", f"{self.x()},{self.y()},{self.width()},{self.height()}")
+
+    def open_near(self, geo):
+        try:
+            x, y, w, h = (int(t) for t in str(self.main.cfg.value("mini_c_geo", "") or "").split(","))
+        except (ValueError, TypeError):
+            w = h = 280 + 2 * self.CM
+            x, y = geo.right() - w, geo.top()
+        scr = QGuiApplication.screenAt(QPoint(x + w // 2, y + 30)) or QGuiApplication.primaryScreen()
+        ag = scr.availableGeometry()
+        w, h = max(self.minimumWidth(), min(w, ag.width())), max(self.minimumHeight(), min(h, ag.height()))
+        x = min(max(x, ag.left() - self.CM), ag.right() - w + self.CM)
+        y = min(max(y, ag.top() - self.CM), ag.bottom() - h + self.CM)
+        self.setGeometry(x, y, w, h)
+        self.track_changed()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self.setFocus()
+
+    def card(self):
+        return QRectF(self.CM, self.CM, self.width() - 2 * self.CM, self.height() - 2 * self.CM)
+
+    def resizeEvent(self, e):
+        r = self.card()
+        wy = r.bottom() - 12 - self.wave.height()
+        self.wave.setGeometry(int(r.left() + 12), int(wy), int(r.width() - 24), self.wave.height())
+        cy = wy - 8 - self.b_play.height() / 2
+        cx = r.center().x()
+        self.b_play.move(int(cx - self.b_play.width() / 2), int(cy - self.b_play.height() / 2))
+        self.b_prev.move(int(cx - self.b_play.width() / 2 - 8 - self.b_prev.width()), int(cy - self.b_prev.height() / 2))
+        self.b_next.move(int(cx + self.b_play.width() / 2 + 8), int(cy - self.b_next.height() / 2))
+        self.t_pos.setGeometry(int(r.left() + 14), int(wy - 20), 60, 16)
+        self.t_left.setGeometry(int(r.right() - 74), int(wy - 20), 60, 16)
+        self.b_editor.move(int(r.left() + 10), int(r.top() + 10))
+        self.b_full.move(int(r.right() - 10 - self.b_full.width()), int(r.top() + 10))
+        narrow = r.width() < self.b_editor.width() + self.b_full.width() + 30
+        self.lbl.setGeometry(int(r.left() + 14), int(r.top() + (46 if not narrow else 80)), int(r.width() - 28), 18)
+        if narrow:
+            self.b_full.move(int(r.left() + 10), int(r.top() + 44))
+        self._bg_key = None
+        self._save.start()
+        self.set_title()
+        super().resizeEvent(e)
+
+    def moveEvent(self, e):
+        self._save.start()
+        super().moveEvent(e)
+
+    # ------------------------------------------------------------ dibujo
+    def bg_pixmap(self):
+        dpr = self.devicePixelRatioF()
+        hov = self.b_full.isVisible()
+        key = (id(self.mini.img), self.width(), self.height(), dpr, hov)
+        if self._bg_key == key and self._bg is not None:
+            return self._bg
+        pm = QPixmap(int(self.width() * dpr), int(self.height() * dpr))
+        pm.setDevicePixelRatio(dpr)
+        pm.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        r = self.card()
+        p.setPen(Qt.PenStyle.NoPen)
+        for i in range(self.CM, 0, -1):
+            p.setBrush(QColor(0, 0, 0, 10))
+            p.drawRoundedRect(r.adjusted(-i * 0.8, -i * 0.5, i * 0.8, i * 1.0), 18 + i, 18 + i)
+        path = QPainterPath()
+        path.addRoundedRect(r, 18, 18)
+        p.setClipPath(path)
+        img = self.mini.img
+        if img is not None:
+            sc = img.scaled(int(r.width() * dpr), int(r.height() * dpr), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                            Qt.TransformationMode.SmoothTransformation)
+            sx, sy = (sc.width() - r.width() * dpr) / 2, (sc.height() - r.height() * dpr) / 2
+            p.drawImage(r, sc, QRectF(sx, sy, r.width() * dpr, r.height() * dpr))
+        else:
+            rg = QRadialGradient(QPointF(r.left() + r.width() * 0.4, r.top() + r.height() * 0.35), r.width() * 0.9)
+            rg.setColorAt(0, QColor(96, 82, 150))
+            rg.setColorAt(1, QColor(34, 30, 52))
+            p.fillRect(r, QBrush(rg))
+            p.save()
+            icons.draw_glyph(p, "note", QRectF(r.center().x() - r.width() * 0.14, r.top() + r.height() * 0.2,
+                                               r.width() * 0.28, r.width() * 0.28), QColor(255, 255, 255, 90))
+            p.restore()
+        bh = min(r.height() * 0.6, 170.0)   # sombra abajo: los botones y la barrita se ven sobre cualquier portada
+        g = QLinearGradient(0, r.bottom() - bh, 0, r.bottom())
+        g.setColorAt(0, QColor(0, 0, 0, 0))
+        g.setColorAt(0.55, QColor(0, 0, 0, 130))
+        g.setColorAt(1, QColor(0, 0, 0, 215))
+        p.fillRect(QRectF(r.left(), r.bottom() - bh, r.width(), bh), QBrush(g))
+        if hov:
+            g2 = QLinearGradient(0, r.top(), 0, r.top() + 110)
+            g2.setColorAt(0, QColor(0, 0, 0, 190))
+            g2.setColorAt(1, QColor(0, 0, 0, 0))
+            p.fillRect(QRectF(r.left(), r.top(), r.width(), 110), QBrush(g2))
+        p.setClipping(False)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QColor(255, 255, 255, 30))
+        p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 18, 18)
+        # asa de la esquina: se ve que se puede agrandar
+        p.setPen(QColor(255, 255, 255, 150))
+        for k in (5, 9, 13):
+            p.drawLine(QPointF(r.right() - k, r.bottom() - 3), QPointF(r.right() - 3, r.bottom() - k))
+        p.end()
+        self._bg, self._bg_key = pm, key
+        return pm
+
+    def paintEvent(self, e):
+        p = QPainter(self)
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+        dpr = self.devicePixelRatioF()
+        r = QRectF(e.rect())
+        p.drawPixmap(r, self.bg_pixmap(), QRectF(r.x() * dpr, r.y() * dpr, r.width() * dpr, r.height() * dpr))
+
+    # ------------------------------------------------------------ canción
+    def set_title(self):
+        path = self.mini.path
+        if not path:
+            txt = T("Nada sonando")
+        else:
+            t = self.main.val(path, "title") or os.path.splitext(os.path.basename(path))[0]
+            a = self.main.val(path, "artist")
+            txt = t + (f"  ·  {a}" if a else "")
+        self.lbl.setText(self.lbl.fontMetrics().elidedText(txt, Qt.TextElideMode.ElideRight, max(40, self.lbl.width())))
+        self.setToolTip("")
+
+    def track_changed(self):
+        self._bg_key = None
+        self.wave.set_levels(self.mini.wave.levels)
+        c = QColor(self.mini.colb)
+        self.wave.accent = QColor.fromHslF(max(c.hslHueF(), 0.0), min(1.0, max(c.hslSaturationF(), 0.55)), 0.68)
+        self.b_play.glow = QColor(self.mini.col).lighter(150)
+        self.set_title()
+        self.sync()
+        self.update()
+
+    def sync(self):
+        pl = self.main.player
+        if pl is None:
+            return
+        from PyQt6.QtMultimedia import QMediaPlayer
+        self.b_play.set_kind("pause" if pl.playbackState() == QMediaPlayer.PlaybackState.PlayingState else "play")
+        self.on_pos(pl.position(), force=True)
+
+    def on_pos(self, ms, force=False):
+        if not self.isVisible() and not force:
+            return
+        pl = self.main.player
+        dur = pl.duration() if pl is not None else 0
+        self.wave.set_pos(ms, dur)
+        a = fmt(ms)
+        if a != self.t_pos.text() or force:
+            self.t_pos.setText(a)
+            self.t_left.setText("-" + fmt(max(0, dur - ms)))
+
+    # ------------------------------------------------------------ ratón: mover y cambiar tamaño
+    def edges_at(self, pos):
+        r = self.card()
+        e = Qt.Edge(0)
+        z = self.EDGE
+        if pos.x() <= r.left() + z:
+            e |= Qt.Edge.LeftEdge
+        elif pos.x() >= r.right() - z:
+            e |= Qt.Edge.RightEdge
+        if pos.y() <= r.top() + z:
+            e |= Qt.Edge.TopEdge
+        elif pos.y() >= r.bottom() - z:
+            e |= Qt.Edge.BottomEdge
+        if not e and pos.x() >= r.right() - 18 and pos.y() >= r.bottom() - 18:
+            e = Qt.Edge.RightEdge | Qt.Edge.BottomEdge   # el asa de la esquina es más grande
+        return e
+
+    def edge_cursor(self, e):
+        L, R, Tp, B = Qt.Edge.LeftEdge, Qt.Edge.RightEdge, Qt.Edge.TopEdge, Qt.Edge.BottomEdge
+        if e in (L | Tp, R | B):
+            return Qt.CursorShape.SizeFDiagCursor
+        if e in (R | Tp, L | B):
+            return Qt.CursorShape.SizeBDiagCursor
+        if e in (L, R):
+            return Qt.CursorShape.SizeHorCursor
+        if e in (Tp, B):
+            return Qt.CursorShape.SizeVerCursor
+        return Qt.CursorShape.ArrowCursor
+
+    def mousePressEvent(self, e):
+        if e.button() != Qt.MouseButton.LeftButton:
+            return
+        ed = self.edges_at(e.position())
+        wh = self.windowHandle()
+        if ed and wh is not None and wh.startSystemResize(ed):
+            return
+        self._press, self._moved = e.globalPosition().toPoint(), False
+
+    def mouseMoveEvent(self, e):
+        if not (e.buttons() & Qt.MouseButton.LeftButton):
+            self.setCursor(self.edge_cursor(self.edges_at(e.position())))
+            return
+        if self._press is None:
+            return
+        gp = e.globalPosition().toPoint()
+        if (gp - self._press).manhattanLength() > 5 and not self._moved:
+            self._moved = True
+            wh = self.windowHandle()
+            if wh is not None and wh.startSystemMove():
+                self._press = None
+
+    def mouseReleaseEvent(self, e):
+        self._press = None
+
+    def mouseDoubleClickEvent(self, e):
+        self.main.toggle_play()
+
+    def wheelEvent(self, e):
+        d = e.angleDelta().y()
+        if d:
+            vs = self.main.vol
+            vs.setValue(max(0, min(100, vs.value() + (5 if d > 0 else -5))))
+            self.lbl.setText(T(f"Volumen {vs.value()} %"))
+            QTimer.singleShot(1300, self.set_title)
+            self.show_hover(True)
+
+    def keyPressEvent(self, e):
+        k = e.key()
+        if k == Qt.Key.Key_Space:
+            self.main.toggle_play()
+        elif k == Qt.Key.Key_Left:
+            self.mini.skip(-5000)
+        elif k == Qt.Key.Key_Right:
+            self.mini.skip(5000)
+        elif k == Qt.Key.Key_Escape:
+            self.mini.leave_compact()
+        else:
+            super().keyPressEvent(e)
+
+    def show_hover(self, on):
+        for w_ in self.hover_w:
+            w_.setVisible(on)
+        self.lbl.setVisible(on)
+        self._bg_key = None
+        self.update()
+
+    def enterEvent(self, e):
+        self.show_hover(True)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        if not self.rect().contains(self.mapFromGlobal(QCursor.pos())):
+            self.show_hover(False)
+        super().leaveEvent(e)
+
+    def contextMenuEvent(self, e):
+        self.mini.show_menu(e.globalPos())
+
+    def closeEvent(self, e):
+        e.ignore()
+        self.main.exit_mini()
+
+
 class MiniPlayer(QWidget):
     """Diseño como el reproductor de la app del celular (portada en tarjeta, título, calidad, barra de avance,
     controles y barra de acciones), con el fondo que mezcla y difumina los colores de la portada."""
@@ -1080,7 +1470,10 @@ class MiniPlayer(QWidget):
         self.cover_rect = QRectF(M + 26, M + 8 + 46 + 6, self.S, self.S)
         # portada grande: ocupa todo el ancho y llega hasta debajo del título (título y artista van encima)
         self.full_rect = QRectF(M, M, self.W, 8 + 46 + 6 + self.S + 18 + 84)
-        self.cover_mode = "card" if str(main.cfg.value("mini_cover", "full")) == "card" else "full"
+        self.fit_rect = QRectF(M, M, self.W, self.W)   # portada entera (sin recortar) a todo el ancho
+        cm = str(main.cfg.value("mini_cover2", "fit"))
+        self.cover_mode = cm if cm in ("fit", "full", "card") else "fit"
+        self.colb, self.colb2 = bottom_colors(None)
         self.blur2 = None
 
         v = QVBoxLayout(self)
@@ -1091,9 +1484,12 @@ class MiniPlayer(QWidget):
         topw.setFixedHeight(46)
         th = QHBoxLayout(topw)
         th.setContentsMargins(0, 0, 0, 0)
-        self.b_down = IconBtn("chevron_d", 40, pad=0.25)
+        self.b_down = PillBtn("arrow_l", T("Editor"))
         self.b_down.setToolTip(T("Volver al editor (Esc)"))
         self.b_down.clicked.connect(self.main.exit_mini)
+        self.b_compact = IconBtn("mini", 34, pad=0.25)
+        self.b_compact.setToolTip(T("Solo la portada: ventanita pequeña con anterior, pausa y siguiente"))
+        self.b_compact.clicked.connect(self.enter_compact)
         cap = QVBoxLayout()
         cap.setSpacing(0)
         self.cap1 = QLabel(T("REPRODUCIENDO"))
@@ -1106,12 +1502,25 @@ class MiniPlayer(QWidget):
             l.setAlignment(Qt.AlignmentFlag.AlignCenter)
             l.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             cap.addWidget(l)
-        self.b_more = IconBtn("morev", 40, pad=0.27)
+        self.b_more = IconBtn("morev", 34, pad=0.25)
         self.b_more.setToolTip(T("Más opciones"))
         self.b_more.clicked.connect(lambda: self.show_menu(self.b_more.mapToGlobal(QPoint(0, self.b_more.height()))))
-        th.addWidget(self.b_down)
+        side = max(self.b_down.width(), 72)   # mismos anchos a los lados: el texto del centro queda centrado
+        lw, rw = QWidget(), QWidget()
+        for w_, items, al in ((lw, (self.b_down,), Qt.AlignmentFlag.AlignLeft), (rw, (self.b_compact, self.b_more), Qt.AlignmentFlag.AlignRight)):
+            w_.setFixedWidth(side)
+            hl = QHBoxLayout(w_)
+            hl.setContentsMargins(0, 0, 0, 0)
+            hl.setSpacing(2)
+            if al == Qt.AlignmentFlag.AlignRight:
+                hl.addStretch(1)
+            for it_ in items:
+                hl.addWidget(it_)
+            if al == Qt.AlignmentFlag.AlignLeft:
+                hl.addStretch(1)
+        th.addWidget(lw)
         th.addLayout(cap, 1)
-        th.addWidget(self.b_more)
+        th.addWidget(rw)
         v.addWidget(topw)
         v.addSpacing(6 + self.S + 18)   # la portada se dibuja en el fondo (así no se redibuja a cada rato)
         # ---- título, artista y calidad
@@ -1220,6 +1629,8 @@ class MiniPlayer(QWidget):
         self.lib.setGeometry(M, M, self.W, self.H - 12 - 56 - 8)
         self.lib.hide()
 
+        self.compact = CompactPlayer(self)   # «solo la portada»: ventanita pequeña que se puede agrandar
+
         self._save_pos = QTimer(self)
         self._save_pos.setSingleShot(True)
         self._save_pos.setInterval(400)
@@ -1233,6 +1644,38 @@ class MiniPlayer(QWidget):
             pl.positionChanged.connect(self.on_pos)
             pl.durationChanged.connect(self.on_dur)
             pl.playbackStateChanged.connect(self.on_state)
+
+    # ------------------------------------------------------------ ventanita «solo la portada»
+    def in_use(self):
+        return self.isVisible() or self.compact.isVisible()
+
+    def open_window(self):
+        """Abre el modo reproductor como se dejó la última vez: completo o solo la portada."""
+        if int(self.main.cfg.value("mini_compact", 0) or 0):
+            self.enter_compact()
+        else:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            self.setFocus()
+
+    def enter_compact(self):
+        self.main.cfg.setValue("mini_compact", 1)
+        self.compact.open_near(self.frameGeometry())
+        self.hide()
+
+    def leave_compact(self):
+        self.main.cfg.setValue("mini_compact", 0)
+        self.compact.hide()
+        self.track_changed(self.path)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self.setFocus()
+
+    def leave(self):
+        self.compact.hide()
+        self.hide()
 
     # ------------------------------------------------------------ colocar en pantalla
     def place_initial(self, main_geo):
@@ -1264,11 +1707,16 @@ class MiniPlayer(QWidget):
         if vis:
             self.move(pos)
             self.show()
+        cvis, cg = self.compact.isVisible(), self.compact.geometry()
+        self.compact.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, self.top)
+        if cvis:
+            self.compact.setGeometry(cg)
+            self.compact.show()
 
     # ------------------------------------------------------------ portada normal o grande difuminada
     def set_cover_mode(self, mode):
-        self.cover_mode = "card" if mode == "card" else "full"
-        self.main.cfg.setValue("mini_cover", self.cover_mode)
+        self.cover_mode = mode if mode in ("fit", "full", "card") else "fit"
+        self.main.cfg.setValue("mini_cover2", self.cover_mode)
         self.apply_cover_mode()
         self.track_changed(self.path)
 
@@ -1287,7 +1735,7 @@ class MiniPlayer(QWidget):
         self.update()
 
     def art_rect(self):
-        return self.full_rect if self.cover_mode == "full" else self.cover_rect
+        return {"full": self.full_rect, "fit": self.fit_rect}.get(self.cover_mode, self.cover_rect)
 
     # ------------------------------------------------------------ fondo (se dibuja una vez por canción)
     def card(self):
@@ -1314,6 +1762,15 @@ class MiniPlayer(QWidget):
         path = QPainterPath()
         path.addRoundedRect(r, RADIUS, RADIUS)
         p.setClipPath(path)
+        if self.cover_mode == "fit":
+            self.paint_fit_cover(p, r, dpr)
+            p.setClipping(False)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QColor(255, 255, 255, 22))
+            p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), RADIUS, RADIUS)
+            p.end()
+            self._bg, self._bg_key = pm, key
+            return pm
         g = QLinearGradient(0, r.top(), 0, r.bottom())
         g.setColorAt(0.0, self.col)
         g.setColorAt(0.48, self.col2)
@@ -1403,6 +1860,40 @@ class MiniPlayer(QWidget):
         q.end()
         return lay
 
+    def paint_fit_cover(self, p, r, dpr):
+        """Portada entera, adaptada al ancho (sin recortarla ni estirarla), que se difumina hacia abajo y se funde
+        con un fondo del mismo color que su parte de abajo."""
+        g = QLinearGradient(0, r.top(), 0, r.bottom())
+        g.setColorAt(0.0, self.colb)
+        g.setColorAt(0.52, self.colb)
+        g.setColorAt(0.80, self.colb2)
+        g.setColorAt(1.0, QColor(14, 14, 20))
+        p.fillRect(r, QBrush(g))
+        fr = self.fit_rect
+
+        def draw(q):
+            if self.img is not None:
+                sc = self.img.scaled(int(fr.width() * dpr), int(fr.height() * dpr), Qt.AspectRatioMode.KeepAspectRatio,
+                                     Qt.TransformationMode.SmoothTransformation)
+                w_, h_ = sc.width() / dpr, sc.height() / dpr
+                q.drawImage(QRectF((fr.width() - w_) / 2, 0, w_, h_), sc)   # si no es cuadrada, se ve entera igual
+            else:
+                rg = QRadialGradient(QPointF(fr.width() * 0.4, fr.height() * 0.35), fr.width() * 0.8)
+                rg.setColorAt(0, QColor(96, 82, 150))
+                rg.setColorAt(1, QColor(46, 38, 72))
+                q.fillRect(QRectF(0, 0, fr.width(), fr.height()), QBrush(rg))
+                icons.draw_glyph(q, "note", QRectF(fr.width() * 0.34, fr.height() * 0.26, fr.width() * 0.32, fr.width() * 0.32),
+                                 QColor(255, 255, 255, 90))
+        lay = self.masked(fr.size(), dpr, draw, [(0.0, 255), (0.56, 255), (0.80, 120), (1.0, 0)])
+        p.drawPixmap(fr.topLeft(), lay)
+        top = QLinearGradient(0, fr.top(), 0, fr.top() + 90)   # sombra arriba: se leen los botones sobre portadas claras
+        top.setColorAt(0, QColor(0, 0, 0, 125))
+        top.setColorAt(1, QColor(0, 0, 0, 0))
+        p.fillRect(QRectF(fr.left(), fr.top(), fr.width(), 90), QBrush(top))
+        p.setOpacity(0.045)
+        p.drawTiledPixmap(r.toRect(), self.noise)
+        p.setOpacity(1.0)
+
     def paint_full_cover(self, p, r, dpr):
         """Portada grande: nítida arriba, cada vez más difuminada hacia abajo y fundida con el fondo (como en la
         imagen de ejemplo); encima, sombras suaves para que se lean la barra de arriba y el título."""
@@ -1457,6 +1948,7 @@ class MiniPlayer(QWidget):
     def set_cover(self, img):
         self.img = img if img is not None and not img.isNull() else None
         self.col, self.col2 = pick_colors(self.img)
+        self.colb, self.colb2 = bottom_colors(self.img)
         if self.img is not None:
             tiny = self.img.scaled(8, 8, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
             mid = tiny.scaled(40, 40, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
@@ -1483,6 +1975,7 @@ class MiniPlayer(QWidget):
             self.update_caption()
             self.sync_all()
             self.update()
+            self.compact.track_changed()
             return
         title = m.val(path, "title") or os.path.splitext(os.path.basename(path))[0]
         artist = m.val(path, "artist") or T("Artista desconocido")
@@ -1524,6 +2017,7 @@ class MiniPlayer(QWidget):
         self.lib.list.viewport().update()
         self.lib.strip.update_now()
         self.update()
+        self.compact.track_changed()
 
     def update_caption(self):
         """«1483 de 3786»: qué número es la canción en la lista que se está recorriendo."""
@@ -1543,6 +2037,7 @@ class MiniPlayer(QWidget):
             lv = envelope(arr)
             if lv:
                 self.wave.set_levels(lv)
+                self.compact.wave.set_levels(lv)
 
     def toast(self, text):
         """Mensaje cortito arriba (volumen, aleatorio…) en lugar del «1483 de 3786»."""
@@ -1629,7 +2124,10 @@ class MiniPlayer(QWidget):
         a.triggered.connect(lambda on: self.set_top(on))
         m.addAction(T("Minimizar"), self.showMinimized)
         m.addSeparator()
-        for mode, label in (("full", T("Portada grande difuminada")), ("card", T("Portada normal"))):
+        m.addAction(T("Solo la portada (ventanita pequeña)"), self.enter_compact)
+        m.addSeparator()
+        for mode, label in (("fit", T("Portada difuminada (entera)")), ("full", T("Portada difuminada extendida")),
+                            ("card", T("Portada normal (tarjeta)"))):
             act = m.addAction(label)
             act.setCheckable(True)
             act.setChecked(self.cover_mode == mode)

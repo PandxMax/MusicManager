@@ -74,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.17"
+APP_VERSION = "2.18"
 
 
 class TMenu(QMenu):
@@ -965,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.18', [
+        'Modo reproductor: la portada difuminada ahora sale entera, adaptada al ancho (sin recortarse); la versión extendida queda como opción en el menú ⋮, junto con la portada normal. Botón «← Editor» bien visible para volver. Nuevo modo «solo la portada»: una ventanita con la portada, anterior / pausa / siguiente y una barrita con la onda de la canción; se agranda o achica tirando de los bordes o de la esquina.',
+    ]),
     ('2.17', [
         'Modo reproductor: nueva portada grande difuminada (ocupa todo lo de arriba y se funde con el fondo, con el título encima, como en la imagen); en el menú ⋮ se elige «Portada grande difuminada» o «Portada normal». La Cola ahora refleja el árbol de carpetas: «Carpetas» muestra las mismas carpetas principales que el árbol (si agregas o quitas una, cambia), y «Canciones» tiene todas las canciones de todas esas carpetas.',
     ]),
@@ -1617,7 +1620,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.17 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.18 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5344,7 +5347,7 @@ class Main(QMainWindow):
 
     def expand_player(self):
         """Con el estilo celular, al reproducir (doble clic, «Reproducir»…) se despliega el reproductor grande."""
-        if getattr(self, "mini", None) is not None and self.mini.isVisible():
+        if getattr(self, "mini", None) is not None and self.mini.in_use():
             return   # en modo reproductor el editor está escondido
         if (getattr(self, "player_style", "classic") == "mobile" and self.mobile is not None
                 and not self.mobile.isVisible() and int(self.cfg.value("auto_expand", 1) or 0)):
@@ -5359,7 +5362,7 @@ class Main(QMainWindow):
         self.player.play()
         if getattr(self, "mobile", None) is not None and self.mobile.isVisible():
             self.mobile.track_changed(path)
-        if getattr(self, "mini", None) is not None and self.mini.isVisible():
+        if getattr(self, "mini", None) is not None and self.mini.in_use():
             self.mini.track_changed(path)
         artist, album = self.val(path, "artist"), self.val(path, "album")
         self.set_now(self.val(path, "title") or os.path.splitext(os.path.basename(path))[0],
@@ -5440,20 +5443,17 @@ class Main(QMainWindow):
         import miniplayer
         if self.mini is None:
             self.mini = miniplayer.MiniPlayer(self, inspect_file, tech_info, read_tags, AUDIO_EXT, find_folder_image)
-        if self.mini.isVisible():
+        if self.mini.in_use():
             return
         self._mini_was_max = self.isMaximized()
         self.mini.track_changed(self.playing_path)
         self.mini.place_initial(self.frameGeometry())
-        self.mini.show()
-        self.mini.raise_()
-        self.mini.activateWindow()
-        self.mini.setFocus()
+        self.mini.open_window()
         self.hide()
 
     def exit_mini(self):
         if self.mini is not None:
-            self.mini.hide()
+            self.mini.leave()
         if getattr(self, "_mini_was_max", False):
             self.showMaximized()
         else:
