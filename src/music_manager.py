@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.23"
+APP_VERSION = "2.24"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.23 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.24 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4051,6 +4051,7 @@ class Main(QMainWindow):
         self._shuffle_hist = []
         self.mobile = None
         self.mini = None   # modo reproductor (ventanita aparte; se crea la primera vez)
+        self.mini_detached = False   # reproductor separado con el editor también abierto
         self.fs_undo = []  # últimos movimientos / renombrados, para poder deshacerlos
         self.music_keys = MusicKeys(self)
         QApplication.instance().installEventFilter(self.music_keys)
@@ -5214,7 +5215,7 @@ class Main(QMainWindow):
         self.btn_mini = GlyphButton("mini")
         self.btn_mini.setToolTip("Modo reproductor: esconde el editor y deja solo el reproductor (se puede mover) · Ctrl+M")
         self.btn_mini.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_mini.clicked.connect(self.enter_mini)
+        self.btn_mini.clicked.connect(lambda: self.enter_mini(False))
         h.addWidget(self.btn_mini)
         self.volbox = VolBox(self.btn_mute, self.vol)
         h.addWidget(self.volbox)
@@ -5348,8 +5349,9 @@ class Main(QMainWindow):
                 inner.set_viz(path, arr)
 
     # ------------------------------------------------- Modo reproductor
-    def enter_mini(self):
-        """Esconde el editor y deja solo un reproductor pequeño que se puede mover por la pantalla."""
+    def enter_mini(self, detached=False):
+        """Modo reproductor: una ventana aparte con el reproductor. detached=True: el editor sigue abierto (dos
+        ventanas, cada una en la barra de tareas); False: el editor se esconde y queda solo el reproductor."""
         if self.player is None:
             self.statusBar().showMessage(T("El reproductor integrado no está disponible."))
             return
@@ -5357,20 +5359,45 @@ class Main(QMainWindow):
         if self.mini is None:
             self.mini = miniplayer.MiniPlayer(self, inspect_file, tech_info, read_tags, AUDIO_EXT, find_folder_image)
         if self.mini.in_use():
+            self.set_mini_detached(detached)
             return
         self._mini_was_max = self.isMaximized()
+        self.mini_detached = bool(detached)
         self.mini.track_changed(self.playing_path)
         self.mini.place_initial(self.frameGeometry())
         self.mini.open_window()
-        self.hide()
+        if detached:
+            if getattr(self, "mobile", None) is not None and self.mobile.isVisible():
+                self.mobile.close_panel()   # el reproductor ya está en su ventana: no hace falta el panel
+        else:
+            self.hide()
+
+    def set_mini_detached(self, on):
+        """Con el reproductor ya abierto: mostrar también el editor (dos ventanas) o esconderlo."""
+        if self.mini is None or not self.mini.in_use():
+            return
+        self.mini_detached = bool(on)
+        if on:
+            if getattr(self, "_mini_was_max", False):
+                self.showMaximized()
+            else:
+                self.showNormal()
+            if getattr(self, "mobile", None) is not None and self.mobile.isVisible():
+                self.mobile.close_panel()
+        else:
+            self._mini_was_max = self.isMaximized()
+            self.hide()
 
     def exit_mini(self):
+        was_detached = getattr(self, "mini_detached", False)
+        self.mini_detached = False
         if self.mini is not None:
             self.mini.leave()
-        if getattr(self, "_mini_was_max", False):
-            self.showMaximized()
-        else:
-            self.showNormal()
+        if not was_detached or not self.isVisible():
+            if getattr(self, "_mini_was_max", False):
+                self.showMaximized()
+            else:
+                self.showNormal()
         self.raise_()
         self.activateWindow()
         if getattr(self, "mobile", None) is not None and self.mobile.isVisible():
@@ -7921,7 +7948,8 @@ class Main(QMainWindow):
         e.addAction(self.act("📥 Pegar metadatos…\tCtrl+Shift+V", self.paste_meta,
                              "Pega en las canciones elegidas las etiquetas copiadas (eliges cuáles)"))
         QShortcut(QKeySequence("Ctrl+Shift+C"), self, activated=self.copy_meta)
-        QShortcut(QKeySequence("Ctrl+M"), self, activated=self.enter_mini)
+        QShortcut(QKeySequence("Ctrl+M"), self, activated=lambda: self.enter_mini(False))
+        QShortcut(QKeySequence("Ctrl+Shift+M"), self, activated=lambda: self.enter_mini(True))
         QShortcut(QKeySequence("Ctrl+Alt+Z"), self, activated=self.undo_fs)
         QShortcut(QKeySequence("Ctrl+Shift+V"), self, activated=self.paste_meta)
         e.addSeparator()
@@ -7953,7 +7981,9 @@ class Main(QMainWindow):
         p.addAction(self.act("⏹ Detener", self.stop_play))
         p.addSeparator()
         p.addAction(self.act("☰ Lista de reproducción", self.show_playlist))
-        p.addAction(self.act("🪟 Modo reproductor (solo el reproductor)\tCtrl+M", self.enter_mini))
+        p.addAction(self.act("🪟 Modo reproductor (solo el reproductor)\tCtrl+M", lambda: self.enter_mini(False)))
+        p.addAction(self.act("🪟 Separar el reproductor (dos ventanas)\tCtrl+Shift+M", lambda: self.enter_mini(True),
+                             "El reproductor pasa a su propia ventana y el editor sigue abierto"))
         p.addAction(self.act("➕ Añadir selección a la lista", lambda: self.pl_add(self.selected_paths())))
 
         t = mb.addMenu("&Herramientas")
@@ -8017,6 +8047,7 @@ class Main(QMainWindow):
         mb.addAction(self.act_settings)
 
         a = mb.addMenu("A&yuda")
+        a.addAction(self.act("👋 Primeros pasos", self.show_welcome, "Un recorrido corto por lo principal del programa"))
         a.addAction(self.act("❓ Guía rápida", self.show_guide))
         a.addAction(self.act("⌨ Atajos de teclado", self.show_shortcuts, "Todas las teclas rápidas del programa"))
         a.addAction(self.act("🔄 Buscar actualizaciones…", self.check_updates))
@@ -8026,6 +8057,8 @@ class Main(QMainWindow):
         a.addSeparator()
         a.addAction(self.act("🆕 Novedades de esta versión", lambda: self.show_whats_new(True)))
         a.addAction(self.act("ℹ️ Acerca de Music Manager", self.show_about))
+        a.addAction(self.act("🐞 Reportar un problema…", self.report_problem,
+                             "Prepara un informe con la versión y los últimos errores para enviarlo al autor"))
         a.addAction(self.act("📋 Registro de errores…", self.open_error_log,
                              "Abre el archivo donde el programa anota los fallos (útil para enviarlo si algo no funciona)"))
         mb.setCornerWidget(self._corner, Qt.Corner.TopRightCorner)
@@ -8864,6 +8897,9 @@ class Main(QMainWindow):
         """Pantallita con lo que cambió, la primera vez que se abre una versión nueva."""
         last = str(self.cfg.value("last_version", "") or "")
         self.cfg.setValue("last_version", APP_VERSION)
+        if not force and not last and not int(self.cfg.value("welcome_done", 0) or 0):
+            self.show_welcome()   # instalación nueva: en vez de la lista de novedades, un recorrido corto
+            return
         if not force:
             if last == APP_VERSION or (last and ver_tuple(last) > ver_tuple(APP_VERSION)):
                 return
@@ -8944,6 +8980,138 @@ class Main(QMainWindow):
         row.addWidget(close)
         v.addLayout(row)
         dlg.exec()
+
+    def show_welcome(self):
+        """Recorrido corto para quien abre el programa por primera vez (también en Ayuda → Primeros pasos)."""
+        pages = [
+            ("folder", "Bienvenido a Music Manager",
+             "Ordena, etiqueta y escucha tu música en un solo lugar.<br><br>A la <b>izquierda</b> están tus carpetas. "
+             "«Música» ya aparece; con <b>Archivo → Agregar carpeta</b> sumas las tuyas (un disco externo, descargas…)."),
+            ("edit", "Editar es seleccionar y escribir",
+             "Haz clic en una canción (o en varias con Ctrl o Mayús) y cambia título, artista, álbum, portada o letra "
+             "abajo y a la derecha.<br><br>Nada se toca en tus archivos hasta que pulses <b>Guardar (Ctrl+S)</b>. "
+             "Mover nunca sobrescribe y borrar va a la papelera."),
+            ("sparkle", "Herramientas que hacen el trabajo",
+             "En <b>Herramientas</b>: rellenar etiquetas automáticamente, buscar portadas y letras, renombrar en lote, "
+             "encontrar duplicados, convertir formatos y revisar la calidad real (espectrograma).<br><br>"
+             "Si te equivocas al mover o renombrar: <b>Edición → Deshacer</b>."),
+            ("note", "Y a escuchar",
+             "Doble clic en una canción para reproducirla. El botón de ventanita separa el reproductor en su propia "
+             "ventana; AvPág y RePág cambian de canción aunque estés en otro programa.<br><br>"
+             "¿Algo falla? <b>Ayuda → Reportar un problema</b>. ¡Disfrútalo!"),
+        ]
+        d = QDialog(self)
+        d.setWindowTitle(T("Primeros pasos"))
+        d.setFixedSize(560, 380)
+        v = QVBoxLayout(d)
+        stack = QStackedWidget()
+        for glyph, title, body in pages:
+            w_ = QWidget()
+            pv = QVBoxLayout(w_)
+            pv.setContentsMargins(24, 14, 24, 6)
+            ic = QLabel()
+            ic.setPixmap(icons.vicon(glyph, self.palette().color(QPalette.ColorRole.Highlight)).pixmap(54, 54))
+            ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            tl = QLabel("<h2>" + T(title) + "</h2>")
+            tl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            bl = QLabel(T(body))
+            bl.setWordWrap(True)
+            bl.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+            bl.setTextFormat(Qt.TextFormat.RichText)
+            pv.addWidget(ic)
+            pv.addWidget(tl)
+            pv.addWidget(bl, 1)
+            stack.addWidget(w_)
+        v.addWidget(stack, 1)
+        row = QHBoxLayout()
+        dots = QLabel("")
+        back = QPushButton(T("Atrás"))
+        nxt = QPushButton("")
+        nxt.setObjectName("accent")
+        nxt.setDefault(True)
+        skip = QPushButton(T("Saltar"))
+
+        def upd():
+            i = stack.currentIndex()
+            dots.setText("  ".join("●" if k == i else "○" for k in range(stack.count())))
+            back.setEnabled(i > 0)
+            nxt.setText(T("Empezar") if i == stack.count() - 1 else T("Siguiente"))
+
+        def go(step):
+            i = stack.currentIndex() + step
+            if i >= stack.count():
+                d.accept()
+            else:
+                stack.setCurrentIndex(max(0, i))
+                upd()
+        back.clicked.connect(lambda: go(-1))
+        nxt.clicked.connect(lambda: go(1))
+        skip.clicked.connect(d.reject)
+        row.addWidget(skip)
+        row.addStretch(1)
+        row.addWidget(dots)
+        row.addStretch(1)
+        row.addWidget(back)
+        row.addWidget(nxt)
+        v.addLayout(row)
+        upd()
+        self.cfg.setValue("welcome_done", 1)
+        d.exec()
+
+    def report_problem(self):
+        """Arma un informe (versión, Windows y los últimos errores anotados) que el usuario puede revisar, copiar y
+        enviar por GitHub. No se envía nada solo: se muestra primero y lo manda la persona."""
+        import platform
+        tail = ""
+        for pth in (error_log_path(), os.path.join(os.path.dirname(error_log_path()), "errores_menores.txt")):
+            try:
+                with open(pth, encoding="utf-8", errors="replace") as fh:
+                    txt = fh.read()[-1800:]
+                if txt.strip():
+                    tail += f"\n--- {os.path.basename(pth)} ---\n{txt}"
+            except OSError:
+                pass
+        home = os.path.expanduser("~")
+        tail = tail.replace(home, "~")   # sin el nombre de usuario de Windows
+        body = (T("¿Qué estabas haciendo y qué pasó? (escríbelo aquí)") + "\n\n\n"
+                f"Music Manager {APP_VERSION} · {platform.system()} {platform.release()} ({platform.version()})\n"
+                + (tail or "\n(" + T("sin errores anotados") + ")"))
+        d = QDialog(self)
+        d.setWindowTitle(T("Reportar un problema"))
+        d.resize(640, 520)
+        v = QVBoxLayout(d)
+        info = QLabel(T("Esto es lo que se enviará. Puedes editarlo o borrar lo que no quieras compartir (por ejemplo, "
+                        "nombres de carpetas). Nada se envía solo: al pulsar «Abrir en GitHub» se abre la página con el "
+                        "texto listo y tú lo publicas (hace falta una cuenta gratuita de GitHub). Si no tienes, usa "
+                        "«Copiar» y mándalo por donde prefieras."))
+        info.setWordWrap(True)
+        info.setObjectName("dlgsub")
+        v.addWidget(info)
+        ed = QPlainTextEdit(body)
+        v.addWidget(ed, 1)
+        row = QHBoxLayout()
+        cp = QPushButton(T("Copiar"))
+        gh = QPushButton(T("Abrir en GitHub"))
+        gh.setObjectName("accent")
+        cl = QPushButton(T("Cerrar"))
+
+        def copy():
+            QApplication.clipboard().setText(ed.toPlainText())
+            self.statusBar().showMessage(T("Informe copiado."))
+
+        def open_gh():
+            QApplication.clipboard().setText(ed.toPlainText())   # por si el texto es largo y la página lo corta
+            q = urllib.parse.urlencode({"title": f"[{APP_VERSION}] ", "body": ed.toPlainText()[:5500]})
+            QDesktopServices.openUrl(QUrl("https://github.com/PandxMax/MusicManager/issues/new?" + q))
+        cp.clicked.connect(copy)
+        gh.clicked.connect(open_gh)
+        cl.clicked.connect(d.reject)
+        row.addWidget(cp)
+        row.addStretch(1)
+        row.addWidget(cl)
+        row.addWidget(gh)
+        v.addLayout(row)
+        d.exec()
 
     def open_error_log(self):
         p = error_log_path()

@@ -240,9 +240,9 @@ class IconBtn(QPushButton):
             p.drawEllipse(r)
             col = QColor(20, 20, 28)
         elif self.style_ == "glass":   # botoncito discreto sobre la portada
-            p.setBrush(QColor(0, 0, 0, 150 if hov else 70))
+            p.setBrush(QColor(0, 0, 0, 165 if hov else 105))
             p.drawEllipse(r)
-            col = QColor(255, 255, 255, 255 if hov else 190)
+            col = QColor(255, 255, 255, 255 if hov else 225)
         else:
             if hov:
                 p.setBrush(QColor(255, 255, 255, 30))
@@ -273,11 +273,11 @@ class WaveSeek(QWidget):
         self.levels, self.pos, self.dur = [], 0, 0
         self.drag, self.hover = None, None
         self.dense, self.accent = dense, QColor(255, 214, 90)
-        if dense:   # barrita compacta: onda seguida, lo escuchado de color y una línea donde va la canción
-            self.BW, self.GAP = 2, 1
+        if dense:   # barrita compacta: onda fina, lo escuchado de color y un punto donde va la canción
+            self.BW, self.GAP = 2, 2
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedHeight(30 if dense else 42)
+        self.setFixedHeight(22 if dense else 42)
 
     def set_levels(self, lv):
         self.levels = list(lv or [])
@@ -319,10 +319,10 @@ class WaveSeek(QWidget):
                 c = (x + self.BW / 2 - x0) / tw
                 bh = max(2.0, maxh * (0.10 + 0.90 * v))
                 p.setBrush(self.accent if c <= frac else (QColor(255, 255, 255, 170) if hov is not None and c <= hov else rest))
-                p.drawRect(QRectF(x, cy - bh / 2, self.BW, bh))
+                p.drawRoundedRect(QRectF(x, cy - bh / 2, self.BW, bh), 1, 1)
             if self.dur:
                 p.setBrush(QColor(255, 255, 255))
-                p.drawRoundedRect(QRectF(x0 + tw * frac - 1, 0, 2.5, self.height()), 1, 1)
+                p.drawEllipse(QPointF(x0 + tw * frac, cy), 4.5, 4.5)
             return
         for i, v in enumerate(lv):
             x = x0 + i * (self.BW + self.GAP)
@@ -1144,7 +1144,7 @@ class CompactPlayer(QWidget):
     """«Solo la portada»: una ventanita con la portada, anterior / pausa / siguiente y una barrita con la onda de la
     canción. Se mueve arrastrando y se agranda o achica tirando de los bordes o las esquinas."""
     CM = 10     # margen transparente (sombra)
-    STRIP = 46  # franja de abajo (tiempos, barrita y volumen): la portada queda entera y limpia arriba
+    STRIP = 68  # franja de abajo (título, tiempos, barrita y volumen): la portada queda entera y limpia arriba
     EDGE = 7    # zona de los bordes para cambiar el tamaño
 
     def __init__(self, mini):
@@ -1158,14 +1158,17 @@ class CompactPlayer(QWidget):
             pass
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
-        self.setMinimumSize(220 + 2 * self.CM, 200 + self.STRIP + 2 * self.CM)
+        self.setMinimumSize(230 + 2 * self.CM, 190 + self.STRIP + 2 * self.CM)
         self._bg, self._bg_key = None, None
         self._press, self._moved = None, False
         if mini.top:
             self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.b_prev = IconBtn("prev", 42, pad=0.25, parent=self)
-        self.b_play = IconBtn("play", 64, "white", 0.27, parent=self)
-        self.b_next = IconBtn("next", 42, pad=0.25, parent=self)
+        self.b_prev = IconBtn("prev", 38, "glass", 0.28, parent=self)
+        self.b_play = IconBtn("play", 62, "white", 0.27, parent=self)
+        self.b_next = IconBtn("next", 38, "glass", 0.28, parent=self)
+        self.name = QLabel("", self)   # título · artista, en la franja de abajo
+        self.name.setStyleSheet("QLabel { color: white; font-size: 12px; background: transparent; }")
+        self.name.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.b_prev.setToolTip(T("Anterior"))
         self.b_play.setToolTip(T("Reproducir / pausa (Espacio)"))
         self.b_next.setToolTip(T("Siguiente"))
@@ -1176,7 +1179,7 @@ class CompactPlayer(QWidget):
         self.wave.seek.connect(mini.do_seek)
         self.t_pos, self.t_left = QLabel("0:00", self), QLabel("-0:00", self)
         for l in (self.t_pos, self.t_left):
-            l.setStyleSheet("QLabel { color: rgba(255,255,255,225); font-size: 11px; font-weight: 700; background: transparent; }")
+            l.setStyleSheet("QLabel { color: rgba(255,255,255,190); font-size: 10px; font-weight: 600; background: transparent; }")
             l.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.t_left.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.b_vol = IconBtn("vol2", 26, pad=0.20, parent=self)
@@ -1235,19 +1238,20 @@ class CompactPlayer(QWidget):
 
     def resizeEvent(self, e):
         r, ca = self.card(), self.cover_area()
-        # franja de abajo: tiempo · barrita · tiempo que falta · volumen (nada de esto tapa la portada)
-        sy = ca.bottom() + (self.STRIP - self.wave.height()) / 2
-        self.t_pos.setGeometry(int(r.left() + 10), int(sy), 34, self.wave.height())
-        self.b_vol.move(int(r.right() - 8 - self.b_vol.width()), int(ca.bottom() + (self.STRIP - self.b_vol.height()) / 2))
-        self.t_left.setGeometry(int(self.b_vol.x() - 4 - 38), int(sy), 38, self.wave.height())
+        # franja de abajo (nada de esto tapa la portada): título · artista y el volumen; debajo, tiempos y barrita
+        self.b_vol.move(int(r.right() - 10 - self.b_vol.width()), int(ca.bottom() + 8))
+        self.name.setGeometry(int(r.left() + 14), int(ca.bottom() + 9), int(self.b_vol.x() - r.left() - 20), 22)
+        sy = ca.bottom() + 38
+        self.t_pos.setGeometry(int(r.left() + 14), int(sy), 30, self.wave.height())
+        self.t_left.setGeometry(int(r.right() - 14 - 34), int(sy), 34, self.wave.height())
         wx = self.t_pos.x() + self.t_pos.width() + 4
         self.wave.setGeometry(int(wx), int(sy), max(40, int(self.t_left.x() - 4 - wx)), self.wave.height())
         # botones sobre la parte de abajo de la portada
-        cy = ca.bottom() - 10 - self.b_play.height() / 2
+        cy = ca.bottom() - 8 - self.b_play.height() / 2
         cx = r.center().x()
         self.b_play.move(int(cx - self.b_play.width() / 2), int(cy - self.b_play.height() / 2))
-        self.b_prev.move(int(cx - self.b_play.width() / 2 - 8 - self.b_prev.width()), int(cy - self.b_prev.height() / 2))
-        self.b_next.move(int(cx + self.b_play.width() / 2 + 8), int(cy - self.b_next.height() / 2))
+        self.b_prev.move(int(cx - self.b_play.width() / 2 - 12 - self.b_prev.width()), int(cy - self.b_prev.height() / 2))
+        self.b_next.move(int(cx + self.b_play.width() / 2 + 12), int(cy - self.b_next.height() / 2))
         self.b_full.move(int(r.right() - 8 - self.b_full.width()), int(r.top() + 8))
         self.lbl.setGeometry(int(r.left() + 14), int(r.top() + 12), int(r.width() - 60), 18)
         self._bg_key = None
@@ -1282,7 +1286,17 @@ class CompactPlayer(QWidget):
         p.setClipPath(path)
         img = self.mini.img
         ca = self.cover_area()
-        p.fillRect(r, QColor(self.mini.colb2).darker(140))   # franja de abajo, del color de la portada (oscuro)
+        # franja de abajo como un vidrio: la portada difuminada debajo, oscurecida con su propio color
+        st = QRectF(r.left(), ca.bottom(), r.width(), self.STRIP)
+        base = QColor(self.mini.colb2)
+        p.fillRect(r, base)
+        if self.mini.blur2 is not None:
+            b2 = self.mini.blur2
+            p.drawPixmap(st, b2, QRectF(0, b2.height() * 0.72, b2.width(), b2.height() * 0.28))
+            veil = QColor(base)
+            veil.setAlpha(150)
+            p.fillRect(st, veil)
+            p.fillRect(st, QColor(0, 0, 0, 70))
         if img is not None:
             if self.mini.blur2 is not None:   # si la ventana no es cuadrada, los lados se rellenan con la portada difuminada
                 p.drawPixmap(ca, self.mini.blur2, QRectF(self.mini.blur2.rect()))
@@ -1300,11 +1314,9 @@ class CompactPlayer(QWidget):
             icons.draw_glyph(p, "note", QRectF(ca.center().x() - ca.width() * 0.14, ca.top() + ca.height() * 0.2,
                                                ca.width() * 0.28, ca.width() * 0.28), QColor(255, 255, 255, 90))
             p.restore()
-        bh = min(ca.height() * 0.4, 96.0)   # sombra suave solo detrás de los tres botones
-        g = QLinearGradient(0, ca.bottom() - bh, 0, ca.bottom())
-        g.setColorAt(0, QColor(0, 0, 0, 0))
-        g.setColorAt(1, QColor(0, 0, 0, 150))
-        p.fillRect(QRectF(ca.left(), ca.bottom() - bh, ca.width(), bh), QBrush(g))
+        p.setPen(QColor(255, 255, 255, 26))   # línea finita que separa la portada de la franja
+        p.drawLine(QPointF(st.left(), st.top() + 0.5), QPointF(st.right(), st.top() + 0.5))
+        p.setPen(Qt.PenStyle.NoPen)
         if hov:
             g2 = QLinearGradient(0, r.top(), 0, r.top() + 110)
             g2.setColorAt(0, QColor(0, 0, 0, 190))
@@ -1339,6 +1351,14 @@ class CompactPlayer(QWidget):
             a = self.main.val(path, "artist")
             txt = t + (f"  ·  {a}" if a else "")
         self.title_txt = txt
+        if path:
+            fm = self.name.fontMetrics()
+            w_ = max(40, self.name.width())
+            tt = fm.elidedText(t, Qt.TextElideMode.ElideRight, int(w_ * 0.62))
+            aa = fm.elidedText(a or "", Qt.TextElideMode.ElideRight, max(20, w_ - fm.horizontalAdvance(tt) - 30))
+            self.name.setText(f"<b>{html.escape(tt)}</b>" + (f"<span style='color:rgba(255,255,255,170)'>  ·  {html.escape(aa)}</span>" if aa else ""))
+        else:
+            self.name.setText(f"<span style='color:rgba(255,255,255,170)'>{html.escape(txt)}</span>")
 
     def track_changed(self):
         self._bg_key = None
@@ -1612,12 +1632,12 @@ class MiniPlayer(QWidget):
             self.b_down.setToolTip(T("Cerrar el reproductor grande"))
             self.b_down.clicked.connect(lambda: self.parentWidget().close_panel())
             self.b_compact = IconBtn("mini", 34, pad=0.25)
-            self.b_compact.setToolTip(T("Modo reproductor: esconde el editor y deja solo el reproductor (se puede mover) · Ctrl+M"))
-            self.b_compact.clicked.connect(self.main.enter_mini)
+            self.b_compact.setToolTip(T("Separar el reproductor en su propia ventana (el editor sigue abierto)"))
+            self.b_compact.clicked.connect(lambda: self.main.enter_mini(True))
         else:
             self.b_down = PillBtn("arrow_l", T("Editor"))
             self.b_down.setToolTip(T("Volver al editor (Esc)"))
-            self.b_down.clicked.connect(self.main.exit_mini)
+            self.b_down.clicked.connect(self.go_editor)
             self.b_compact = IconBtn("mini", 34, pad=0.25)
             self.b_compact.setToolTip(T("Solo la portada: ventanita pequeña con anterior, pausa y siguiente"))
             self.b_compact.clicked.connect(self.enter_compact)
@@ -2290,17 +2310,28 @@ class MiniPlayer(QWidget):
         m.play_file(path)
 
     # ------------------------------------------------------------ acciones
+    def go_editor(self):
+        """«← Editor»: con las dos ventanas abiertas trae el editor al frente; si estaba escondido, vuelve a él."""
+        m = self.main
+        if getattr(m, "mini_detached", False):
+            if m.isMinimized():
+                m.showNormal()
+            m.raise_()
+            m.activateWindow()
+        else:
+            m.exit_mini()
+
     def edit_song(self):
         p = self.path
         if not self.embedded:
-            self.main.exit_mini()
+            self.go_editor()
         if p and os.path.isfile(p):
             self.main.go_to_folder(p)
 
     def quality_song(self):
         p = self.path
         if not self.embedded:
-            self.main.exit_mini()
+            self.go_editor()
         if p and os.path.isfile(p):
             self.main.go_to_folder(p)
             QTimer.singleShot(300, self.main.open_spectrum)
@@ -2308,9 +2339,16 @@ class MiniPlayer(QWidget):
     def show_menu(self, gpos):
         m = QMenu(self)
         if self.embedded:
-            m.addAction(T("Modo reproductor (solo el reproductor)"), self.main.enter_mini)
+            m.addAction(T("Separar el reproductor (dos ventanas)"), lambda: self.main.enter_mini(True))
+            m.addAction(T("Modo reproductor (solo el reproductor)"), lambda: self.main.enter_mini(False))
         else:
-            m.addAction(T("Volver al editor"), self.main.exit_mini)
+            if getattr(self.main, "mini_detached", False):
+                m.addAction(T("Ir al editor"), self.go_editor)
+                m.addAction(T("Unir de nuevo al editor (cerrar esta ventana)"), self.main.exit_mini)
+                m.addAction(T("Esconder el editor (solo el reproductor)"), lambda: self.main.set_mini_detached(False))
+            else:
+                m.addAction(T("Volver al editor"), self.main.exit_mini)
+                m.addAction(T("Mostrar también el editor (dos ventanas)"), lambda: self.main.set_mini_detached(True))
             a = m.addAction(T("Siempre encima de las demás ventanas"))
             a.setCheckable(True)
             a.setChecked(self.top)
@@ -2473,7 +2511,7 @@ class MiniPlayer(QWidget):
                 self.lib.go_back()
             elif self.panel.isVisible():
                 self.toggle_lyrics()
-            else:
+            elif not getattr(self.main, "mini_detached", False):
                 self.main.exit_mini()
         elif k == Qt.Key.Key_L:
             self.toggle_lyrics()

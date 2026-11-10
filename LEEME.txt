@@ -751,3 +751,15 @@ VERSIÓN 2.23
    También funcionan las teclas multimedia del teclado (reproducir/pausa, siguiente, anterior).
  - Ventanita «solo la portada»: la carátula se ve entera, sin nada encima salvo los tres botones.
    Los tiempos, la barrita de avance y el botón de volumen van en una franja debajo de la imagen.
+
+VERSIÓN 2.24
+------------
+ - Separar el reproductor: botón de ventanita del panel, Reproducción → «Separar el reproductor
+   (dos ventanas)» o Ctrl+Shift+M. El reproductor pasa a su propia ventana, con todas sus opciones,
+   y el editor sigue abierto: dos ventanas en la barra de tareas. En su menú ⋮: «Ir al editor»,
+   «Unir de nuevo al editor» y «Esconder el editor (solo el reproductor)».
+ - Ventanita «solo la portada» más cuidada: portada limpia, botones redondos de vidrio, y una franja
+   con título · artista, barrita fina con punto de avance, tiempos y volumen.
+ - Ayuda → «Primeros pasos»: recorrido de 4 pantallas (sale solo la primera vez en instalaciones nuevas).
+ - Ayuda → «Reportar un problema»: arma un informe con la versión, Windows y los últimos errores; lo
+   revisas y lo envías por GitHub o lo copias. Nada se envía solo.

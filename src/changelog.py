@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.24', [
+        'Nuevo «Separar el reproductor» (botón de ventanita del panel, o Reproducción → Separar, Ctrl+Shift+M): el reproductor pasa a su propia ventana con todas sus opciones y el editor sigue abierto; son dos ventanas en la barra de tareas. Ventanita «solo la portada» más cuidada: portada limpia, botones redondos de vidrio y una franja con el título, el artista, la barrita fina y el volumen. Ayuda → «Primeros pasos» (recorrido corto, sale solo en instalaciones nuevas) y «Reportar un problema» (prepara el informe con la versión y los últimos errores para enviarlo).',
+    ]),
     ('2.23', [
         'Windows ahora sabe qué canción suena (título, artista, álbum y portada): aparece en Wallpaper Engine, en el panel multimedia de Windows y en la pantalla de bloqueo, y funcionan las teclas multimedia del teclado. Ventanita «solo la portada»: la carátula se ve entera y limpia; la barrita, los tiempos y el nuevo botón de volumen van en una franja debajo de la imagen.',
     ]),
