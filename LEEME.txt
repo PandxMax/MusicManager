@@ -643,3 +643,12 @@ VERSIÓN 2.13
 ------------
  - Buscar en carpetas con miles de canciones ya no parpadea ni se traba: la lista se arma solo con lo
    que coincide (antes se escondían una por una las demás, y con 3000+ canciones eso era muy lento).
+
+VERSIÓN 2.14
+------------
+ - Modo reproductor: botón 🪟 en el reproductor (también Reproducción → Modo reproductor, o Ctrl+M).
+   El editor se esconde y queda solo un reproductor pequeño que se puede arrastrar a cualquier parte.
+   La portada se funde con el color de la canción; debajo, título, la onda de la canción (clic para
+   avanzar) con los controles encima, tiempos y la calidad del archivo (bits, kHz, kbps, formato).
+   Clic en la portada = letra · botón de líneas = cola · rueda del ratón = volumen.
+   Al pasar el ratón: 📌 siempre encima, minimizar y volver al editor. Esc también vuelve al editor.

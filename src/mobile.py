@@ -184,8 +184,12 @@ class MobilePlayer(QFrame):
         self.btn_fx = RoundButton("fx", 36)
         self.btn_fx.setToolTip("Ajustes de la canción")
         self.btn_fx.clicked.connect(self.main.open_fx)
+        self.btn_mini = RoundButton("mini", 36)
+        self.btn_mini.setToolTip("Modo reproductor: esconde el editor y deja solo el reproductor (se puede mover) · Ctrl+M")
+        self.btn_mini.clicked.connect(self.main.enter_mini)
         top.addWidget(self.btn_close)
         top.addWidget(cap, 1)
+        top.addWidget(self.btn_mini)
         top.addWidget(self.btn_fx)
         v.addLayout(top)
 

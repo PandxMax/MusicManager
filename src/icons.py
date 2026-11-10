@@ -14,7 +14,7 @@ LEAD = {
     "💿": "disc", "💬": "chat", "✔": "check", "🔳": "grid", "🆕": "sparkle", "🔊": "vol3", "🔉": "vol2",
     "🔈": "vol1", "🔇": "vol0", "⋯": "more", "✕": "close", "◀": "arrow_l", "▲": "arrow_u", "🎚": "fx",
     "🔁": "loop", "🎵": "note", "⚙": "gear", "🌐": "globe", "▤": "table", "👁": "eye", "↕": "sort", "👤": "person", "🛠": "tools", "🗃": "explorer", "🎧": "note", "📖": "book", "🏷": "tag", "📤": "download",
-    "📁": "folder", "📡": "server", "🩺": "check", "📈": "chart", "🔌": "server", "🔑": "pin", "🧹": "sparkle", "⌨": "grid",
+    "📁": "folder", "📡": "server", "🩺": "check", "📈": "chart", "🔌": "server", "🔑": "pin", "🧹": "sparkle", "⌨": "grid", "🪟": "mini",
 }
 
 
@@ -403,6 +403,28 @@ def draw_glyph(p, kind, rect, col):
         p.drawEllipse(QPointF(7.5, 7.25), 1.1, 1.1)
         p.drawEllipse(QPointF(7.5, 16.75), 1.1, 1.1)
         p.setBrush(Qt.BrushStyle.NoBrush)
+    elif k in ("rew", "ffw"):   # dos triángulos (retroceder / adelantar unos segundos)
+        if k == "rew":
+            p.translate(24, 0)
+            p.scale(-1, 1)
+        solid()
+        p.drawPolygon(_poly([(3, 6), (3, 18), (12, 12)]))
+        p.drawPolygon(_poly([(12, 6), (12, 18), (21, 12)]))
+    elif k == "mini":   # modo reproductor: ventana con una ventanita abajo a la derecha
+        p.drawRoundedRect(QRectF(3, 4.5, 18, 15), 2.5, 2.5)
+        solid()
+        p.drawRoundedRect(QRectF(11.5, 11.5, 7, 5.5), 1.3, 1.3)
+    elif k == "expand":   # volver a la ventana grande
+        line((13.5, 4.5), (19.5, 4.5), (19.5, 10.5))
+        line((19.5, 4.5), (13, 11))
+        line((10.5, 19.5), (4.5, 19.5), (4.5, 13.5))
+        line((4.5, 19.5), (11, 13))
+    elif k == "minus":
+        line((6, 12), (18, 12))
+    elif k == "eqbars":   # barras de ecualizador
+        solid()
+        for x, h in ((4, 7), (9.5, 14), (15, 10)):
+            p.drawRoundedRect(QRectF(x, 20 - h, 4.5, h), 2, 2)
     elif k == "gear":
         p.drawEllipse(QPointF(12, 12), 3, 3)
         for i in range(8):

@@ -74,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.13"
+APP_VERSION = "2.14"
 
 
 class TMenu(QMenu):
@@ -965,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.14', [
+        'Nuevo «modo reproductor»: botón 🪟 en el reproductor (o Ctrl+M). El editor se esconde y queda solo un reproductor pequeño que puedes mover a cualquier parte de la pantalla, con la portada que se funde con el color de la canción, la onda para avanzar, los controles encima, la calidad del archivo, letra y cola. Esc o el botón de cuadritos vuelve al editor.',
+    ]),
     ('2.13', [
         'Búsqueda en carpetas con miles de canciones (por ejemplo 3500 con «Incluir subcarpetas»): ya no parpadea ni se traba. La lista se arma solo con lo que coincide, en vez de esconder canción por canción, y cada búsqueda tarda menos de una décima de segundo.',
     ]),
@@ -1605,7 +1608,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.13 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.14 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4303,6 +4306,7 @@ class Main(QMainWindow):
         self.repeat = str(self.cfg.value("repeat", "off") or "off")
         self._shuffle_hist = []
         self.mobile = None
+        self.mini = None   # modo reproductor (ventanita aparte; se crea la primera vez)
         if self.player is not None:
             import mobile
             self.mobile = mobile.MobilePlayer(self, central, inspect_file)
@@ -5280,6 +5284,11 @@ class Main(QMainWindow):
         h.addWidget(seekbox)
         h.addWidget(self.time_lbl)
         h.addWidget(self.btn_fx)
+        self.btn_mini = GlyphButton("mini")
+        self.btn_mini.setToolTip("Modo reproductor: esconde el editor y deja solo el reproductor (se puede mover) · Ctrl+M")
+        self.btn_mini.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_mini.clicked.connect(self.enter_mini)
+        h.addWidget(self.btn_mini)
         self.volbox = VolBox(self.btn_mute, self.vol)
         h.addWidget(self.volbox)
         self.disc = SpinDisc(40)
@@ -5319,6 +5328,8 @@ class Main(QMainWindow):
 
     def expand_player(self):
         """Con el estilo celular, al reproducir (doble clic, «Reproducir»…) se despliega el reproductor grande."""
+        if getattr(self, "mini", None) is not None and self.mini.isVisible():
+            return   # en modo reproductor el editor está escondido
         if (getattr(self, "player_style", "classic") == "mobile" and self.mobile is not None
                 and not self.mobile.isVisible() and int(self.cfg.value("auto_expand", 1) or 0)):
             self.mobile.open_panel()
@@ -5332,6 +5343,8 @@ class Main(QMainWindow):
         self.player.play()
         if getattr(self, "mobile", None) is not None and self.mobile.isVisible():
             self.mobile.track_changed(path)
+        if getattr(self, "mini", None) is not None and self.mini.isVisible():
+            self.mini.track_changed(path)
         artist, album = self.val(path, "artist"), self.val(path, "album")
         self.set_now(self.val(path, "title") or os.path.splitext(os.path.basename(path))[0],
                      " · ".join(x for x in (artist, album) if x))
@@ -5399,6 +5412,44 @@ class Main(QMainWindow):
     def viz_ready(self, path, arr, fps):
         if path == self.playing_path:
             self.viz.set_data(arr, fps)
+            if getattr(self, "mini", None) is not None:
+                self.mini.set_viz(path, arr)
+
+    # ------------------------------------------------- Modo reproductor
+    def enter_mini(self):
+        """Esconde el editor y deja solo un reproductor pequeño que se puede mover por la pantalla."""
+        if self.player is None:
+            self.statusBar().showMessage(T("El reproductor integrado no está disponible."))
+            return
+        import miniplayer
+        if self.mini is None:
+            self.mini = miniplayer.MiniPlayer(self, inspect_file, tech_info)
+        if self.mini.isVisible():
+            return
+        self._mini_was_max = self.isMaximized()
+        self.mini.track_changed(self.playing_path)
+        self.mini.place_initial(self.frameGeometry())
+        self.mini.show()
+        self.mini.raise_()
+        self.mini.activateWindow()
+        self.mini.setFocus()
+        self.hide()
+
+    def exit_mini(self):
+        if self.mini is not None:
+            self.mini.hide()
+        if getattr(self, "_mini_was_max", False):
+            self.showMaximized()
+        else:
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        if getattr(self, "mobile", None) is not None and self.mobile.isVisible():
+            self.mobile.track_changed(self.playing_path)
+
+    def quit_from_mini(self):
+        self.exit_mini()
+        QTimer.singleShot(0, self.close)
 
     # ------------------------------------------------- Lista de reproducción
     QUEUE = "Cola actual"
@@ -7899,6 +7950,7 @@ class Main(QMainWindow):
         e.addAction(self.act("📥 Pegar metadatos…\tCtrl+Shift+V", self.paste_meta,
                              "Pega en las canciones elegidas las etiquetas copiadas (eliges cuáles)"))
         QShortcut(QKeySequence("Ctrl+Shift+C"), self, activated=self.copy_meta)
+        QShortcut(QKeySequence("Ctrl+M"), self, activated=self.enter_mini)
         QShortcut(QKeySequence("Ctrl+Shift+V"), self, activated=self.paste_meta)
         e.addSeparator()
         e.addAction(self.act("✏️ Renombrar\tF2", self.rename_current))
@@ -7929,6 +7981,7 @@ class Main(QMainWindow):
         p.addAction(self.act("⏹ Detener", self.stop_play))
         p.addSeparator()
         p.addAction(self.act("☰ Lista de reproducción", self.show_playlist))
+        p.addAction(self.act("🪟 Modo reproductor (solo el reproductor)\tCtrl+M", self.enter_mini))
         p.addAction(self.act("➕ Añadir selección a la lista", lambda: self.pl_add(self.selected_paths())))
 
         t = mb.addMenu("&Herramientas")
