@@ -74,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.16"
+APP_VERSION = "2.17"
 
 
 class TMenu(QMenu):
@@ -965,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.17', [
+        'Modo reproductor: nueva portada grande difuminada (ocupa todo lo de arriba y se funde con el fondo, con el título encima, como en la imagen); en el menú ⋮ se elige «Portada grande difuminada» o «Portada normal». La Cola ahora refleja el árbol de carpetas: «Carpetas» muestra las mismas carpetas principales que el árbol (si agregas o quitas una, cambia), y «Canciones» tiene todas las canciones de todas esas carpetas.',
+    ]),
     ('2.16', [
         'Modo reproductor con el diseño de la app del celular: portada en tarjeta, «REPRODUCIENDO · 1483 de 3786», título, artista, calidad (MP3 · 44.1 kHz · 320 kbps · Alta), barra de avance con la onda, controles con el botón blanco grande y la barra Cola · Letra · Ajustes · Editar · Calidad; el fondo sigue mezclando y difuminando los colores de la portada. «Cola» abre todas las canciones, carpetas, artistas y géneros, ahora con la portada de cada canción y de cada carpeta.',
     ]),
@@ -1614,7 +1617,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.16 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.17 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4362,6 +4365,12 @@ class Main(QMainWindow):
             return json.loads(self.cfg.value("pinned", "[]"))
         except Exception:
             return []
+
+    def tree_roots(self):
+        """Las carpetas principales del árbol (Música y las que agregaste), tal como se ven a la izquierda."""
+        ents = [(n, p) for n, p in main_folders()]
+        ents += [("📌 " + (os.path.basename(p) or p), p) for p in self.pinned() if os.path.isdir(p)]
+        return ents
 
     def build_trees(self):
         ents = [(n, p, "main") for n, p in main_folders()]

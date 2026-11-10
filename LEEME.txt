@@ -678,3 +678,13 @@ VERSIÓN 2.16
    canción, de cada carpeta y de cada artista.
  - «Editar» y «Calidad» vuelven al editor con la canción marcada (Calidad abre el espectrograma).
  - Doble clic en la portada = reproducir/pausa. Rueda del ratón = volumen.
+
+VERSIÓN 2.17
+------------
+ - Modo reproductor: portada grande difuminada (ocupa toda la parte de arriba, se va difuminando y se
+   funde con el fondo; el título y el artista van encima, a la izquierda). En el menú ⋮ eliges
+   «Portada grande difuminada» o «Portada normal» (la de tarjeta). Se recuerda tu elección.
+ - Cola → Carpetas: muestra las mismas carpetas principales que el árbol del editor (Música y las que
+   agregaste). Dentro de cada una, sus subcarpetas (igual que el árbol) y sus canciones. Cada vez que
+   abres la Cola se revisa de nuevo: si agregas o quitas carpetas o canciones, se refleja.
+ - Cola → Canciones: todas las canciones de todas las carpetas del árbol.

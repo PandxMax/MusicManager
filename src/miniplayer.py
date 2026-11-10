@@ -306,6 +306,7 @@ class QualityRow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.fmt, self.detail, self.lvl = "", "", 5
+        self.left = False   # alineada a la izquierda (portada grande) o al centro (portada normal)
         self.setFixedHeight(24)
 
     def set(self, fmt, detail, lvl):
@@ -329,8 +330,8 @@ class QualityRow(QWidget):
         if self.lvl in QUALITY:
             lab = T(QUALITY[self.lvl][0])
             parts.append(("lvl", lab, mb.horizontalAdvance(lab) + 18))
-        total = sum(w for _k, _t, w in parts)
-        x = (self.width() - total) / 2
+        total = sum(w for _k, _t, w in parts) + 4 * max(0, len(parts) - 1)
+        x = 0 if self.left else (self.width() - total) / 2
         h = self.height()
         for kind, text, w in parts:
             if kind == "chip":
@@ -416,28 +417,58 @@ class Panel(QWidget):
 KIND_R, KEY_R, TITLE_R, SUB_R, RIGHT_R, REP_R = (Qt.ItemDataRole.UserRole + i for i in range(6))
 
 
-class LibraryWorker(QThread):
-    """Busca todas las canciones de la carpeta (y de todas sus subcarpetas) y lee sus etiquetas en segundo plano."""
-    listed = pyqtSignal(str, list)            # carpeta, archivos (en cuanto se encuentran)
-    progress = pyqtSignal(str, int, int)      # carpeta, leídos, total
-    done = pyqtSignal(str, dict)              # carpeta, {ruta: (título, artista, álbum, género)}
+def _hidden_dir(dp, name):
+    """Igual que el árbol de carpetas: no se muestran las carpetas ocultas o de sistema."""
+    if name.startswith("."):
+        return True
+    full = os.path.join(dp, name)
+    if os.path.islink(full):
+        return True
+    try:
+        return bool(os.stat(full, follow_symlinks=False).st_file_attributes & 0x6)
+    except AttributeError:
+        return False
+    except OSError:
+        return True
 
-    def __init__(self, base, known, read_fn, exts):
+
+class LibraryWorker(QThread):
+    """Recorre las carpetas del árbol (todas sus subcarpetas) y lee las etiquetas que falten, en segundo plano."""
+    listed = pyqtSignal(object)            # estructura: carpetas, subcarpetas, canciones
+    progress = pyqtSignal(int, int)        # leídas, total
+    done = pyqtSignal(object)              # {ruta: (título, artista, álbum, género)}
+
+    def __init__(self, roots, known, prev, read_fn, exts):
         super().__init__()
-        self.base, self.known, self.read_fn, self.exts = base, known, read_fn, exts
+        self.roots, self.known, self.prev, self.read_fn, self.exts = roots, known, prev, read_fn, exts
 
     def run(self):
-        files = []
-        for dp, dns, fns in os.walk(self.base):
-            if self.isInterruptionRequested():
-                return
-            dns.sort(key=str.lower)
-            for f in sorted(fns, key=str.lower):
-                if os.path.splitext(f)[1].lower() in self.exts:
-                    files.append(os.path.join(dp, f))
-        self.listed.emit(self.base, files)
-        tags = {}
-        for i, f in enumerate(files):
+        order, children, direct, files = [], {}, {}, []
+        walked = []
+        for root in sorted(self.roots, key=len):
+            nr = os.path.normcase(os.path.normpath(root))
+            if any(nr == w or nr.startswith(w.rstrip("\\/") + os.sep) for w in walked):
+                continue   # está dentro de otra carpeta del árbol: ya se recorrió (sin repetir canciones)
+            walked.append(nr)
+            for dp, dns, fns in os.walk(root):
+                if self.isInterruptionRequested():
+                    return
+                dns[:] = sorted((d for d in dns if not _hidden_dir(dp, d)), key=str.lower)
+                order.append(dp)
+                children[dp] = [os.path.join(dp, d) for d in dns]
+                fl = [os.path.join(dp, f) for f in sorted(fns, key=str.lower)
+                      if os.path.splitext(f)[1].lower() in self.exts]
+                direct[dp] = fl
+                files += fl
+        self.listed.emit({"order": order, "children": children, "direct": direct, "files": files})
+        tags, todo = {}, []
+        for f in files:
+            t = self.prev.get(f)
+            if t is not None:
+                tags[f] = t
+            else:
+                todo.append(f)
+        for i, f in enumerate(todo):
             if self.isInterruptionRequested():
                 return
             t = self.known.get(f)
@@ -450,8 +481,8 @@ class LibraryWorker(QThread):
             tags[f] = (str(t.get("title") or ""), str(t.get("artist") or t.get("albumartist") or ""),
                        str(t.get("album") or ""), str(t.get("genre") or ""))
             if i % 120 == 119:
-                self.progress.emit(self.base, i + 1, len(files))
-        self.done.emit(self.base, tags)
+                self.progress.emit(i + 1, len(todo))
+        self.done.emit(tags)
 
 
 class RowDelegate(QStyledItemDelegate):
@@ -618,7 +649,8 @@ class LibraryPage(QWidget):
     def __init__(self, mini):
         super().__init__(mini)
         self.mini, self.main = mini, mini.main
-        self.base, self.files, self.tags, self.loaded = None, [], {}, False
+        self.roots, self.files, self.tags, self.loaded, self.scanning = [], [], {}, False, False
+        self.order, self.children, self.direct, self.fcount = [], {}, {}, {}
         self.worker, self.tab, self.stack = None, "songs", []
         self.read_pct = 0
         self.pix, self.rep = {}, {}   # portadas pequeñas ya cargadas · canción que representa a cada carpeta
@@ -647,8 +679,8 @@ class LibraryPage(QWidget):
         self.h_title.setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: 800; background: transparent; }")
         self.h_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.b_ref = IconBtn("refresh", 32, pad=0.27)
-        self.b_ref.setToolTip(T("Volver a leer la carpeta"))
-        self.b_ref.clicked.connect(lambda: self.open_for(self.base, force=True))
+        self.b_ref.setToolTip(T("Volver a leer las carpetas"))
+        self.b_ref.clicked.connect(lambda: self.open_for(force=True))
         self.b_close = IconBtn("close", 32, pad=0.30)
         self.b_close.setToolTip(T("Cerrar la biblioteca (Esc)"))
         self.b_close.clicked.connect(self.mini.close_library)
@@ -780,24 +812,27 @@ class LibraryPage(QWidget):
         super().showEvent(e)
 
     # ------------------------------------------------------------ datos
-    def open_for(self, base, force=False):
-        if not base or not os.path.isdir(base):
-            self.base, self.files, self.tags, self.loaded = base, [], {}, True
-            self.h_sub.setText(T("Abre una carpeta en el editor para ver su música aquí."))
+    def open_for(self, force=False):
+        """Siempre refleja el árbol de carpetas tal como está ahora: si agregaste o quitaste carpetas (o canciones),
+        se vuelve a recorrer. Mientras tanto se ve lo de la última vez; las etiquetas ya leídas no se releen."""
+        roots = list(self.main.tree_roots()) if hasattr(self.main, "tree_roots") else []
+        self.roots = [(lab, p) for lab, p in roots if p and os.path.isdir(p)]
+        if not self.roots:
+            self.files, self.loaded = [], True
             self.render()
+            self.h_sub.setText(T("Agrega carpetas al árbol del editor para ver su música aquí."))
             return
-        if base == self.base and (self.loaded or self.worker is not None) and not force:
+        if self.worker is not None and not force:
             self.render()
             return
         if self.worker is not None:
             self.worker.requestInterruption()
-        self.base, self.files, self.tags, self.loaded, self.read_pct = base, [], {}, False, 0
-        self.stack = []
+        self.loaded, self.read_pct, self.scanning = False, 0, True
         known = dict(getattr(self.main, "tags_cache", {}) or {})
-        w = LibraryWorker(base, known, self.mini.read_fn, self.mini.exts)
-        w.listed.connect(self.on_listed)
-        w.progress.connect(self.on_progress)
-        w.done.connect(self.on_done)
+        w = LibraryWorker([p for _l, p in self.roots], known, dict(self.tags), self.mini.read_fn, self.mini.exts)
+        w.listed.connect(lambda st, w=w: self.on_listed(w, st))
+        w.progress.connect(lambda n, t, w=w: self.on_progress(w, n, t))
+        w.done.connect(lambda tg, w=w: self.on_done(w, tg))
         w.finished.connect(lambda w=w: self._worker_done(w))
         self._workers = getattr(self, "_workers", set())
         self._workers.add(w)   # se guarda hasta que termine (no se destruye un hilo en marcha)
@@ -810,43 +845,43 @@ class LibraryPage(QWidget):
         if self.worker is w:
             self.worker = None
 
-    def on_listed(self, base, files):
-        if base != self.base:
+    def on_listed(self, w, st):
+        if w is not self.worker:
             return
-        self.files = files
+        self.scanning = False
+        self.order, self.children, self.direct = st["order"], st["children"], st["direct"]
+        self.files = st["files"]
         self.index_folders()
+        if self.stack:   # si la carpeta en la que estabas ya no existe, se vuelve atrás
+            self.stack = [x for x in self.stack if x[0] != "folder" or x[1] in self.children]
         self.render()
 
-    def on_progress(self, base, n, total):
-        if base != self.base:
+    def on_progress(self, w, n, total):
+        if w is not self.worker:
             return
         self.read_pct = int(n * 100 / max(1, total))
         self.update_sub()
 
-    def on_done(self, base, tags):
-        if base != self.base:
+    def on_done(self, w, tags):
+        if w is not self.worker:
             return
         self.tags, self.loaded = tags, True
         self.render()
 
     def index_folders(self):
-        """Cuántas canciones hay en cada carpeta (contando sus subcarpetas) y qué subcarpetas tiene cada una."""
-        self.fcount, self.children, self.direct, self.rep = {}, {}, {}, {}
-        base = os.path.normpath(self.base)
-        for f in self.files:
-            d = os.path.dirname(f)
-            self.direct.setdefault(d, []).append(f)
-            cur = d
-            while True:
-                self.fcount[cur] = self.fcount.get(cur, 0) + 1
-                self.rep.setdefault(cur, f)   # la portada de la carpeta = la de su primera canción
-                if os.path.normpath(cur) == base:
-                    break
-                par = os.path.dirname(cur)
-                if par == cur or len(par) < len(base):
-                    break
-                self.children.setdefault(par, set()).add(cur)
-                cur = par
+        """Cuántas canciones hay en cada carpeta (con sus subcarpetas) y qué portada la representa."""
+        self.fcount, self.rep = {}, {}
+        for d in reversed(self.order):   # de las más profundas hacia arriba
+            fl = self.direct.get(d, [])
+            n = len(fl)
+            rp = fl[0] if fl else None
+            for c in self.children.get(d, ()):
+                n += self.fcount.get(c, 0)
+                if rp is None:
+                    rp = self.rep.get(c)
+            self.fcount[d] = n
+            if rp:
+                self.rep[d] = rp
 
     def info(self, f):
         t = self.tags.get(f)
@@ -913,28 +948,32 @@ class LibraryPage(QWidget):
 
     def update_sub(self):
         n = len(self.files)
-        if not self.base:
-            return
-        if not self.files and not self.loaded:
+        if not self.files and (self.scanning or self.worker is not None):
             txt = T("Buscando canciones…")
         else:
-            txt = f"📁 {os.path.basename(os.path.normpath(self.base)) or self.base}  ·  " + T(f"{n} canciones cargadas")
-            if not self.loaded:
-                txt += "  ·  " + T(f"leyendo etiquetas {self.read_pct} %")
+            txt = "🌳 " + T(f"{len(self.roots)} carpetas del árbol") + "  ·  " + T(f"{n} canciones cargadas")
+            if not self.loaded and self.worker is not None:
+                txt += "  ·  " + (T("revisando carpetas…") if self.scanning else T(f"leyendo etiquetas {self.read_pct} %"))
         top = self.stack[-1] if self.stack else None
         if top is not None:
             cnt = getattr(self, "_shown_songs", 0)
             txt = T(f"{cnt} canciones")
             if top[0] == "folder":
-                rel = os.path.relpath(top[1], self.base)
-                txt = f"📁 {rel}  ·  " + txt
-        elif self.tab in ("artists", "genres", "folders") and self.files:
+                subs = len(self.children.get(top[1], ()))
+                if subs:
+                    txt = T(f"{subs} carpetas") + "  ·  " + T(f"{self.fcount.get(top[1], 0)} canciones en total") \
+                        + ("  ·  " + T(f"{cnt} aquí") if cnt else "")
+        elif self.tab in ("artists", "genres") and self.files:
             g = getattr(self, "_shown_groups", 0)
-            what = {"artists": T(f"{g} artistas"), "genres": T(f"{g} géneros"), "folders": T(f"{g} carpetas")}[self.tab]
+            what = {"artists": T(f"{g} artistas"), "genres": T(f"{g} géneros")}[self.tab]
             txt = txt + f"  ·  {what}"
         if self.search.text().strip():
             txt = T(f"{getattr(self, '_shown_rows', 0)} resultados") + "  ·  " + txt
         self.h_sub.setText(txt)
+
+    def folder_row(self, d, label=None):
+        return ("folder", d, label or os.path.basename(os.path.normpath(d)) or d, "",
+                str(self.fcount.get(d, 0)), self.rep.get(d))
 
     def render(self):
         q = self.search.text().strip().lower()
@@ -942,11 +981,16 @@ class LibraryPage(QWidget):
         rows = []
         self._shown_groups = 0
         if top is None:
-            self.h_title.setText(T("Biblioteca"))
+            self.h_title.setText({"songs": T("Todas las canciones"), "folders": T("Carpetas"),
+                                  "artists": T("Artistas"), "genres": T("Géneros")}.get(self.tab, T("Biblioteca")))
         else:
-            self.h_title.setText(os.path.basename(top[1]) if top[0] == "folder" else (top[1] or T("(sin nombre)")))
+            self.h_title.setText(os.path.basename(os.path.normpath(top[1])) if top[0] == "folder"
+                                 else (top[1] or T("(sin nombre)")))
         self.b_back.setVisible(top is not None)
-        if self.files:
+        if self.tab == "folders" and top is None:   # las carpetas principales del árbol, tal cual
+            for lab, p in self.roots:
+                rows.append(self.folder_row(p, re.sub(r"^\W+\s*", "", lab) or lab))
+        elif self.files:
             if self.tab == "songs" and top is None:
                 rows = [self.song_row(f) for f in self.files]
                 rows.sort(key=lambda r: r[2].lower())
@@ -954,13 +998,9 @@ class LibraryPage(QWidget):
                 members = self.groups(1 if top[0] == "artist" else 3).get(top[1], [])
                 rows = [self.song_row(f) for f in members]
                 rows.sort(key=lambda r: (r[3].lower(), r[2].lower()))
-            elif self.tab == "folders":
-                folder = top[1] if top is not None else self.base
-                subs = sorted(self.children.get(folder, ()), key=lambda d: os.path.basename(d).lower())
-                self._shown_groups = len(subs)
-                for d in subs:
-                    rows.append(("folder", d, os.path.basename(d), "", str(self.fcount.get(d, 0)), self.rep.get(d)))
-                rows += [self.song_row(f) for f in self.direct.get(folder, [])]
+            elif top is not None and top[0] == "folder":   # dentro de una carpeta: subcarpetas y luego canciones
+                rows = [self.folder_row(d) for d in self.children.get(top[1], ())]
+                rows += [self.song_row(f) for f in self.direct.get(top[1], [])]
             else:
                 idx = 1 if self.tab == "artists" else 3
                 gr = self.groups(idx)
@@ -987,18 +1027,19 @@ class LibraryPage(QWidget):
             it.setData(TITLE_R, title)
             it.setData(SUB_R, sub)
             it.setData(RIGHT_R, right)
-            if kind == "song":
+            if kind in ("song", "folder"):
                 it.setToolTip(key)
             self.list.addItem(it)
+        if not rows:
+            empty = QListWidgetItem()
+            empty.setData(KIND_R, "info")
+            busy = self.scanning or (self.worker is not None and not self.files)
+            empty.setData(TITLE_R, T("Buscando canciones…") if busy else T("No hay canciones aquí."))
+            empty.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.list.addItem(empty)
         self.list.setUpdatesEnabled(True)
         self.update_sub()
         self._vis.start()
-        if not self.files:
-            empty = QListWidgetItem()
-            empty.setData(KIND_R, "info")
-            empty.setData(TITLE_R, T("Buscando canciones…") if not self.loaded else T("No hay canciones aquí."))
-            empty.setFlags(Qt.ItemFlag.NoItemFlags)
-            self.list.addItem(empty)
 
 
 class MiniPlayer(QWidget):
@@ -1037,6 +1078,10 @@ class MiniPlayer(QWidget):
         self.H = self.S + self.EXTRA
         self.setFixedSize(self.W + 2 * M, self.H + 2 * M)
         self.cover_rect = QRectF(M + 26, M + 8 + 46 + 6, self.S, self.S)
+        # portada grande: ocupa todo el ancho y llega hasta debajo del título (título y artista van encima)
+        self.full_rect = QRectF(M, M, self.W, 8 + 46 + 6 + self.S + 18 + 84)
+        self.cover_mode = "card" if str(main.cfg.value("mini_cover", "full")) == "card" else "full"
+        self.blur2 = None
 
         v = QVBoxLayout(self)
         v.setContentsMargins(M + 12, M + 8, M + 12, M + 12)
@@ -1168,6 +1213,8 @@ class MiniPlayer(QWidget):
         pv.addWidget(self.lyr, 1)
         self.panel.hide()
 
+        self.apply_cover_mode()
+
         # ---- biblioteca («Cola»): ocupa todo menos la barra de acciones
         self.lib = LibraryPage(self)
         self.lib.setGeometry(M, M, self.W, self.H - 12 - 56 - 8)
@@ -1218,6 +1265,30 @@ class MiniPlayer(QWidget):
             self.move(pos)
             self.show()
 
+    # ------------------------------------------------------------ portada normal o grande difuminada
+    def set_cover_mode(self, mode):
+        self.cover_mode = "card" if mode == "card" else "full"
+        self.main.cfg.setValue("mini_cover", self.cover_mode)
+        self.apply_cover_mode()
+        self.track_changed(self.path)
+
+    def apply_cover_mode(self):
+        full = self.cover_mode == "full"
+        al = (Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter) if full else Qt.AlignmentFlag.AlignCenter
+        for l in (self.title, self.sub):
+            l.setAlignment(al)
+            l.setContentsMargins(6 if full else 0, 0, 0, 0)
+        self.title.setStyleSheet("QLabel { color: white; font-size: %dpx; font-weight: 800; background: transparent; }"
+                                 % (23 if full else 20))
+        self.quality.left = full
+        self.quality.setContentsMargins(0, 0, 0, 0)
+        self.quality.update()
+        self._bg_key = None
+        self.update()
+
+    def art_rect(self):
+        return self.full_rect if self.cover_mode == "full" else self.cover_rect
+
     # ------------------------------------------------------------ fondo (se dibuja una vez por canción)
     def card(self):
         return QRectF(M, M, self.W, self.H)
@@ -1226,7 +1297,7 @@ class MiniPlayer(QWidget):
         """Sombra, degradado con los colores de la portada, la portada muy difuminada que se mezcla con el fondo,
         grano y la portada nítida en su tarjeta. Todo en una imagen: al repintar solo se copia el trozo necesario."""
         dpr = self.devicePixelRatioF()
-        key = (id(self.img), self.W, self.H, dpr)
+        key = (id(self.img), self.W, self.H, dpr, self.cover_mode)
         if self._bg_key == key and self._bg is not None:
             return self._bg
         pm = QPixmap(int(self.width() * dpr), int(self.height() * dpr))
@@ -1275,6 +1346,15 @@ class MiniPlayer(QWidget):
         p.setOpacity(0.045)   # grano
         p.drawTiledPixmap(r.toRect(), self.noise)
         p.setOpacity(1.0)
+        if self.cover_mode == "full":
+            self.paint_full_cover(p, r, dpr)
+            p.setClipping(False)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QColor(255, 255, 255, 22))
+            p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), RADIUS, RADIUS)
+            p.end()
+            self._bg, self._bg_key = pm, key
+            return pm
         # portada en su tarjeta, con sombra
         cr = self.cover_rect
         for i in range(14, 0, -1):
@@ -1305,6 +1385,67 @@ class MiniPlayer(QWidget):
         self._bg, self._bg_key = pm, key
         return pm
 
+    def masked(self, size, dpr, draw, stops):
+        """Dibuja algo en una capa y lo va volviendo transparente hacia abajo según `stops` [(pos, alfa)]."""
+        lay = QPixmap(int(size.width() * dpr), int(size.height() * dpr))
+        lay.setDevicePixelRatio(dpr)
+        lay.fill(Qt.GlobalColor.transparent)
+        q = QPainter(lay)
+        q.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        q.setRenderHint(QPainter.RenderHint.Antialiasing)
+        draw(q)
+        q.resetTransform()
+        q.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
+        g = QLinearGradient(0, 0, 0, size.height())
+        for pos, a in stops:
+            g.setColorAt(pos, QColor(0, 0, 0, a))
+        q.fillRect(QRectF(0, 0, size.width(), size.height()), QBrush(g))
+        q.end()
+        return lay
+
+    def paint_full_cover(self, p, r, dpr):
+        """Portada grande: nítida arriba, cada vez más difuminada hacia abajo y fundida con el fondo (como en la
+        imagen de ejemplo); encima, sombras suaves para que se lean la barra de arriba y el título."""
+        fr = self.full_rect
+        ext = QRectF(fr.left(), fr.top(), fr.width(), fr.height() * 1.28)   # la parte difuminada baja un poco más
+        if self.img is None:
+            rg = QRadialGradient(QPointF(fr.left() + fr.width() * 0.35, fr.top() + fr.height() * 0.3), fr.width())
+            rg.setColorAt(0, QColor(70, 62, 100))
+            rg.setColorAt(1, QColor(34, 34, 46))
+            lay = self.masked(ext.size(), dpr, lambda q: (q.fillRect(QRectF(0, 0, ext.width(), fr.height()), QBrush(rg)),
+                              icons.draw_glyph(q, "note", QRectF(fr.width() * 0.34, fr.height() * 0.2, fr.width() * 0.32,
+                                                                   fr.width() * 0.32), QColor(255, 255, 255, 70))),
+                              [(0.0, 255), (0.55, 255), (0.78, 0), (1.0, 0)])
+            p.drawPixmap(ext.topLeft(), lay)
+        else:
+            def crop(q, rect, img):
+                sc = img.scaled(int(rect.width() * dpr), int(rect.height() * dpr),
+                                Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+                sx, sy = (sc.width() - rect.width() * dpr) / 2, (sc.height() - rect.height() * dpr) / 2
+                q.drawImage(rect, sc, QRectF(sx, sy, rect.width() * dpr, rect.height() * dpr))
+            soft = self.blur2.toImage() if self.blur2 is not None else self.img
+            # 1) la versión difuminada, más larga, que se desvanece en el fondo
+            lay = self.masked(ext.size(), dpr, lambda q: crop(q, QRectF(0, 0, ext.width(), ext.height()), soft),
+                              [(0.0, 255), (0.62, 255), (0.86, 90), (1.0, 0)])
+            p.drawPixmap(ext.topLeft(), lay)
+            # 2) la nítida encima, que se va borrando: abajo queda la difuminada (la «difuminación»)
+            lay2 = self.masked(fr.size(), dpr, lambda q: crop(q, QRectF(0, 0, fr.width(), fr.height()), self.img),
+                               [(0.0, 255), (0.50, 255), (0.80, 40), (1.0, 0)])
+            p.drawPixmap(fr.topLeft(), lay2)
+        top = QLinearGradient(0, fr.top(), 0, fr.top() + 110)   # sombra arriba (barra de «REPRODUCIENDO»)
+        top.setColorAt(0, QColor(0, 0, 0, 130))
+        top.setColorAt(1, QColor(0, 0, 0, 0))
+        p.fillRect(QRectF(fr.left(), fr.top(), fr.width(), 110), QBrush(top))
+        bot = QLinearGradient(0, fr.top() + fr.height() * 0.5, 0, ext.bottom())   # sombra abajo (título)
+        bot.setColorAt(0, QColor(0, 0, 0, 0))
+        bot.setColorAt(0.55, QColor(0, 0, 0, 95))
+        bot.setColorAt(1, QColor(0, 0, 0, 40))
+        p.fillRect(QRectF(fr.left(), fr.top() + fr.height() * 0.5, fr.width(), ext.bottom() - fr.top() - fr.height() * 0.5),
+                   QBrush(bot))
+        p.setOpacity(0.045)   # grano encima de todo, como en la foto
+        p.drawTiledPixmap(r.toRect(), self.noise)
+        p.setOpacity(1.0)
+
     def paintEvent(self, e):
         p = QPainter(self)
         p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
@@ -1321,8 +1462,12 @@ class MiniPlayer(QWidget):
             mid = tiny.scaled(40, 40, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.blur = QPixmap.fromImage(mid.scaled(240, 240, Qt.AspectRatioMode.IgnoreAspectRatio,
                                                      Qt.TransformationMode.SmoothTransformation))
+            sm = self.img.scaled(18, 18, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            sm = sm.scaled(54, 54, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.blur2 = QPixmap.fromImage(sm.scaled(360, 360, Qt.AspectRatioMode.IgnoreAspectRatio,
+                                                     Qt.TransformationMode.SmoothTransformation))
         else:
-            self.blur = None
+            self.blur = self.blur2 = None
         self.b_play.glow = QColor(self.col).lighter(150)
         self._bg_key = None
 
@@ -1445,8 +1590,7 @@ class MiniPlayer(QWidget):
     def open_library(self):
         if self.panel.isVisible():
             self.toggle_lyrics()
-        base = self.main.current_dir or str(self.main.cfg.value("last_dir", "") or "")
-        self.lib.open_for(base)
+        self.lib.open_for()
         self.lib.show()
         self.lib.raise_()
         self.a_queue.set_active(True)
@@ -1484,6 +1628,12 @@ class MiniPlayer(QWidget):
         a.setChecked(self.top)
         a.triggered.connect(lambda on: self.set_top(on))
         m.addAction(T("Minimizar"), self.showMinimized)
+        m.addSeparator()
+        for mode, label in (("full", T("Portada grande difuminada")), ("card", T("Portada normal"))):
+            act = m.addAction(label)
+            act.setCheckable(True)
+            act.setChecked(self.cover_mode == mode)
+            act.triggered.connect(lambda _on, md=mode: self.set_cover_mode(md))
         m.addSeparator()
         mute = False
         try:
@@ -1600,7 +1750,7 @@ class MiniPlayer(QWidget):
         super().mouseReleaseEvent(e)
 
     def mouseDoubleClickEvent(self, e):
-        if self.cover_rect.contains(e.position()) and not self.lib.isVisible():
+        if self.art_rect().contains(e.position()) and not self.lib.isVisible():
             self.main.toggle_play()   # doble clic en la portada = reproducir / pausa (como en el celular)
 
     def wheelEvent(self, e):

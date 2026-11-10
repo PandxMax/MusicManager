@@ -590,6 +590,10 @@ try:
     for wd in (mp.title, mp.quality, mp.wave, mp.b_play, mp.bar):
         print("  geo", type(wd).__name__, wd.geometry().getRect(), flush=True)
     shot(mp, "s_mini")
+    mp.set_cover_mode("card")
+    shot(mp, "s_mini_normal")
+    mp.set_cover_mode("full")
+    print("modo portada:", mp.cover_mode, flush=True)
     mp.toggle_lyrics()
     shot(mp, "s_mini_letra")
     mp.toggle_lyrics()
@@ -638,11 +642,31 @@ try:
     shot(mp, "s_lib_canciones")
     mp.lib.set_tab("folders")
     wait(1500)
+    print("raices:", [ascii(mp.lib.list.item(i).data(mm.Qt.ItemDataRole.UserRole + 2)) for i in range(mp.lib.list.count())],
+          flush=True)
     shot(mp, "s_lib_carpetas")
-    mp.lib.on_click(mp.lib.list.item(1))
-    wait(800)
+    rit = next(mp.lib.list.item(i) for i in range(mp.lib.list.count())
+               if os.path.normcase(mp.lib.list.item(i).data(mm.Qt.ItemDataRole.UserRole + 1) or "") == os.path.normcase(os.path.normpath(root)))
+    mp.lib.on_click(rit)
+    wait(1200)
+    print("dentro:", ascii(mp.lib.h_title.text()), ascii(mp.lib.h_sub.text()),
+          [ascii(mp.lib.list.item(i).data(mm.Qt.ItemDataRole.UserRole + 2)) for i in range(min(9, mp.lib.list.count()))], flush=True)
     shot(mp, "s_lib_carpeta_dentro")
-    mp.lib.go_back()
+    # se agrega una carpeta nueva con una canción: al volver a abrir la Cola tiene que aparecer
+    nd = os.path.join(root, "Nueva Carpeta Test")
+    os.makedirs(nd, exist_ok=True)
+    shutil.copy2(songs[0], os.path.join(nd, "Cancion nueva.mp3"))
+    QTest.mouseClick(mp.a_queue, Qt.MouseButton.LeftButton)
+    wait(300)
+    QTest.mouseClick(mp.a_queue, Qt.MouseButton.LeftButton)
+    for _ in range(80):
+        wait(250)
+        if mp.lib.loaded:
+            break
+    print("tras agregar:", "Nueva Carpeta Test" in [os.path.basename(c) for c in mp.lib.children.get(os.path.normpath(root), mp.lib.children.get(root, []))],
+          len(mp.lib.files), ascii(mp.lib.h_sub.text()), flush=True)
+    shutil.rmtree(nd, ignore_errors=True)
+    mp.lib.set_tab("folders")
     mp.lib.set_tab("artists")
     wait(1200)
     shot(mp, "s_lib_artistas")

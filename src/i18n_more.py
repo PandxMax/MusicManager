@@ -1560,3 +1560,18 @@ ROWS += [
 ROWS += [('Modo reproductor con el diseño de la app del celular: portada en tarjeta, «REPRODUCIENDO · 1483 de 3786», título, artista, calidad (MP3 · 44.1 kHz · 320 kbps · Alta), barra de avance con la onda, controles con el botón blanco grande y la barra Cola · Letra · Ajustes · Editar · Calidad; el fondo sigue mezclando y difuminando los colores de la portada. «Cola» abre todas las canciones, carpetas, artistas y géneros, ahora con la portada de cada canción y de cada carpeta.',
   "Player mode with the phone app design: cover card, “NOW PLAYING · 1483 of 3786”, title, artist, quality (MP3 · 44.1 kHz · 320 kbps · High), waveform progress bar, controls with the big white button and the Queue · Lyrics · Settings · Edit · Quality bar; the background still blends the cover colors. “Queue” opens all songs, folders, artists and genres, now with each song and folder cover.",
   "Режим плеера в стиле мобильного приложения; «Очередь» открывает библиотеку с обложками.")]
+ROWS += [
+    ("Portada grande difuminada", "Large blurred cover", "Большая размытая обложка"),
+    ("Portada normal", "Normal cover", "Обычная обложка"),
+    ("Agrega carpetas al árbol del editor para ver su música aquí.", "Add folders to the editor's tree to see their music here.",
+     "Добавьте папки в дерево редактора, чтобы увидеть здесь их музыку."),
+    ("Volver a leer las carpetas", "Read the folders again", "Перечитать папки"),
+    ("%s carpetas del árbol", "%s folders in the tree", "папок в дереве: %s"),
+    ("revisando carpetas…", "checking folders…", "проверка папок…"),
+    ("%s canciones en total", "%s songs in total", "всего песен: %s"),
+    ("%s aquí", "%s here", "здесь: %s"),
+    ("Todas las canciones", "All songs", "Все песни"),
+]
+ROWS += [('Modo reproductor: nueva portada grande difuminada (ocupa todo lo de arriba y se funde con el fondo, con el título encima, como en la imagen); en el menú ⋮ se elige «Portada grande difuminada» o «Portada normal». La Cola ahora refleja el árbol de carpetas: «Carpetas» muestra las mismas carpetas principales que el árbol (si agregas o quitas una, cambia), y «Canciones» tiene todas las canciones de todas esas carpetas.',
+  "Player mode: new large blurred cover (fills the top and blends into the background, with the title on top, like in the example image); in the ⋮ menu choose “Large blurred cover” or “Normal cover”. The Queue now mirrors the folder tree: “Folders” shows the same main folders as the tree (add or remove one and it changes), and “Songs” has all songs from all those folders.",
+  "Режим плеера: большая размытая обложка; «Очередь» отражает дерево папок.")]
