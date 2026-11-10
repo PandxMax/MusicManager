@@ -743,3 +743,11 @@ VERSIÓN 2.22
  - Versiones de componentes fijadas (requirements.txt) para que cada compilación sea igual.
  - El panel del editor y la ventanita comparten la biblioteca ya leída.
  - El historial de novedades pasó a su propio archivo (src/changelog.py).
+
+VERSIÓN 2.23
+------------
+ - Windows sabe qué canción suena (título, artista, álbum, portada, sonando/pausa): la muestran
+   Wallpaper Engine, el panel multimedia de Windows (al cambiar el volumen) y la pantalla de bloqueo.
+   También funcionan las teclas multimedia del teclado (reproducir/pausa, siguiente, anterior).
+ - Ventanita «solo la portada»: la carátula se ve entera, sin nada encima salvo los tres botones.
+   Los tiempos, la barrita de avance y el botón de volumen van en una franja debajo de la imagen.

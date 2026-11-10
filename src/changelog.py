@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.23', [
+        'Windows ahora sabe qué canción suena (título, artista, álbum y portada): aparece en Wallpaper Engine, en el panel multimedia de Windows y en la pantalla de bloqueo, y funcionan las teclas multimedia del teclado. Ventanita «solo la portada»: la carátula se ve entera y limpia; la barrita, los tiempos y el nuevo botón de volumen van en una franja debajo de la imagen.',
+    ]),
     ('2.22', [
         'Los atajos de música (AvPág, RePág, Pausa o los que elijas) ahora funcionan también fuera del programa: escribiendo un documento, jugando o con el programa minimizado. Se puede desactivar en Ajustes → Atajos de música. Correcciones internas: la actualización comprueba que la descarga esté completa y sea la publicada antes de instalar; las claves de IA, Discogs y AcoustID se guardan cifradas; los fallos menores quedan anotados en «errores_menores.txt»; versiones de componentes fijadas para que las compilaciones sean siempre iguales; el panel y la ventanita comparten la biblioteca ya leída.',
     ]),

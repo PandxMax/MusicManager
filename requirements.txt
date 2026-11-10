@@ -5,3 +5,11 @@ send2trash==2.1.0
 numpy==2.5.4
 imageio-ffmpeg==0.8.1
 yt-dlp
+winrt-runtime; sys_platform == "win32"
+winrt-Windows.Foundation; sys_platform == "win32"
+winrt-Windows.Foundation.Collections; sys_platform == "win32"
+winrt-Windows.Media; sys_platform == "win32"
+winrt-Windows.Media.Core; sys_platform == "win32"
+winrt-Windows.Media.Playback; sys_platform == "win32"
+winrt-Windows.Storage.Streams; sys_platform == "win32"
+winrt-Windows.Media.Control; sys_platform == "win32"

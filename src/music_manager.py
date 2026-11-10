@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.22"
+APP_VERSION = "2.23"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.22 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.23 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4054,6 +4054,15 @@ class Main(QMainWindow):
         self.fs_undo = []  # últimos movimientos / renombrados, para poder deshacerlos
         self.music_keys = MusicKeys(self)
         QApplication.instance().installEventFilter(self.music_keys)
+        self.media = None
+        if self.player is not None:   # Windows (y Wallpaper Engine, pantalla de bloqueo…) sabe qué canción suena
+            try:
+                import smtc
+                self.media = smtc.MediaSession(self)
+                self.media.pressed.connect(self.on_media_button)
+                self.player.playbackStateChanged.connect(self.media_state)
+            except Exception:
+                note_quiet()
         if self.player is not None:   # los atajos de todo Windows solo están activos mientras hay música puesta
             self.player.playbackStateChanged.connect(lambda _st: self.music_keys.refresh_global())
         if self.player is not None:
@@ -4112,6 +4121,37 @@ class Main(QMainWindow):
             return json.loads(self.cfg.value("pinned", "[]"))
         except Exception:
             return []
+
+    def on_media_button(self, name):
+        """Botones del panel multimedia de Windows o teclas multimedia del teclado."""
+        if self.player is None:
+            return
+        st = self.player.playbackState()
+        if name == "next":
+            self.step_play(1)
+        elif name == "prev":
+            self.step_play(-1)
+        elif name == "stop":
+            self.player.stop()
+        elif (name == "play") != (st == QMediaPlayer.PlaybackState.PlayingState):
+            self.toggle_play()
+
+    def media_state(self, st=None):
+        if self.media is None or self.player is None:
+            return
+        st = self.player.playbackState()
+        self.media.set_state("playing" if st == QMediaPlayer.PlaybackState.PlayingState else
+                             "paused" if st == QMediaPlayer.PlaybackState.PausedState else "stopped")
+
+    def media_track(self, path):
+        if self.media is None or not path:
+            return
+        try:
+            cover = self.cover_data_of(path)
+        except Exception:
+            cover = None
+        self.media.set_track(self.val(path, "title") or os.path.splitext(os.path.basename(path))[0],
+                             self.val(path, "artist"), self.val(path, "album"), bytes(cover) if cover else b"")
 
     def tree_roots(self):
         """Las carpetas principales del árbol (Música y las que agregaste), tal como se ven a la izquierda."""
@@ -5233,6 +5273,7 @@ class Main(QMainWindow):
             self.mobile.track_changed(path)
         if getattr(self, "mini", None) is not None and self.mini.in_use():
             self.mini.track_changed(path)
+        self.media_track(path)
         artist, album = self.val(path, "artist"), self.val(path, "album")
         self.set_now(self.val(path, "title") or os.path.splitext(os.path.basename(path))[0],
                      " · ".join(x for x in (artist, album) if x))
@@ -7602,6 +7643,8 @@ class Main(QMainWindow):
             self.player.stop()
         try:
             self.music_keys.release_global()
+            if self.media is not None:
+                self.media.close()
         except Exception:
             note_quiet()
         if getattr(self, "mini", None) is not None:
@@ -9189,6 +9232,18 @@ def tidy_install_folder():
 
 
 if __name__ == "__main__":
+    if os.environ.get("MM_SELFTEST"):   # comprobación al compilar: que el EXE trae lo necesario (no abre ventanas)
+        res = []
+        for mod in ("winrt.windows.media.playback", "winrt.windows.media", "winrt.windows.storage.streams",
+                    "smtc", "miniplayer", "changelog", "secret"):
+            try:
+                __import__(mod)
+                res.append(f"OK {mod}")
+            except Exception as e:
+                res.append(f"FALLA {mod}: {type(e).__name__}: {e}")
+        with open(os.environ["MM_SELFTEST"], "w", encoding="utf-8") as fh:
+            fh.write("\n".join(res))
+        sys.exit(0)
     install_error_guard()
     tidy_install_folder()
     _polish = DialogPolish()

@@ -724,6 +724,30 @@ try:
     wait(700)
     cp = mp.compact
     print("compacto:", cp.isVisible(), "completo:", mp.isVisible(), cp.width(), cp.height(), flush=True)
+    try:   # lo que ve Windows (y Wallpaper Engine): título, artista, portada
+        import asyncio
+
+        async def ver():
+            from winrt.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as M
+            m = await M.request_async()
+            out = []
+            for ses in m.get_sessions():
+                pr = await ses.try_get_media_properties_async()
+                out.append((pr.title, pr.artist, pr.album_title, pr.thumbnail is not None, int(ses.get_playback_info().playback_status)))
+            return out
+        import threading
+        box = []
+        th = threading.Thread(target=lambda: box.append(asyncio.run(ver())))
+        th.start()
+        while th.is_alive():
+            wait(100)
+        print("Windows ve:", ascii(box), "smtc ok:", w.media.ok, ascii(w.media.error), flush=True)
+    except Exception:
+        print("FALLO smtc", ascii(traceback.format_exc()), flush=True)
+    QTest.mouseClick(cp.b_vol, Qt.MouseButton.LeftButton)
+    wait(300)
+    print("volumen en ventanita:", mp.volpop.isVisible(), flush=True)
+    mp.volpop.hide()
     shot(cp, "s_compacto")
     cp.resize(460, 380)
     wait(400)
