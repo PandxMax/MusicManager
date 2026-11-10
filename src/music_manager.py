@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.24"
+APP_VERSION = "2.25"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.24 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.25 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5377,6 +5377,7 @@ class Main(QMainWindow):
         if self.mini is None or not self.mini.in_use():
             return
         self.mini_detached = bool(on)
+        self.mini.sync_mode()
         if on:
             if getattr(self, "_mini_was_max", False):
                 self.showMaximized()
@@ -5384,6 +5385,9 @@ class Main(QMainWindow):
                 self.showNormal()
             if getattr(self, "mobile", None) is not None and self.mobile.isVisible():
                 self.mobile.close_panel()
+            for w_ in (self.mini, self.mini.compact):   # el reproductor queda delante
+                if w_.isVisible():
+                    w_.raise_()
         else:
             self._mini_was_max = self.isMaximized()
             self.hide()

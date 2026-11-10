@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.25', [
+        'Reproductor separado: el botón de arriba a la izquierda ahora es «Ocultar editor» (queda solo el reproductor) y, con el editor escondido, «Mostrar editor»; en el panel del editor hay además un botón para dejar solo el reproductor. Ventanita «solo la portada»: cambiar su tamaño ya es fluido (no parpadea).',
+    ]),
     ('2.24', [
         'Nuevo «Separar el reproductor» (botón de ventanita del panel, o Reproducción → Separar, Ctrl+Shift+M): el reproductor pasa a su propia ventana con todas sus opciones y el editor sigue abierto; son dos ventanas en la barra de tareas. Ventanita «solo la portada» más cuidada: portada limpia, botones redondos de vidrio y una franja con el título, el artista, la barrita fina y el volumen. Ayuda → «Primeros pasos» (recorrido corto, sale solo en instalaciones nuevas) y «Reportar un problema» (prepara el informe con la versión y los últimos errores para enviarlo).',
     ]),

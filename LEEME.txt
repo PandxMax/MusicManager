@@ -763,3 +763,12 @@ VERSIÓN 2.24
  - Ayuda → «Primeros pasos»: recorrido de 4 pantallas (sale solo la primera vez en instalaciones nuevas).
  - Ayuda → «Reportar un problema»: arma un informe con la versión, Windows y los últimos errores; lo
    revisas y lo envías por GitHub o lo copias. Nada se envía solo.
+
+VERSIÓN 2.25
+------------
+ - Reproductor separado: el botón de arriba a la izquierda es «Ocultar editor» (queda solo el
+   reproductor); con el editor escondido pasa a «Mostrar editor» (también Esc). El reproductor sigue
+   abierto en los dos casos. Para cerrarlo: menú ⋮ → «Cerrar el reproductor y volver al editor».
+ - Panel del editor: dos botones arriba a la derecha, «Solo el reproductor» (esconde el editor) y
+   «Separar» (dos ventanas).
+ - Ventanita «solo la portada»: cambiar el tamaño es fluido, ya no parpadea.

@@ -1663,3 +1663,12 @@ ROWS += [
     ('Abrir en GitHub', 'Open in GitHub', 'Открыть в GitHub'),
     ('Informe copiado.', 'Report copied.', 'Отчёт скопирован.'),
 ]
+ROWS += [
+    ('Reproductor separado: el botón de arriba a la izquierda ahora es «Ocultar editor» (queda solo el reproductor) y, con el editor escondido, «Mostrar editor»; en el panel del editor hay además un botón para dejar solo el reproductor. Ventanita «solo la portada»: cambiar su tamaño ya es fluido (no parpadea).', 'Detached player: the top-left button is now “Hide editor” (player only) and, with the editor hidden, “Show editor”; the editor panel also has a button to leave only the player. “Cover only” window: resizing is now smooth (no flicker).', 'Отдельный плеер: кнопка «Скрыть редактор» / «Показать редактор». Окно «только обложка»: плавное изменение размера.'),
+    ('Ocultar editor', 'Hide editor', 'Скрыть редактор'),
+    ('Mostrar editor', 'Show editor', 'Показать редактор'),
+    ('Esconde el editor: queda solo el reproductor', 'Hides the editor: only the player remains', 'Скрывает редактор: остаётся только плеер'),
+    ('Vuelve a mostrar el editor (el reproductor sigue abierto) · Esc', 'Shows the editor again (the player stays open) · Esc', 'Снова показывает редактор (плеер остаётся открытым) · Esc'),
+    ('Solo el reproductor: esconde el editor · Ctrl+M', 'Player only: hides the editor · Ctrl+M', 'Только плеер: скрывает редактор · Ctrl+M'),
+    ('Cerrar el reproductor y volver al editor', 'Close the player and go back to the editor', 'Закрыть плеер и вернуться в редактор'),
+]
