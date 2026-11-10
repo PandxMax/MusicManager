@@ -652,3 +652,15 @@ VERSIÓN 2.14
    avanzar) con los controles encima, tiempos y la calidad del archivo (bits, kHz, kbps, formato).
    Clic en la portada = letra · botón de líneas = cola · rueda del ratón = volumen.
    Al pasar el ratón: 📌 siempre encima, minimizar y volver al editor. Esc también vuelve al editor.
+
+VERSIÓN 2.15
+------------
+ - Modo reproductor: ya no se traba ni se pone lento (el fondo se dibuja una sola vez).
+ - El primer botón de abajo (cuadritos) abre la Biblioteca:
+     Canciones: todas las de la carpeta que estabas editando, con todas sus subcarpetas,
+                y cuántas se cargaron.
+     Carpetas:  la estructura de carpetas (entra y sale con la flecha), con cuántas canciones tiene cada una.
+     Artistas y Géneros: agrupados, con su cantidad.
+   Hay buscador. Al tocar una canción suena, y «siguiente/anterior» siguen esa lista.
+   Abajo se ve lo que suena; tocándolo vuelves al reproductor. Esc = atrás / cerrar.
+ - Volver al editor: botón de arriba a la derecha (al pasar el ratón), Esc o clic derecho.

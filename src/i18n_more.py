@@ -1520,3 +1520,27 @@ ROWS += [
      "New “player mode”: 🪟 button in the player (or Ctrl+M). The editor hides and only a small player remains that you can move anywhere on screen: the cover blends into the song’s color, a waveform to seek, controls on top, file quality, lyrics and queue. Esc or the grid button returns to the editor.",
      "Новый «режим плеера»: кнопка 🪟 в плеере (или Ctrl+M) — остаётся только маленький перемещаемый плеер."),
 ]
+ROWS += [
+    ("Biblioteca: todas las canciones, carpetas, artistas y géneros", "Library: all songs, folders, artists and genres",
+     "Библиотека: все песни, папки, исполнители и жанры"),
+    ("Biblioteca", "Library", "Библиотека"), ("Canciones", "Songs", "Песни"), ("Carpetas", "Folders", "Папки"),
+    ("Artistas", "Artists", "Исполнители"), ("Géneros", "Genres", "Жанры"), ("Atrás", "Back", "Назад"),
+    ("Volver a leer la carpeta", "Read the folder again", "Перечитать папку"),
+    ("Cerrar la biblioteca (Esc)", "Close the library (Esc)", "Закрыть библиотеку (Esc)"),
+    ("Buscar…", "Search…", "Поиск…"),
+    ("Abre una carpeta en el editor para ver su música aquí.", "Open a folder in the editor to see its music here.",
+     "Откройте папку в редакторе, чтобы увидеть здесь её музыку."),
+    ("Buscando canciones…", "Looking for songs…", "Поиск песен…"),
+    ("%s canciones cargadas", "%s songs loaded", "загружено песен: %s"),
+    ("leyendo etiquetas %s %", "reading tags %s %", "чтение тегов %s %"),
+    ("%s canciones", "%s songs", "песен: %s"), ("%s artistas", "%s artists", "исполнителей: %s"),
+    ("%s géneros", "%s genres", "жанров: %s"), ("%s carpetas", "%s folders", "папок: %s"),
+    ("(sin nombre)", "(no name)", "(без имени)"), ("(sin artista)", "(no artist)", "(без исполнителя)"),
+    ("(sin género)", "(no genre)", "(без жанра)"), ("Leyendo etiquetas…", "Reading tags…", "Чтение тегов…"),
+    ("%s % — la lista se completa sola", "%s % — the list fills in by itself", "%s % — список дополнится сам"),
+    ("No hay canciones aquí.", "There are no songs here.", "Здесь нет песен."),
+]
+ROWS += [('Modo reproductor: ya no se traba (la ventanita se redibujaba entera muchas veces por segundo; ahora el fondo se dibuja una sola vez). Nuevo: el primer botón de abajo abre la Biblioteca con «Canciones» (todas las de la carpeta que estabas editando, incluidas todas sus subcarpetas, con la cantidad cargada), «Carpetas», «Artistas» y «Géneros», con buscador. Al tocar una canción suena y «siguiente» sigue esa lista.',
+  "Player mode no longer lags (the little window was redrawn completely many times per second; now the background is drawn once). New: the first bottom button opens the Library with “Songs” (all songs of the folder you were editing, including all its subfolders, with the number loaded), “Folders”, “Artists” and “Genres”, with search. Tapping a song plays it and “next” follows that list.",
+  "Режим плеера больше не тормозит. Новое: библиотека — песни, папки, исполнители и жанры.")]
+ROWS += [("%s resultados", "%s results", "результатов: %s")]

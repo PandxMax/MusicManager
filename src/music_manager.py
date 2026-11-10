@@ -74,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.14"
+APP_VERSION = "2.15"
 
 
 class TMenu(QMenu):
@@ -965,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.15', [
+        'Modo reproductor: ya no se traba (la ventanita se redibujaba entera muchas veces por segundo; ahora el fondo se dibuja una sola vez). Nuevo: el primer botón de abajo abre la Biblioteca con «Canciones» (todas las de la carpeta que estabas editando, incluidas todas sus subcarpetas, con la cantidad cargada), «Carpetas», «Artistas» y «Géneros», con buscador. Al tocar una canción suena y «siguiente» sigue esa lista.',
+    ]),
     ('2.14', [
         'Nuevo «modo reproductor»: botón 🪟 en el reproductor (o Ctrl+M). El editor se esconde y queda solo un reproductor pequeño que puedes mover a cualquier parte de la pantalla, con la portada que se funde con el color de la canción, la onda para avanzar, los controles encima, la calidad del archivo, letra y cola. Esc o el botón de cuadritos vuelve al editor.',
     ]),
@@ -1608,7 +1611,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.14 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.15 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5322,6 +5325,7 @@ class Main(QMainWindow):
         if not path:
             return
         self.pl_active = False   # reproducir desde la carpeta: sigue el orden de la carpeta
+        self.mini_seq = None
         self.play_file(path)
         if user:
             self.expand_player()
@@ -5423,7 +5427,7 @@ class Main(QMainWindow):
             return
         import miniplayer
         if self.mini is None:
-            self.mini = miniplayer.MiniPlayer(self, inspect_file, tech_info)
+            self.mini = miniplayer.MiniPlayer(self, inspect_file, tech_info, read_tags, AUDIO_EXT)
         if self.mini.isVisible():
             return
         self._mini_was_max = self.isMaximized()
@@ -5772,6 +5776,9 @@ class Main(QMainWindow):
         """Canciones que se van a recorrer: la lista de reproducción activa o las de la carpeta, en su orden."""
         if self.pl_active and self.playlist:
             return list(self.playlist), True
+        ms = getattr(self, "mini_seq", None)
+        if ms and self.playing_path in ms:   # se eligió desde la biblioteca del modo reproductor
+            return list(ms), True
         return [self.list.item(r).data(PATH_ROLE) for r in range(self.list.count())
                 if self.list.item(r).data(KIND_ROLE) != "dir"], False
 
