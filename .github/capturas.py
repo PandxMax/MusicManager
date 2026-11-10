@@ -569,6 +569,59 @@ try:
 except Exception:
     print("FALLO idioma", ascii(traceback.format_exc()), flush=True)
 
+# reproductor del editor (panel de la derecha) con el diseño nuevo
+try:
+    w.chk_sub.setChecked(False)
+    w.search.clear()
+    w.load_folder(first)
+    wait(600)
+    w.set_player_style("mobile")
+    wait(900)
+    w.play_file(list(w._all_files)[1])
+    wait(1500)
+    if w.player is not None:
+        w.player.setPosition(1500)
+        w.player.pause()
+    wait(1200)
+    inn = w.mobile.inner
+    print("panel:", w.mobile.isVisible(), inn.isVisible(), inn.width(), inn.height(), inn.S, ascii(inn.title.text()),
+          ascii(inn.cap2.text()), flush=True)
+    shot(w, "s_panel_editor")
+    inn.set_cover_mode("card")
+    shot(w.mobile, "s_panel_tarjeta")
+    inn.set_cover_mode("full")
+    shot(w.mobile, "s_panel_extendida")
+    inn.set_cover_mode("fit")
+    QTest.mouseClick(inn.a_queue, Qt.MouseButton.LeftButton)
+    for _ in range(120):
+        wait(250)
+        if inn.lib.loaded:
+            break
+    wait(1200)
+    shot(w.mobile, "s_panel_cola")
+    print("panel cola:", len(inn.lib.files), flush=True)
+    QTest.mouseClick(inn.a_queue, Qt.MouseButton.LeftButton)
+    inn.toggle_lyrics()
+    shot(w.mobile, "s_panel_letra")
+    inn.toggle_lyrics()
+    w.resize(1366, 620)
+    wait(700)
+    shot(w.mobile, "s_panel_bajo")
+    w.resize(1366, 768)
+    wait(500)
+    QTest.mouseClick(inn.b_compact, Qt.MouseButton.LeftButton)
+    wait(1200)
+    print("del panel al modo reproductor:", w.mini is not None and w.mini.in_use(), w.isVisible(), flush=True)
+    w.exit_mini()
+    wait(600)
+    QTest.mouseClick(inn.b_down, Qt.MouseButton.LeftButton)
+    wait(700)
+    print("panel cerrado:", not w.mobile.isVisible(), flush=True)
+    w.set_player_style("classic")
+    wait(500)
+except Exception:
+    print("FALLO panel", ascii(traceback.format_exc()), flush=True)
+
 # modo reproductor (diseño como la app del celular, con el fondo difuminado)
 try:
     w.chk_sub.setChecked(False)

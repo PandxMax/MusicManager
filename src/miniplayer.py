@@ -1432,24 +1432,47 @@ class CompactPlayer(QWidget):
         self.main.exit_mini()
 
 
+class _NoCompact:
+    """El reproductor del editor no tiene ventanita «solo la portada» (eso es del modo reproductor)."""
+    class wave:
+        @staticmethod
+        def set_levels(lv):
+            pass
+
+    def isVisible(self):
+        return False
+
+    def hide(self):
+        pass
+
+    def track_changed(self):
+        pass
+
+
 class MiniPlayer(QWidget):
     """Diseño como el reproductor de la app del celular (portada en tarjeta, título, calidad, barra de avance,
     controles y barra de acciones), con el fondo que mezcla y difumina los colores de la portada."""
     BASE_W = 330
     EXTRA = 386   # alto que no es la portada (barra de arriba, textos, onda, controles, acciones)
 
-    def __init__(self, main, inspect_file=None, tech_fn=None, read_fn=None, exts=None, folder_img_fn=None):
-        super().__init__(None, Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+    def __init__(self, main, inspect_file=None, tech_fn=None, read_fn=None, exts=None, folder_img_fn=None, parent=None):
+        self.embedded = parent is not None   # dentro del editor (panel de la derecha) o ventanita aparte
+        if self.embedded:
+            super().__init__(parent)
+        else:
+            super().__init__(None, Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+        self.m = 0 if self.embedded else M
         self.main, self.inspect_file, self.tech_fn = main, inspect_file, tech_fn
         self.read_fn, self.folder_img_fn = read_fn, folder_img_fn
         self.exts = set(exts or {".mp3", ".flac", ".ogg", ".oga", ".opus", ".m4a", ".mp4"})
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setWindowTitle("Music Manager")
-        try:
-            self.setWindowIcon(main.windowIcon())
-        except Exception:
-            pass
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        if not self.embedded:
+            self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+            self.setWindowTitle("Music Manager")
+            try:
+                self.setWindowIcon(main.windowIcon())
+            except Exception:
+                pass
+            self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.path, self.img = None, None
         self.col, self.col2 = pick_colors(None)
         self.blur, self._bg, self._bg_key = None, None, None
@@ -1458,38 +1481,45 @@ class MiniPlayer(QWidget):
         self._press, self._moved, self._drag_off = None, False, None
         self.tech_text = ""
         self.top = bool(int(main.cfg.value("mini_top", 0) or 0))
-        if self.top:
+        if self.top and not self.embedded:
             self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
 
-        scr = QGuiApplication.primaryScreen()
-        ah = scr.availableGeometry().height() if scr is not None else 900
-        self.W = max(270, min(self.BASE_W, ah - 2 * M - 8 - self.EXTRA + 52))
-        self.S = self.W - 52                       # lado de la portada
-        self.H = self.S + self.EXTRA
-        self.setFixedSize(self.W + 2 * M, self.H + 2 * M)
-        self.cover_rect = QRectF(M + 26, M + 8 + 46 + 6, self.S, self.S)
-        # portada grande: ocupa todo el ancho y llega hasta debajo del título (título y artista van encima)
-        self.full_rect = QRectF(M, M, self.W, 8 + 46 + 6 + self.S + 18 + 84)
-        self.fit_rect = QRectF(M, M, self.W, self.W)   # portada entera (sin recortar) a todo el ancho
+        if self.embedded:
+            self.W, self.H = max(300, parent.width()), max(560, parent.height())
+        else:
+            scr = QGuiApplication.primaryScreen()
+            ah = scr.availableGeometry().height() if scr is not None else 900
+            self.W = max(270, min(self.BASE_W, ah - 2 * self.m - 8 - self.EXTRA + 52))
+            self.H = self.W - 52 + self.EXTRA
+            self.setFixedSize(self.W + 2 * self.m, self.H + 2 * self.m)
+        self.calc_rects()
         cm = str(main.cfg.value("mini_cover2", "fit"))
         self.cover_mode = cm if cm in ("fit", "full", "card") else "fit"
         self.colb, self.colb2 = bottom_colors(None)
         self.blur2 = None
 
         v = QVBoxLayout(self)
-        v.setContentsMargins(M + 12, M + 8, M + 12, M + 12)
+        v.setContentsMargins(self.m + 12, self.m + 8, self.m + 12, self.m + 12)
         v.setSpacing(0)
         # ---- barra de arriba
         topw = QWidget()
         topw.setFixedHeight(46)
         th = QHBoxLayout(topw)
         th.setContentsMargins(0, 0, 0, 0)
-        self.b_down = PillBtn("arrow_l", T("Editor"))
-        self.b_down.setToolTip(T("Volver al editor (Esc)"))
-        self.b_down.clicked.connect(self.main.exit_mini)
-        self.b_compact = IconBtn("mini", 34, pad=0.25)
-        self.b_compact.setToolTip(T("Solo la portada: ventanita pequeña con anterior, pausa y siguiente"))
-        self.b_compact.clicked.connect(self.enter_compact)
+        if self.embedded:   # en el editor: flecha para esconder el panel y botón para pasar al modo reproductor
+            self.b_down = IconBtn("chevron_r", 36, pad=0.27)
+            self.b_down.setToolTip(T("Cerrar el reproductor grande"))
+            self.b_down.clicked.connect(lambda: self.parentWidget().close_panel())
+            self.b_compact = IconBtn("mini", 34, pad=0.25)
+            self.b_compact.setToolTip(T("Modo reproductor: esconde el editor y deja solo el reproductor (se puede mover) · Ctrl+M"))
+            self.b_compact.clicked.connect(self.main.enter_mini)
+        else:
+            self.b_down = PillBtn("arrow_l", T("Editor"))
+            self.b_down.setToolTip(T("Volver al editor (Esc)"))
+            self.b_down.clicked.connect(self.main.exit_mini)
+            self.b_compact = IconBtn("mini", 34, pad=0.25)
+            self.b_compact.setToolTip(T("Solo la portada: ventanita pequeña con anterior, pausa y siguiente"))
+            self.b_compact.clicked.connect(self.enter_compact)
         cap = QVBoxLayout()
         cap.setSpacing(0)
         self.cap1 = QLabel(T("REPRODUCIENDO"))
@@ -1522,7 +1552,9 @@ class MiniPlayer(QWidget):
         th.addLayout(cap, 1)
         th.addWidget(rw)
         v.addWidget(topw)
-        v.addSpacing(6 + self.S + 18)   # la portada se dibuja en el fondo (así no se redibuja a cada rato)
+        from PyQt6.QtWidgets import QSpacerItem
+        self.cover_gap = QSpacerItem(0, 6 + self.S + 18, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        v.addItem(self.cover_gap)   # la portada se dibuja en el fondo (así no se redibuja a cada rato)
         # ---- título, artista y calidad
         self.title = QLabel("—")
         self.title.setStyleSheet("QLabel { color: white; font-size: 20px; font-weight: 800; background: transparent; }")
@@ -1626,10 +1658,11 @@ class MiniPlayer(QWidget):
 
         # ---- biblioteca («Cola»): ocupa todo menos la barra de acciones
         self.lib = LibraryPage(self)
-        self.lib.setGeometry(M, M, self.W, self.H - 12 - 56 - 8)
+        self.lib.setGeometry(self.m, self.m, self.W, self.H - 12 - 56 - 8)
         self.lib.hide()
 
-        self.compact = CompactPlayer(self)   # «solo la portada»: ventanita pequeña que se puede agrandar
+        # «solo la portada»: ventanita pequeña que se puede agrandar (solo en la ventanita aparte)
+        self.compact = _NoCompact() if self.embedded else CompactPlayer(self)
 
         self._save_pos = QTimer(self)
         self._save_pos.setSingleShot(True)
@@ -1644,6 +1677,31 @@ class MiniPlayer(QWidget):
             pl.positionChanged.connect(self.on_pos)
             pl.durationChanged.connect(self.on_dur)
             pl.playbackStateChanged.connect(self.on_state)
+
+    # ------------------------------------------------------------ medidas
+    def calc_rects(self):
+        m = self.m
+        self.S = max(110, min(self.W - 52, self.H - self.EXTRA))   # lado de la portada (según el alto disponible)
+        self.cover_rect = QRectF(m + (self.W - self.S) / 2, m + 8 + 46 + 6, self.S, self.S)
+        # portada grande: ocupa todo el ancho y llega hasta debajo del título (título y artista van encima)
+        self.full_rect = QRectF(m, m, self.W, 8 + 46 + 6 + self.S + 18 + 84)
+        # portada entera a todo el ancho (si no hay alto suficiente, se recorta un poco arriba y abajo)
+        self.fit_rect = QRectF(m, m, self.W, min(self.W, self.S + 78 + 70))
+
+    def resizeEvent(self, e):
+        if self.embedded and (self.width(), self.height()) != (self.W, self.H) and self.width() > 50:
+            self.W, self.H = self.width(), self.height()
+            self.calc_rects()
+            self.cover_gap.changeSize(0, 6 + self.S + 18, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+            self.layout().invalidate()
+            self.panel.setGeometry(self.cover_rect.toRect())
+            self.lib.setGeometry(0, 0, self.W, self.H - 12 - 56 - 8)
+            self._bg_key = None
+            if self.path:
+                wmax = self.W - 40
+                t = self.title.toolTip() or self.title.text()
+                self.title.setText(self.title.fontMetrics().elidedText(t, Qt.TextElideMode.ElideRight, wmax))
+        super().resizeEvent(e)
 
     # ------------------------------------------------------------ ventanita «solo la portada»
     def in_use(self):
@@ -1690,8 +1748,8 @@ class MiniPlayer(QWidget):
             scr = QGuiApplication.screenAt(main_geo.center()) or QGuiApplication.primaryScreen()
             pos = QPoint(main_geo.right() - self.width() - 10, main_geo.top() + (main_geo.height() - self.height()) // 2)
         ag = scr.availableGeometry()
-        x = min(max(pos.x(), ag.left() - M), ag.right() - self.width() + M)
-        y = min(max(pos.y(), ag.top() - M), ag.bottom() - self.height() + M)
+        x = min(max(pos.x(), ag.left() - self.m), ag.right() - self.width() + self.m)
+        y = min(max(pos.y(), ag.top() - self.m), ag.bottom() - self.height() + self.m)
         self.move(x, y)
 
     def moveEvent(self, e):
@@ -1719,6 +1777,10 @@ class MiniPlayer(QWidget):
         self.main.cfg.setValue("mini_cover2", self.cover_mode)
         self.apply_cover_mode()
         self.track_changed(self.path)
+        for other in (getattr(self.main, "mini", None), getattr(getattr(self.main, "mobile", None), "inner", None)):
+            if other is not None and other is not self and other.cover_mode != self.cover_mode:
+                other.cover_mode = self.cover_mode   # el del editor y la ventanita usan el mismo estilo
+                other.apply_cover_mode()
 
     def apply_cover_mode(self):
         full = self.cover_mode == "full"
@@ -1739,7 +1801,13 @@ class MiniPlayer(QWidget):
 
     # ------------------------------------------------------------ fondo (se dibuja una vez por canción)
     def card(self):
-        return QRectF(M, M, self.W, self.H)
+        return QRectF(self.m, self.m, self.W, self.H)
+
+    def border_path(self, r):
+        bp = QPainterPath()
+        if not self.embedded:
+            bp.addRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), RADIUS, RADIUS)
+        return bp
 
     def bg_pixmap(self):
         """Sombra, degradado con los colores de la portada, la portada muy difuminada que se mezcla con el fondo,
@@ -1756,18 +1824,21 @@ class MiniPlayer(QWidget):
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         r = self.card()
         p.setPen(Qt.PenStyle.NoPen)
-        for i in range(M, 0, -1):   # sombra suave alrededor de la ventanita
+        for i in range(self.m, 0, -1):   # sombra suave alrededor de la ventanita
             p.setBrush(QColor(0, 0, 0, 7))
             p.drawRoundedRect(r.adjusted(-i * 0.8, -i * 0.5, i * 0.8, i * 1.0), RADIUS + i, RADIUS + i)
         path = QPainterPath()
-        path.addRoundedRect(r, RADIUS, RADIUS)
+        if self.embedded:   # pegado al borde derecho del editor: solo se redondea el lado izquierdo
+            path.addRoundedRect(QRectF(r.left(), r.top(), r.width() + 40, r.height()), 20, 20)
+        else:
+            path.addRoundedRect(r, RADIUS, RADIUS)
         p.setClipPath(path)
         if self.cover_mode == "fit":
             self.paint_fit_cover(p, r, dpr)
             p.setClipping(False)
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QColor(255, 255, 255, 22))
-            p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), RADIUS, RADIUS)
+            p.drawPath(self.border_path(r))
             p.end()
             self._bg, self._bg_key = pm, key
             return pm
@@ -1808,7 +1879,7 @@ class MiniPlayer(QWidget):
             p.setClipping(False)
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QColor(255, 255, 255, 22))
-            p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), RADIUS, RADIUS)
+            p.drawPath(self.border_path(r))
             p.end()
             self._bg, self._bg_key = pm, key
             return pm
@@ -1837,7 +1908,7 @@ class MiniPlayer(QWidget):
         p.setClipping(False)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.setPen(QColor(255, 255, 255, 22))
-        p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), RADIUS, RADIUS)
+        p.drawPath(self.border_path(r))
         p.end()
         self._bg, self._bg_key = pm, key
         return pm
@@ -1873,10 +1944,16 @@ class MiniPlayer(QWidget):
 
         def draw(q):
             if self.img is not None:
-                sc = self.img.scaled(int(fr.width() * dpr), int(fr.height() * dpr), Qt.AspectRatioMode.KeepAspectRatio,
-                                     Qt.TransformationMode.SmoothTransformation)
-                w_, h_ = sc.width() / dpr, sc.height() / dpr
-                q.drawImage(QRectF((fr.width() - w_) / 2, 0, w_, h_), sc)   # si no es cuadrada, se ve entera igual
+                if abs(fr.width() - fr.height()) < 2:
+                    sc = self.img.scaled(int(fr.width() * dpr), int(fr.height() * dpr), Qt.AspectRatioMode.KeepAspectRatio,
+                                         Qt.TransformationMode.SmoothTransformation)
+                    w_, h_ = sc.width() / dpr, sc.height() / dpr
+                    q.drawImage(QRectF((fr.width() - w_) / 2, 0, w_, h_), sc)   # si no es cuadrada, se ve entera igual
+                else:   # poco alto (panel del editor en pantallas bajas): a todo el ancho, recortando arriba y abajo
+                    sc = self.img.scaled(int(fr.width() * dpr), int(fr.height() * dpr),
+                                         Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+                    sx, sy = (sc.width() - fr.width() * dpr) / 2, (sc.height() - fr.height() * dpr) / 2
+                    q.drawImage(QRectF(0, 0, fr.width(), fr.height()), sc, QRectF(sx, sy, fr.width() * dpr, fr.height() * dpr))
             else:
                 rg = QRadialGradient(QPointF(fr.width() * 0.4, fr.height() * 0.35), fr.width() * 0.8)
                 rg.setColorAt(0, QColor(96, 82, 150))
@@ -1939,7 +2016,8 @@ class MiniPlayer(QWidget):
 
     def paintEvent(self, e):
         p = QPainter(self)
-        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+        if not self.embedded:
+            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
         dpr = self.devicePixelRatioF()
         r = QRectF(e.rect())
         p.drawPixmap(r, self.bg_pixmap(), QRectF(r.x() * dpr, r.y() * dpr, r.width() * dpr, r.height() * dpr))
@@ -2104,27 +2182,32 @@ class MiniPlayer(QWidget):
     # ------------------------------------------------------------ acciones
     def edit_song(self):
         p = self.path
-        self.main.exit_mini()
+        if not self.embedded:
+            self.main.exit_mini()
         if p and os.path.isfile(p):
             self.main.go_to_folder(p)
 
     def quality_song(self):
         p = self.path
-        self.main.exit_mini()
+        if not self.embedded:
+            self.main.exit_mini()
         if p and os.path.isfile(p):
             self.main.go_to_folder(p)
             QTimer.singleShot(300, self.main.open_spectrum)
 
     def show_menu(self, gpos):
         m = QMenu(self)
-        m.addAction(T("Volver al editor"), self.main.exit_mini)
-        a = m.addAction(T("Siempre encima de las demás ventanas"))
-        a.setCheckable(True)
-        a.setChecked(self.top)
-        a.triggered.connect(lambda on: self.set_top(on))
-        m.addAction(T("Minimizar"), self.showMinimized)
-        m.addSeparator()
-        m.addAction(T("Solo la portada (ventanita pequeña)"), self.enter_compact)
+        if self.embedded:
+            m.addAction(T("Modo reproductor (solo el reproductor)"), self.main.enter_mini)
+        else:
+            m.addAction(T("Volver al editor"), self.main.exit_mini)
+            a = m.addAction(T("Siempre encima de las demás ventanas"))
+            a.setCheckable(True)
+            a.setChecked(self.top)
+            a.triggered.connect(lambda on: self.set_top(on))
+            m.addAction(T("Minimizar"), self.showMinimized)
+            m.addSeparator()
+            m.addAction(T("Solo la portada (ventanita pequeña)"), self.enter_compact)
         m.addSeparator()
         for mode, label in (("fit", T("Portada difuminada (entera)")), ("full", T("Portada difuminada extendida")),
                             ("card", T("Portada normal (tarjeta)"))):
@@ -2140,8 +2223,9 @@ class MiniPlayer(QWidget):
             pass
         m.addAction(T("Quitar silencio") if mute else T("Silenciar"), self.main.toggle_mute)
         m.addAction(T(f"Volumen: {self.main.vol.value()} % (rueda del ratón)")).setEnabled(False)
-        m.addSeparator()
-        m.addAction(T("Cerrar el programa"), self.main.quit_from_mini)
+        if not self.embedded:
+            m.addSeparator()
+            m.addAction(T("Cerrar el programa"), self.main.quit_from_mini)
         m.exec(gpos)
 
     # ------------------------------------------------------------ reproductor
@@ -2221,7 +2305,7 @@ class MiniPlayer(QWidget):
 
     # ------------------------------------------------------------ ratón y teclado
     def mousePressEvent(self, e):
-        if e.button() == Qt.MouseButton.LeftButton:
+        if e.button() == Qt.MouseButton.LeftButton and not self.embedded:
             self._press = e.globalPosition().toPoint()
             self._moved = False
             self._drag_off = None
@@ -2257,6 +2341,8 @@ class MiniPlayer(QWidget):
             self.change_vol(5 if d > 0 else -5)
 
     def keyPressEvent(self, e):
+        if self.embedded:
+            return super().keyPressEvent(e)
         k = e.key()
         if k == Qt.Key.Key_Space:
             self.main.toggle_play()

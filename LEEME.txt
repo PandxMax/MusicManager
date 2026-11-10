@@ -699,3 +699,13 @@ VERSIÓN 2.18
    anterior / pausa / siguiente y una barrita con la onda de la canción (clic para avanzar).
    Se agranda o achica tirando de los bordes o de la esquina, y se mueve arrastrando.
    Al pasar el ratón aparecen «← Editor» y «Reproductor» (volver al reproductor completo).
+
+VERSIÓN 2.19
+------------
+ - El reproductor del editor (panel de la derecha, estilo celular) tiene ahora el mismo diseño nuevo que
+   el modo reproductor: portada difuminada, «REPRODUCIENDO · n de N», calidad, barra con la onda,
+   controles y la barra Cola · Letra · Ajustes · Editar · Calidad. La Cola (canciones, carpetas del
+   árbol, artistas y géneros, con portadas) se abre dentro del panel.
+ - Arriba del panel: flecha para esconderlo, botón de ventanita para pasar al modo reproductor y menú ⋮
+   (estilo de portada, silenciar). El estilo de portada elegido vale para el panel y para la ventanita.
+ - Volumen en el panel: rueda del ratón sobre el reproductor.

@@ -314,6 +314,22 @@ class MobilePlayer(QFrame):
         self.sync_vol(main.vol.value())
         self.sync_modes()
 
+    # ------------------------------------------------------------ diseño nuevo (el mismo del modo reproductor)
+    def attach_inner(self, inner):
+        """El panel muestra el reproductor nuevo (el de la app del celular) ocupándolo entero."""
+        self.inner = inner
+        for w_ in self.findChildren(QWidget):
+            if w_ is not inner and w_.parentWidget() is self:
+                w_.hide()
+        inner.setGeometry(self.rect())
+        inner.show()
+        inner.raise_()
+
+    def resizeEvent(self, e):
+        if getattr(self, "inner", None) is not None:
+            self.inner.setGeometry(self.rect())
+        super().resizeEvent(e)
+
     # ------------------------------------------------------------ abrir / cerrar
     def place(self):
         par = self.parentWidget()
@@ -407,6 +423,9 @@ class MobilePlayer(QFrame):
 
     # ------------------------------------------------------------ datos de la canción
     def track_changed(self, path):
+        if getattr(self, "inner", None) is not None:
+            self.inner.track_changed(path)
+            return
         if not path:
             self.title.setText(T("Nada sonando"))
             self.sub.setText("")
@@ -482,6 +501,10 @@ class MobilePlayer(QFrame):
 
     def show_page(self, i):
         """0 = portada · 1 = letra · 2 = cola de reproducción (todo dentro del reproductor, sin ventanas aparte)."""
+        if getattr(self, "inner", None) is not None:
+            if i == 2:
+                self.inner.open_library()
+            return
         if i == 2:
             self.fill_queue()
         self.stack.setCurrentIndex(i)
@@ -529,7 +552,7 @@ class MobilePlayer(QFrame):
 
     # ------------------------------------------------------------ reproductor
     def on_pos(self, ms):
-        if not self.isVisible():
+        if not self.isVisible() or getattr(self, "inner", None) is not None:
             return
         if not self.seek.isSliderDown():
             self.seek.setValue(ms)

@@ -74,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.18"
+APP_VERSION = "2.19"
 
 
 class TMenu(QMenu):
@@ -965,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.19', [
+        'El reproductor del editor (el panel de la derecha) ahora tiene el mismo diseño nuevo: portada difuminada, «REPRODUCIENDO · n de N», calidad, barra con la onda, controles y la barra Cola · Letra · Ajustes · Editar · Calidad, con la Cola (canciones, carpetas del árbol, artistas, géneros) dentro del panel. El estilo de portada elegido vale para los dos.',
+    ]),
     ('2.18', [
         'Modo reproductor: la portada difuminada ahora sale entera, adaptada al ancho (sin recortarse); la versión extendida queda como opción en el menú ⋮, junto con la portada normal. Botón «← Editor» bien visible para volver. Nuevo modo «solo la portada»: una ventanita con la portada, anterior / pausa / siguiente y una barrita con la onda de la canción; se agranda o achica tirando de los bordes o de la esquina.',
     ]),
@@ -1620,7 +1623,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.18 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.19 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4322,6 +4325,13 @@ class Main(QMainWindow):
         if self.player is not None:
             import mobile
             self.mobile = mobile.MobilePlayer(self, central, inspect_file)
+            try:   # el panel usa el mismo diseño que el modo reproductor
+                import miniplayer
+                self.mobile.attach_inner(miniplayer.MiniPlayer(self, inspect_file, tech_info, read_tags, AUDIO_EXT,
+                                                               find_folder_image, parent=self.mobile))
+            except Exception:
+                import traceback
+                traceback.print_exc()
             QTimer.singleShot(300, lambda: self.set_player_style(str(self.cfg.value("player_style", "classic")), first=True))
         self.statusBar().addPermanentWidget(self.player_bar)   # reproductor en la línea de estado, a la derecha
         self.statusBar().setSizeGripEnabled(False)
@@ -5433,6 +5443,9 @@ class Main(QMainWindow):
             self.viz.set_data(arr, fps)
             if getattr(self, "mini", None) is not None:
                 self.mini.set_viz(path, arr)
+            inner = getattr(getattr(self, "mobile", None), "inner", None)
+            if inner is not None:
+                inner.set_viz(path, arr)
 
     # ------------------------------------------------- Modo reproductor
     def enter_mini(self):
@@ -7703,6 +7716,8 @@ class Main(QMainWindow):
             self.player.stop()
         if getattr(self, "mini", None) is not None:
             self.mini.shutdown()
+        if getattr(getattr(self, "mobile", None), "inner", None) is not None:
+            self.mobile.inner.shutdown()
         try:
             self.thumbs.stop()
         except Exception:
