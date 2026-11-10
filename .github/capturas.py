@@ -393,7 +393,30 @@ try:
     print("atajo cambiado a F8:", ascii(os.path.basename(w.playing_path)), flush=True)
     w.cfg.remove("hk_next")
     w.music_keys.load()
+    # atajos en todo Windows: se simula la tecla a nivel del sistema, con el foco en un cuadro de texto
+    import ctypes
+    w.play_file(fl[5])
+    wait(900)
+    w.search.setFocus()
+    print("globales registrados:", sorted(w.music_keys.registered), "fallidos:", w.music_keys.failed, flush=True)
+    ctypes.windll.user32.keybd_event(0x22, 0, 0, 0)
+    ctypes.windll.user32.keybd_event(0x22, 0, 2, 0)
+    wait(1200)
+    g1 = os.path.basename(w.playing_path)
+    ctypes.windll.user32.keybd_event(0x21, 0, 0, 0)
+    ctypes.windll.user32.keybd_event(0x21, 0, 2, 0)
+    wait(1200)
+    print("global AvPag/RePag:", ascii(os.path.basename(fl[5])), "->", ascii(g1), "->", ascii(os.path.basename(w.playing_path)), flush=True)
     w.player.stop()
+    wait(500)
+    print("sin musica, teclas libres:", w.music_keys.registered == {}, flush=True)
+    import secret
+    secret.put(w.cfg, "key_Prueba", "sk-secreta-123")
+    raw = str(w.cfg.value("key_Prueba", ""))
+    print("clave cifrada:", raw.startswith("dpapi:"), "sk-secreta" not in raw, "se lee:", secret.get(w.cfg, "key_Prueba") == "sk-secreta-123",
+          "vieja sin cifrar se lee:", secret.unprotect("clave-vieja") == "clave-vieja", flush=True)
+    w.cfg.remove("key_Prueba")
+    print("novedades:", len(mm.CHANGELOG), mm.CHANGELOG[0][0], flush=True)
     smoke("ajustes atajos", lambda: w.open_settings("atajos"), "s_ajustes_atajos")
 except Exception:
     print("FALLO lote", ascii(traceback.format_exc()), flush=True)

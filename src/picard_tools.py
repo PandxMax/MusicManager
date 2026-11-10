@@ -5,6 +5,7 @@
 2. Emparejar un álbum completo con MusicBrainz: busca el lanzamiento, coloca cada archivo en su pista
    (título, número de pista y de disco, año, intérprete del álbum), guarda los IDs de MusicBrainz y la portada
    del Cover Art Archive."""
+import secret
 import os, re, sys, json, time, zipfile, hashlib, tempfile, shutil, subprocess, difflib, unicodedata
 import urllib.request, urllib.parse, urllib.error
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QStandardPaths, QUrl
@@ -32,7 +33,7 @@ def nice_table(tb):
     tb.verticalHeader().setDefaultSectionSize(34)
 from i18n import tr as T
 
-UA = "MusicManager/2.21 ( https://github.com/PandxMax/MusicManager )"
+UA = "MusicManager/2.22 ( https://github.com/PandxMax/MusicManager )"
 FP_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
 FP_SHA256 = "36b478e16aa69f757f376645db0d436073a42c0097b6bb2677109e7835b59bbc"
 MB_KEYS = {"musicbrainz_trackid", "musicbrainz_releasetrackid", "musicbrainz_albumid", "musicbrainz_releasegroupid",
@@ -239,7 +240,7 @@ class AcoustIdDialog(QDialog):
         kh.setWordWrap(True)
         kc.addWidget(kh)
         kr = QHBoxLayout()
-        self.key = QLineEdit(str(main.cfg.value("acoustid_key", "") or ""))
+        self.key = QLineEdit(secret.get(main.cfg, "acoustid_key"))
         self.key.setPlaceholderText(T("pega aquí tu clave gratuita"))
         self.key.returnPressed.connect(self.save_key)
         kr.addWidget(self.key, 1)
@@ -310,7 +311,7 @@ class AcoustIdDialog(QDialog):
         if not k:
             self.key.setFocus()
             return
-        self.main.cfg.setValue("acoustid_key", k)
+        secret.put(self.main.cfg, "acoustid_key", k)
         self.show_key_editor(False)
 
     def start(self):
@@ -319,7 +320,7 @@ class AcoustIdDialog(QDialog):
             self.show_key_editor(True)
             self.status.setText(T("Falta la clave de AcoustID. Pulsa «Conseguir clave gratis», regístrate y pégala aquí."))
             return
-        self.main.cfg.setValue("acoustid_key", key)
+        secret.put(self.main.cfg, "acoustid_key", key)
         self.show_key_editor(False)
         if not fpcalc_exe():
             self.status.setText(T("Descargando el analizador de audio (fpcalc, 1,5 MB, solo la primera vez)…"))

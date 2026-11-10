@@ -728,3 +728,18 @@ VERSIÓN 2.21
  - Barrita de volumen desplegable: botón de altavoz debajo de la onda (en el panel y en la ventanita).
  - Ventanita «solo la portada»: ya no aparece ni desaparece nada sobre la carátula. Queda un botoncito
    fijo arriba a la derecha (volver al reproductor); lo demás está en el clic derecho.
+
+VERSIÓN 2.22
+------------
+ - Atajos de música en todo Windows: AvPág, RePág y Pausa (o los que elijas) funcionan aunque estés en
+   otro programa, jugando o con Music Manager minimizado. OJO: mientras haya una canción puesta, esas
+   teclas quedan reservadas para la música (AvPág/RePág no mueven la página en otros programas); si
+   molesta, elige una combinación en Ajustes → Atajos de música, o desactiva «fuera del programa».
+   Al detener la música o cerrar el programa, las teclas quedan libres.
+ - La actualización comprueba la descarga (tamaño, huella sha256 de GitHub y que el zip no esté dañado)
+   antes de instalar.
+ - Las claves de IA, Discogs y AcoustID se guardan cifradas (protección de datos de Windows).
+ - Los fallos menores que el programa tolera se anotan en «errores_menores.txt» (junto a errores.txt).
+ - Versiones de componentes fijadas (requirements.txt) para que cada compilación sea igual.
+ - El panel del editor y la ventanita comparten la biblioteca ya leída.
+ - El historial de novedades pasó a su propio archivo (src/changelog.py).

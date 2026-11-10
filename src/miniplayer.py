@@ -901,6 +901,16 @@ class LibraryPage(QWidget):
             return
         if self.worker is not None:
             self.worker.requestInterruption()
+        if not self.files:   # el panel del editor y la ventanita comparten lo ya leído (no se lee todo dos veces)
+            for other in (getattr(getattr(self.main, "mini", None), "lib", None),
+                          getattr(getattr(getattr(self.main, "mobile", None), "inner", None), "lib", None)):
+                if other is not None and other is not self and other.files:
+                    self.order, self.children, self.direct = other.order, other.children, other.direct
+                    self.files, self.tags = other.files, dict(other.tags)
+                    self.index_folders()
+                    for k, v in list(other.pix.items())[-300:]:
+                        self.pix.setdefault(k, v)
+                    break
         self.loaded, self.read_pct, self.scanning = False, 0, True
         known = dict(getattr(self.main, "tags_cache", {}) or {})
         w = LibraryWorker([p for _l, p in self.roots], known, dict(self.tags), self.mini.read_fn, self.mini.exts)
