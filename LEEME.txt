@@ -716,3 +716,15 @@ VERSIÓN 2.20
    carpetas, y conserva dónde estabas.
  - Menos memoria con bibliotecas grandes (las portadas pequeñas de la Cola se sueltan y se recargan).
  - El programa abre un poco más ligero (las portadas de la Cola se preparan cuando la abres).
+
+VERSIÓN 2.21
+------------
+ - Guardar muchos cambios (6 o más archivos) y mover muchos elementos (12 o más) van en segundo plano,
+   con barra de progreso: la ventana ya no se congela.
+ - Edición → «Deshacer último mover / renombrar» (Ctrl+Alt+Z): devuelve a su sitio lo último que
+   moviste o renombraste (canciones o carpetas). Recuerda las últimas 20 operaciones.
+ - Atajos de música en todas las ventanas: AvPág = siguiente, RePág = anterior, Pausa = reproducir/pausa.
+   Se cambian en Ajustes → Atajos de música (cualquier tecla o combinación). No actúan mientras escribes.
+ - Barrita de volumen desplegable: botón de altavoz debajo de la onda (en el panel y en la ventanita).
+ - Ventanita «solo la portada»: ya no aparece ni desaparece nada sobre la carátula. Queda un botoncito
+   fijo arriba a la derecha (volver al reproductor); lo demás está en el clic derecho.

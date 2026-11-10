@@ -10,7 +10,7 @@ import sys, os, json, re, shutil, time, base64, html, urllib.request, urllib.err
 from functools import lru_cache
 from urllib.parse import quote_plus, quote
 
-from PyQt6.QtCore import QItemSelectionModel
+from PyQt6.QtCore import QItemSelectionModel, QEventLoop
 from PyQt6.QtCore import (QAbstractNativeEventFilter, QCoreApplication, Qt, QSettings, QThread, pyqtSignal, QMimeData, QUrl, QSize,
                           QTimer, QRectF, QStandardPaths, QPropertyAnimation, QEasingCurve, QPoint, QRect, QBuffer, QByteArray, QIODevice, QEvent, QPointF, QPersistentModelIndex, QObject)
 from PyQt6.QtGui import (QFontMetrics, QAction, QColor, QBrush, QIcon, QPixmap, QPainter, QImage,
@@ -18,9 +18,9 @@ from PyQt6.QtGui import (QFontMetrics, QAction, QColor, QBrush, QIcon, QPixmap, 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QSplitter, QTreeWidget, QTreeWidgetItem,
     QListWidget, QListWidgetItem, QListView, QAbstractItemView, QVBoxLayout,
-    QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
+    QHBoxLayout, QGridLayout, QFormLayout, QLabel, QLineEdit, QPlainTextEdit, QTextEdit,
     QPushButton, QComboBox, QGroupBox, QCheckBox, QFileDialog, QMessageBox,
-    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QStyleOptionViewItem, QAbstractItemDelegate, QTableWidget, QTableWidgetItem, QRadioButton, QButtonGroup,
+    QInputDialog, QGraphicsDropShadowEffect, QToolTip, QStackedWidget, QStyle, QStyleOptionSlider, QHeaderView, QMenu, QToolBar, QTabWidget, QColorDialog, QSizePolicy, QScrollArea, QFileIconProvider, QFrame, QSlider, QDialog, QTextBrowser, QProgressDialog, QKeySequenceEdit, QAbstractSpinBox, QLayout, QRubberBand, QSplashScreen, QToolButton, QAbstractScrollArea, QStyledItemDelegate, QStyleOptionViewItem, QAbstractItemDelegate, QTableWidget, QTableWidgetItem, QRadioButton, QButtonGroup,
 )
 import mutagen
 import i18n
@@ -74,7 +74,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.20"
+APP_VERSION = "2.21"
 
 
 class TMenu(QMenu):
@@ -965,6 +965,9 @@ class AIWorker(AIBase):
 
 
 CHANGELOG = [
+    ('2.21', [
+        'Guardar muchos cambios y mover muchos archivos ahora van en segundo plano con barra de progreso (la ventana ya no se congela). Nuevo «Deshacer último mover / renombrar» (Edición, Ctrl+Alt+Z). Atajos de música: AvPág = siguiente, RePág = anterior, Pausa = reproducir/pausa, en todas las ventanas; se cambian en Ajustes → Atajos de música. Barrita de volumen desplegable en el reproductor (botón de altavoz bajo la onda). En la ventanita «solo la portada» ya no aparece ni desaparece nada sobre la carátula: queda un botoncito fijo y discreto, y lo demás está en el clic derecho.',
+    ]),
     ('2.20', [
         'Mejoras internas del reproductor nuevo: la Cola ya no salta al principio mientras la miras (solo se vuelve a llenar si de verdad cambió algo en las carpetas, y conserva dónde estabas); usa menos memoria con bibliotecas grandes (las portadas pequeñas se sueltan y se recargan al volver); y el programa abre un poco más ligero (las portadas de la Cola se preparan recién cuando la abres).',
     ]),
@@ -1626,7 +1629,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.20 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.21 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3664,6 +3667,70 @@ class SongList(QListWidget):
 
 
 # ------------------------------------------------------------- Ventana principal
+class BatchWorker(QThread):
+    """Hace un trabajo por cada elemento (guardar, mover…) fuera del hilo de la ventana, para que no se congele."""
+    step = pyqtSignal(int)
+
+    def __init__(self, items, fn):
+        super().__init__()
+        self.items, self.fn, self.results = list(items), fn, []
+
+    def run(self):
+        for i, it in enumerate(self.items):
+            try:
+                self.results.append((it, self.fn(it), None))
+            except Exception as e:
+                self.results.append((it, None, e))
+            self.step.emit(i + 1)
+
+
+HOTKEYS = (("hk_next", "PgDown", "Siguiente canción"), ("hk_prev", "PgUp", "Canción anterior"),
+           ("hk_pause", "Pause", "Reproducir / pausa"))
+
+
+class MusicKeys(QObject):
+    """Atajos de música que funcionan en todas las ventanas del programa (editor, reproductor y ventanita):
+    siguiente, anterior y pausa. Se configuran en Ajustes → Atajos de música. No actúan mientras se escribe."""
+
+    def __init__(self, main):
+        super().__init__(main)
+        self.main = main
+        self.load()
+
+    def load(self):
+        self.map = {}
+        for key, default, _lab in HOTKEYS:
+            seq = str(self.main.cfg.value(key, default) or "").strip()
+            if seq:
+                self.map[QKeySequence(seq).toString(QKeySequence.SequenceFormat.PortableText)] = key
+
+    def eventFilter(self, obj, ev):
+        if ev.type() != QEvent.Type.KeyPress or not self.map or not isinstance(obj, QWidget):
+            return False
+        k = ev.key()
+        if k in (Qt.Key.Key_Shift, Qt.Key.Key_Control, Qt.Key.Key_Alt, Qt.Key.Key_Meta, Qt.Key.Key_unknown, 0):
+            return False
+        fw = QApplication.focusWidget()
+        if isinstance(fw, (QLineEdit, QTextEdit, QPlainTextEdit, QKeySequenceEdit, QAbstractSpinBox)) or \
+                (isinstance(fw, QComboBox) and fw.isEditable()):
+            return False   # se está escribiendo: la tecla es para el texto
+        try:
+            seq = QKeySequence(ev.keyCombination()).toString(QKeySequence.SequenceFormat.PortableText)
+        except Exception:
+            return False
+        act = self.map.get(seq)
+        if act is None or self.main.player is None:
+            return False
+        if not ev.isAutoRepeat():
+            if act == "hk_next":
+                self.main.step_play(1)
+            elif act == "hk_prev":
+                self.main.step_play(-1)
+            else:
+                self.main.toggle_play()
+        return True
+
+
 class Main(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -4325,6 +4392,9 @@ class Main(QMainWindow):
         self._shuffle_hist = []
         self.mobile = None
         self.mini = None   # modo reproductor (ventanita aparte; se crea la primera vez)
+        self.fs_undo = []  # últimos movimientos / renombrados, para poder deshacerlos
+        self.music_keys = MusicKeys(self)
+        QApplication.instance().installEventFilter(self.music_keys)
         if self.player is not None:
             import mobile
             self.mobile = mobile.MobilePlayer(self, central, inspect_file)
@@ -4782,6 +4852,7 @@ class Main(QMainWindow):
         try:
             self.release_if([path])
             self.fs_retry(os.rename, path, new)
+            self.push_undo(T("renombrar carpeta"), [(new, path)])
         except Exception as e:
             QMessageBox.warning(self, "Error", str(e))
             self.refresh_trees()
@@ -4843,9 +4914,72 @@ class Main(QMainWindow):
                 QApplication.processEvents()
                 time.sleep(0.15)
 
+    def run_batch(self, title, items, fn):
+        """Ejecuta fn(elemento) para cada uno en segundo plano, con una barra de progreso. La ventana sigue viva
+        (no sale «No responde») pero no deja tocar nada más hasta terminar. Devuelve [(elemento, resultado, error)]."""
+        items = list(items)
+        w = BatchWorker(items, fn)
+        dlg = QProgressDialog(T(title), None, 0, len(items), self)
+        dlg.setWindowTitle(T(title))
+        dlg.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dlg.setMinimumDuration(400)
+        dlg.setAutoClose(False)
+        dlg.setAutoReset(False)
+        w.step.connect(dlg.setValue)
+        loop = QEventLoop()
+        w.finished.connect(loop.quit)
+        w.start()
+        if w.isRunning():
+            loop.exec()
+        w.wait()
+        dlg.close()
+        dlg.deleteLater()
+        return w.results
+
+    def push_undo(self, label, pairs):
+        """Guarda (dónde está ahora, dónde estaba) de lo último que se movió o renombró."""
+        pairs = [(a, b) for a, b in pairs if a != b]
+        if pairs:
+            self.fs_undo.append((label, pairs))
+            del self.fs_undo[:-20]
+
+    def undo_fs(self):
+        if not self.fs_undo:
+            self.statusBar().showMessage(T("No hay nada que deshacer (solo se pueden deshacer movimientos y renombrados)."))
+            return
+        label, pairs = self.fs_undo.pop()
+        self.release_if([a for a, _ in pairs])
+        ok, errors = 0, []
+        for now, before in reversed(pairs):
+            try:
+                if not os.path.exists(now):
+                    errors.append(T(f"«{os.path.basename(now)}» ya no está donde quedó."))
+                    continue
+                if os.path.exists(before):
+                    errors.append(T(f"Ya hay otro «{os.path.basename(before)}» en el lugar original."))
+                    continue
+                os.makedirs(os.path.dirname(before), exist_ok=True)
+                self.fs_retry(shutil.move, now, before)
+                if os.path.isfile(before):
+                    self.retarget(now, before)
+                ok += 1
+            except Exception as e:
+                errors.append(f"{os.path.basename(now)}: {e}")
+        cd = self.current_dir
+        while cd and not os.path.isdir(cd):
+            cd = os.path.dirname(cd)
+        self.current_dir = cd
+        self.after_fs_change()
+        self.statusBar().showMessage(T(f"Deshecho: {label} ({ok} elemento(s) devueltos a su sitio)."))
+        if errors:
+            QMessageBox.warning(self, T("No se pudo deshacer todo"), "\n".join(errors[:20]))
+
     def move_items(self, paths, target):
         target = os.path.normpath(target)
         moved, errors, failed = 0, [], []
+        undo = []
+        if len(paths) >= 12:   # muchos: en segundo plano con barra de progreso
+            return self.move_items_bg(paths, target)
         try:
             self.thumbs.request(self.gen, [])   # que las miniaturas no estén leyendo estos archivos mientras se mueven
         except Exception:
@@ -4878,18 +5012,79 @@ class Main(QMainWindow):
             try:
                 self.fs_retry(shutil.move, src, dst)
                 moved += 1
+                undo.append((dst, src))
                 if os.path.isfile(dst):
                     self.retarget(src, dst)
             except Exception as e:
                 errors.append(f"{name}: {e}")
                 failed.append(src)
         QApplication.restoreOverrideCursor()
+        self.push_undo(T("mover"), undo)
         self.statusBar().showMessage(f"{moved} elemento(s) movido(s) a {target}")
         if errors:
             QMessageBox.warning(self, "Algunos elementos no se movieron", "\n".join(errors[:20]))
         QApplication.processEvents()
         self.after_fs_change()
         if failed:   # solo quedan marcadas las que no se pudieron mover
+            self.load_folder(self.current_dir, select=failed)
+
+    def move_items_bg(self, paths, target):
+        """Mover muchos elementos: mismo comportamiento (nunca sobrescribe, reintenta si está en uso) pero en segundo
+        plano, con barra de progreso y sin dejar la ventana congelada."""
+        try:
+            self.thumbs.request(self.gen, [])
+        except Exception:
+            pass
+        self.release_if(list(paths))
+        errors, jobs = [], []
+        for src in paths:
+            src = os.path.normpath(src)
+            if not os.path.exists(src):
+                continue
+            name = os.path.basename(src)
+            if os.path.isdir(src) and self.is_protected(src):
+                errors.append(f"«{name}» es una carpeta principal y no se puede mover.")
+            elif os.path.normpath(os.path.dirname(src)) == target:
+                continue
+            elif os.path.isdir(src) and (target == src or target.startswith(src + os.sep)):
+                errors.append(f"No puedes mover «{name}» dentro de sí misma.")
+            else:
+                jobs.append(src)
+
+        def one(src):
+            dst = os.path.join(target, os.path.basename(src))
+            if os.path.exists(dst):   # nunca sobrescribe: crea "nombre (2)"
+                root, ext = os.path.splitext(dst) if os.path.isfile(src) else (dst, "")
+                n = 2
+                while os.path.exists(f"{root} ({n}){ext}"):
+                    n += 1
+                dst = f"{root} ({n}){ext}"
+            for attempt in range(20):   # «en uso» un instante (miniatura, antivirus…): se reintenta ~3 s
+                try:
+                    shutil.move(src, dst)
+                    return dst
+                except PermissionError:
+                    if attempt == 19:
+                        raise
+                    time.sleep(0.15)
+
+        res = self.run_batch(f"Moviendo {len(jobs)} elementos…", jobs, one) if jobs else []
+        moved, failed, undo = 0, [], []
+        for src, dst, err in res:
+            if err is not None or not dst:
+                errors.append(f"{os.path.basename(src)}: {err}")
+                failed.append(src)
+                continue
+            moved += 1
+            undo.append((dst, src))
+            if os.path.isfile(dst):
+                self.retarget(src, dst)
+        self.push_undo(T("mover"), undo)
+        self.statusBar().showMessage(f"{moved} elemento(s) movido(s) a {target}")
+        if errors:
+            QMessageBox.warning(self, "Algunos elementos no se movieron", "\n".join(errors[:20]))
+        self.after_fs_change()
+        if failed:
             self.load_folder(self.current_dir, select=failed)
 
     def reload_all(self):
@@ -6225,6 +6420,7 @@ class Main(QMainWindow):
 
     def do_renames(self, res):
         done, errors, newpaths = 0, [], []
+        undo = []
         for old, nb in res:
             oname = os.path.basename(old)
             if not nb:
@@ -6252,10 +6448,12 @@ class Main(QMainWindow):
                         time.sleep(0.15)
                 self.retarget(old, new)
                 newpaths.append(new)
+                undo.append((new, old))
                 done += 1
             except Exception as e:
                 errors.append(f"{oname}: {e}")
                 newpaths.append(old)
+        self.push_undo(T("renombrar"), undo)
         if done:
             self.load_folder(self.current_dir, select=newpaths)
             self.statusBar().showMessage(f"{done} archivo(s) renombrado(s).")
@@ -6740,19 +6938,43 @@ class Main(QMainWindow):
         self.release_if(list(self.pending))
         errors, ok, skipped = [], 0, set()
         saved_paths = []
-        for path, ch in list(self.pending.items()):
+        save_lrc = bool(int(self.cfg.value("save_lrc_v2", 0) or 0))
+
+        def write_one(item):
+            path, ch = item
+            sk = set()
+            easy = {k: v for k, v in ch.items() if k in EASY_KEYS or k in MB_KEYS}
+            if easy:
+                sk |= set(write_tags(path, easy))
+            if "lyrics" in ch or "_cover" in ch:
+                write_extra(path, ch.get("lyrics"), ch.get("_cover"))
+            if ch.get("lyrics") and is_lrc(ch["lyrics"]) and save_lrc:
+                try:  # archivo .lrc junto a la canción: lo leen casi todos los reproductores
+                    with open(os.path.splitext(path)[0] + ".lrc", "w", encoding="utf-8") as fh:
+                        fh.write(ch["lyrics"])
+                except OSError:
+                    pass
+            return sk
+
+        todo = list(self.pending.items())
+        if len(todo) >= 6:   # muchos archivos: en segundo plano, con barra de progreso (la ventana no se congela)
             try:
-                easy = {k: v for k, v in ch.items() if k in EASY_KEYS or k in MB_KEYS}
-                if easy:
-                    skipped |= set(write_tags(path, easy))
-                if "lyrics" in ch or "_cover" in ch:
-                    write_extra(path, ch.get("lyrics"), ch.get("_cover"))
-                if ch.get("lyrics") and is_lrc(ch["lyrics"]) and int(self.cfg.value("save_lrc_v2", 0) or 0):
-                    try:  # archivo .lrc junto a la canción: lo leen casi todos los reproductores
-                        with open(os.path.splitext(path)[0] + ".lrc", "w", encoding="utf-8") as fh:
-                            fh.write(ch["lyrics"])
-                    except OSError:
-                        pass
+                self.thumbs.request(self.gen, [])
+            except Exception:
+                pass
+            results = self.run_batch(f"Guardando {len(todo)} archivos…", todo, write_one)
+        else:
+            results = []
+            for item in todo:
+                try:
+                    results.append((item, write_one(item), None))
+                except Exception as e:
+                    results.append((item, None, e))
+        for (path, ch), sk, err in results:
+            try:
+                if err is not None:
+                    raise err
+                skipped |= sk or set()
                 ok += 1
                 saved_paths.append(path)
                 del self.pending[path]
@@ -7983,6 +8205,8 @@ class Main(QMainWindow):
         e.addAction(self.act("✂️ Cortar\tCtrl+X", lambda: self.clip_set("cut")))
         e.addAction(self.act("📋 Copiar\tCtrl+C", lambda: self.clip_set("copy")))
         e.addAction(self.act("📥 Pegar\tCtrl+V", self.paste_here))
+        e.addAction(self.act("↩ Deshacer último mover / renombrar\tCtrl+Alt+Z", self.undo_fs,
+                             "Devuelve a su sitio lo último que moviste o renombraste"))
         e.addSeparator()
         e.addAction(self.act("📋 Copiar metadatos\tCtrl+Shift+C", self.copy_meta,
                              "Copia las etiquetas y la portada de la canción elegida"))
@@ -7990,6 +8214,7 @@ class Main(QMainWindow):
                              "Pega en las canciones elegidas las etiquetas copiadas (eliges cuáles)"))
         QShortcut(QKeySequence("Ctrl+Shift+C"), self, activated=self.copy_meta)
         QShortcut(QKeySequence("Ctrl+M"), self, activated=self.enter_mini)
+        QShortcut(QKeySequence("Ctrl+Alt+Z"), self, activated=self.undo_fs)
         QShortcut(QKeySequence("Ctrl+Shift+V"), self, activated=self.paste_meta)
         e.addSeparator()
         e.addAction(self.act("✏️ Renombrar\tF2", self.rename_current))
@@ -8562,6 +8787,35 @@ class Main(QMainWindow):
                                                     chk("Pasar a la siguiente canción al terminar", "autonext", 1),
                                                     chk("Estilo celular: abrir el reproductor grande al reproducir una canción",
                                                         "auto_expand", 1)))
+        # Atajos de música
+        hk_rows = []
+        for hk_key, hk_def, hk_lab in HOTKEYS:
+            ed = QKeySequenceEdit(QKeySequence(str(self.cfg.value(hk_key, hk_def) or "")))
+            try:
+                ed.setMaximumSequenceLength(1)
+                ed.setClearButtonEnabled(True)
+            except Exception:
+                pass
+            ed.setFixedWidth(200)
+            rowk = QHBoxLayout()
+            lbk = QLabel(hk_lab)
+            lbk.setFixedWidth(170)
+            rowk.addWidget(lbk)
+            rowk.addWidget(ed)
+            dfb = QPushButton("Por defecto")
+            dfb.clicked.connect(lambda _c=False, ed=ed, d=hk_def: ed.setKeySequence(QKeySequence(d)))
+            rowk.addWidget(dfb)
+            rowk.addStretch(1)
+            hk_rows.append(rowk)
+            apply_fns.append(lambda ed=ed, k=hk_key: self.cfg.setValue(
+                k, ed.keySequence().toString(QKeySequence.SequenceFormat.PortableText)))
+        apply_fns.append(lambda: self.music_keys.load())
+        hk_hint = QLabel("Haz clic en un recuadro y pulsa la tecla (o combinación) que quieras. Funcionan en el editor, en el "
+                         "modo reproductor y en la ventanita de la portada, mientras no estés escribiendo en un cuadro de "
+                         "texto. Deja un recuadro vacío para quitar ese atajo.")
+        hk_hint.setWordWrap(True)
+        hk_hint.setObjectName("hint")
+        add_page("atajos", "Atajos de música", page(QLabel("<b>Teclas para controlar la música</b>"), *hk_rows, hk_hint))
         # Apariencia
         theme_cb = QComboBox()
         theme_cb.addItem(T("Oscuro"), "dark")

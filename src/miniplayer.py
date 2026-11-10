@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt, QRectF, QPointF, QRect, QPoint, QTimer, QSize, QThr
 from PyQt6.QtGui import (QPainter, QPixmap, QImage, QColor, QLinearGradient, QRadialGradient, QBrush, QPainterPath,
                          QCursor, QGuiApplication, QFont, QFontMetrics)
 from PyQt6.QtWidgets import (QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QTextBrowser, QListWidget,
-                             QListWidgetItem, QFrame, QMenu, QSizePolicy, QLineEdit, QStyledItemDelegate, QStyle)
+                             QListWidgetItem, QFrame, QMenu, QSizePolicy, QLineEdit, QStyledItemDelegate, QStyle, QSlider)
 import icons
 from i18n import tr as T
 
@@ -239,6 +239,10 @@ class IconBtn(QPushButton):
             p.setBrush(QColor(225, 225, 230) if down else QColor(244, 244, 248) if hov else QColor(255, 255, 255))
             p.drawEllipse(r)
             col = QColor(20, 20, 28)
+        elif self.style_ == "glass":   # botoncito discreto sobre la portada
+            p.setBrush(QColor(0, 0, 0, 150 if hov else 70))
+            p.drawEllipse(r)
+            col = QColor(255, 255, 255, 255 if hov else 190)
         else:
             if hov:
                 p.setBrush(QColor(255, 255, 255, 30))
@@ -1164,19 +1168,15 @@ class CompactPlayer(QWidget):
             l.setStyleSheet("QLabel { color: rgba(255,255,255,225); font-size: 11px; font-weight: 700; background: transparent; }")
             l.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.t_left.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.b_full = PillBtn("expand", T("Reproductor"), self)
-        self.b_full.setToolTip(T("Volver al reproductor completo (Esc)"))
+        # un solo botoncito discreto, siempre en el mismo sitio (nada aparece ni desaparece sobre la portada);
+        # lo demás (volver al editor, siempre encima…) está en el clic derecho
+        self.b_full = IconBtn("expand", 28, "glass", 0.27, self)
+        self.b_full.setToolTip(T("Volver al reproductor completo (Esc) · clic derecho: más opciones"))
         self.b_full.clicked.connect(mini.leave_compact)
-        self.b_editor = PillBtn("arrow_l", T("Editor"), self)
-        self.b_editor.setToolTip(T("Volver al editor"))
-        self.b_editor.clicked.connect(self.main.exit_mini)
         self.lbl = QLabel("", self)
         self.lbl.setStyleSheet("QLabel { color: white; font-size: 12px; font-weight: 700; background: transparent; }")
         self.lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.hover_w = (self.b_full, self.b_editor)
-        for w_ in self.hover_w:
-            w_.hide()
-        self.lbl.hide()
+        self.lbl.hide()   # solo se muestra un momento al cambiar el volumen
         self._save = QTimer(self)
         self._save.setSingleShot(True)
         self._save.setInterval(400)
@@ -1225,12 +1225,8 @@ class CompactPlayer(QWidget):
         self.b_next.move(int(cx + self.b_play.width() / 2 + 8), int(cy - self.b_next.height() / 2))
         self.t_pos.setGeometry(int(r.left() + 14), int(wy - 20), 60, 16)
         self.t_left.setGeometry(int(r.right() - 74), int(wy - 20), 60, 16)
-        self.b_editor.move(int(r.left() + 10), int(r.top() + 10))
-        self.b_full.move(int(r.right() - 10 - self.b_full.width()), int(r.top() + 10))
-        narrow = r.width() < self.b_editor.width() + self.b_full.width() + 30
-        self.lbl.setGeometry(int(r.left() + 14), int(r.top() + (46 if not narrow else 80)), int(r.width() - 28), 18)
-        if narrow:
-            self.b_full.move(int(r.left() + 10), int(r.top() + 44))
+        self.b_full.move(int(r.right() - 8 - self.b_full.width()), int(r.top() + 8))
+        self.lbl.setGeometry(int(r.left() + 14), int(r.top() + 12), int(r.width() - 60), 18)
         self._bg_key = None
         self._save.start()
         self.set_title()
@@ -1243,7 +1239,7 @@ class CompactPlayer(QWidget):
     # ------------------------------------------------------------ dibujo
     def bg_pixmap(self):
         dpr = self.devicePixelRatioF()
-        hov = self.b_full.isVisible()
+        hov = self.lbl.isVisible()
         key = (id(self.mini.img), self.width(), self.height(), dpr, hov)
         if self._bg_key == key and self._bg is not None:
             return self._bg
@@ -1315,8 +1311,7 @@ class CompactPlayer(QWidget):
             t = self.main.val(path, "title") or os.path.splitext(os.path.basename(path))[0]
             a = self.main.val(path, "artist")
             txt = t + (f"  ·  {a}" if a else "")
-        self.lbl.setText(self.lbl.fontMetrics().elidedText(txt, Qt.TextElideMode.ElideRight, max(40, self.lbl.width())))
-        self.setToolTip("")
+        self.title_txt = txt
 
     def track_changed(self):
         self._bg_key = None
@@ -1410,8 +1405,9 @@ class CompactPlayer(QWidget):
             vs = self.main.vol
             vs.setValue(max(0, min(100, vs.value() + (5 if d > 0 else -5))))
             self.lbl.setText(T(f"Volumen {vs.value()} %"))
-            QTimer.singleShot(1300, self.set_title)
             self.show_hover(True)
+            self._tgen = getattr(self, "_tgen", 0) + 1
+            QTimer.singleShot(1300, lambda g=self._tgen: g == self._tgen and self.show_hover(False))
 
     def keyPressEvent(self, e):
         k = e.key()
@@ -1427,20 +1423,10 @@ class CompactPlayer(QWidget):
             super().keyPressEvent(e)
 
     def show_hover(self, on):
-        for w_ in self.hover_w:
-            w_.setVisible(on)
+        """Solo para el aviso de volumen (un momento, arriba). La portada no cambia al pasar el ratón."""
         self.lbl.setVisible(on)
         self._bg_key = None
         self.update()
-
-    def enterEvent(self, e):
-        self.show_hover(True)
-        super().enterEvent(e)
-
-    def leaveEvent(self, e):
-        if not self.rect().contains(self.mapFromGlobal(QCursor.pos())):
-            self.show_hover(False)
-        super().leaveEvent(e)
 
     def contextMenuEvent(self, e):
         self.mini.show_menu(e.globalPos())
@@ -1448,6 +1434,75 @@ class CompactPlayer(QWidget):
     def closeEvent(self, e):
         e.ignore()
         self.main.exit_mini()
+
+
+class VolPopup(QWidget):
+    """Barrita de volumen desplegable: aparece encima del botón de volumen y se cierra al hacer clic fuera."""
+
+    def __init__(self, main):
+        super().__init__(None, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.main = main
+        self.setFixedSize(54, 196)
+        v = QVBoxLayout(self)
+        v.setContentsMargins(8, 10, 8, 8)
+        v.setSpacing(4)
+        self.pct = QLabel("")
+        self.pct.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pct.setStyleSheet("QLabel { color: white; font-size: 11px; font-weight: 800; background: transparent; }")
+        self.sl = QSlider(Qt.Orientation.Vertical)
+        self.sl.setRange(0, 100)
+        self.sl.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sl.setStyleSheet(
+            "QSlider::groove:vertical { width: 6px; background: rgba(255,255,255,60); border-radius: 3px; }"
+            "QSlider::sub-page:vertical { background: rgba(255,255,255,60); border-radius: 3px; }"
+            "QSlider::add-page:vertical { background: white; border-radius: 3px; }"
+            "QSlider::handle:vertical { height: 16px; width: 16px; margin: 0 -5px; border-radius: 8px; background: white; }")
+        self.b_mute = IconBtn("vol2", 30, pad=0.24)
+        self.b_mute.setToolTip(T("Silenciar"))
+        self.b_mute.clicked.connect(self.main.toggle_mute)
+        self.b_mute.clicked.connect(lambda: QTimer.singleShot(0, self.sync))
+        v.addWidget(self.pct)
+        v.addWidget(self.sl, 1, Qt.AlignmentFlag.AlignHCenter)
+        v.addWidget(self.b_mute, 0, Qt.AlignmentFlag.AlignHCenter)
+        self.sl.valueChanged.connect(self.main.vol.setValue)
+        self.main.vol.valueChanged.connect(lambda _x: self.sync())
+
+    def sync(self):
+        x = self.main.vol.value()
+        self.sl.blockSignals(True)
+        self.sl.setValue(x)
+        self.sl.blockSignals(False)
+        self.pct.setText(f"{x} %")
+        self.b_mute.set_kind(vol_kind(self.main))
+
+    def open_above(self, btn):
+        self.sync()
+        g = btn.mapToGlobal(QPoint(btn.width() // 2, 0))
+        self.move(g.x() - self.width() // 2, g.y() - self.height() - 4)
+        self.show()
+
+    def wheelEvent(self, e):
+        d = e.angleDelta().y()
+        if d:
+            self.main.vol.setValue(max(0, min(100, self.main.vol.value() + (5 if d > 0 else -5))))
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(QColor(255, 255, 255, 40))
+        p.setBrush(QColor(22, 22, 28, 245))
+        p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 16, 16)
+
+
+def vol_kind(main):
+    x = main.vol.value()
+    try:
+        if main.audio.isMuted():
+            return "vol0"
+    except Exception:
+        pass
+    return "vol0" if x == 0 else ("vol1" if x < 34 else "vol2" if x < 67 else "vol3")
 
 
 class _NoCompact:
@@ -1597,7 +1652,14 @@ class MiniPlayer(QWidget):
         self.t_pos, self.t_left = QLabel("0:00"), QLabel("-0:00")
         for l in (self.t_pos, self.t_left):
             l.setStyleSheet("QLabel { color: rgba(255,255,255,190); font-size: 12px; background: transparent; }")
+        self.b_vol = IconBtn("vol2", 26, pad=0.20)
+        self.b_vol.setToolTip(T("Volumen (clic: barrita · rueda del ratón: subir / bajar)"))
+        self.volpop = VolPopup(main)
+        self.b_vol.clicked.connect(lambda: self.volpop.open_above(self.b_vol))
+        main.vol.valueChanged.connect(lambda _x: self.b_vol.set_kind(vol_kind(self.main)))
         tr_.addWidget(self.t_pos)
+        tr_.addStretch(1)
+        tr_.addWidget(self.b_vol)
         tr_.addStretch(1)
         tr_.addWidget(self.t_left)
         v.addLayout(tr_)
@@ -2122,7 +2184,9 @@ class MiniPlayer(QWidget):
         try:
             seq, _ = self.main.play_seq()
             if self.path in seq:
-                txt = T(f"{seq.index(self.path) + 1} de {len(seq)}")
+                import i18n
+                word = {"en": "of", "ru": "из"}.get(getattr(i18n, "CUR", "es"), "de")
+                txt = f"{seq.index(self.path) + 1} {word} {len(seq)}"
         except Exception:
             pass
         self.cap2.setText(txt)
@@ -2225,7 +2289,10 @@ class MiniPlayer(QWidget):
             a.triggered.connect(lambda on: self.set_top(on))
             m.addAction(T("Minimizar"), self.showMinimized)
             m.addSeparator()
-            m.addAction(T("Solo la portada (ventanita pequeña)"), self.enter_compact)
+            if self.compact.isVisible():
+                m.addAction(T("Reproductor completo"), self.leave_compact)
+            else:
+                m.addAction(T("Solo la portada (ventanita pequeña)"), self.enter_compact)
         m.addSeparator()
         for mode, label in (("fit", T("Portada difuminada (entera)")), ("full", T("Portada difuminada extendida")),
                             ("card", T("Portada normal (tarjeta)"))):
@@ -2294,6 +2361,7 @@ class MiniPlayer(QWidget):
             self.on_dur(pl.duration())
             self.on_state(pl.playbackState())
         self.sync_modes()
+        self.b_vol.set_kind(vol_kind(self.main))
 
     def toggle_shuffle(self):
         self.main.set_shuffle(not self.main.shuffle)
