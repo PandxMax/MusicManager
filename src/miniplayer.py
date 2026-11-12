@@ -1196,6 +1196,9 @@ class CompactPlayer(QWidget):
         self.b_full = IconBtn("expand", 28, "glass", 0.27, self)
         self.b_full.setToolTip(T("Volver al reproductor completo (Esc) · clic derecho: más opciones"))
         self.b_full.clicked.connect(mini.leave_compact)
+        self.b_x = IconBtn("close", 28, "glass", 0.30, self)   # ✕: cierra la ventanita y vuelve al editor
+        self.b_x.setToolTip(T("Cerrar y volver al editor"))
+        self.b_x.clicked.connect(self.main.exit_mini)
         self.lbl = QLabel("", self)
         self.lbl.setStyleSheet("QLabel { color: white; font-size: 12px; font-weight: 700; background: transparent; }")
         self.lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -1270,7 +1273,8 @@ class CompactPlayer(QWidget):
         self.b_play.move(int(cx - self.b_play.width() / 2), int(cy - self.b_play.height() / 2))
         self.b_prev.move(int(cx - self.b_play.width() / 2 - 12 - self.b_prev.width()), int(cy - self.b_prev.height() / 2))
         self.b_next.move(int(cx + self.b_play.width() / 2 + 12), int(cy - self.b_next.height() / 2))
-        self.b_full.move(int(r.right() - 8 - self.b_full.width()), int(r.top() + 8))
+        self.b_x.move(int(r.right() - 8 - self.b_x.width()), int(r.top() + 8))
+        self.b_full.move(int(self.b_x.x() - 6 - self.b_full.width()), int(r.top() + 8))
         self.lbl.setGeometry(int(r.left() + 14), int(r.top() + 12), int(r.width() - 60), 18)
         self._bg_key = None
         self._save.start()
@@ -1670,11 +1674,19 @@ class MiniPlayer(QWidget):
         for l in (self.cap1, self.cap2):
             l.setAlignment(Qt.AlignmentFlag.AlignCenter)
             l.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            l.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)   # si no cabe, se recorta (no se monta)
             cap.addWidget(l)
+        if not self.embedded:
+            self.cap1.hide()   # en la ventanita, arriba van los botones: queda solo «8 de 10»
         self.b_more = IconBtn("morev", 34, pad=0.25)
         self.b_more.setToolTip(T("Más opciones"))
         self.b_more.clicked.connect(lambda: self.show_menu(self.b_more.mapToGlobal(QPoint(0, self.b_more.height()))))
         right = [self.b_compact, self.b_more]
+        if not self.embedded:   # ✕: cierra la ventana del reproductor y vuelve al editor
+            self.b_x = IconBtn("close", 34, pad=0.30)
+            self.b_x.setToolTip(T("Cerrar el reproductor y volver al editor"))
+            self.b_x.clicked.connect(self.main.exit_mini)
+            right.append(self.b_x)
         if self.embedded:   # en el panel: además, botón para dejar SOLO el reproductor (el editor se esconde)
             self.b_solo = IconBtn("expand", 34, pad=0.27)
             self.b_solo.setToolTip(T("Solo el reproductor: esconde el editor · Ctrl+M"))

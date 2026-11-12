@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.26"
+APP_VERSION = "2.27"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.26 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.27 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5192,7 +5192,8 @@ class Main(QMainWindow):
         self.btn_list = GlyphButton("list")
         self.btn_list.setToolTip("Lista de reproducción")
         self.btn_list.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_list.clicked.connect(self.show_playlist)
+        self.btn_list.clicked.connect(self.toggle_library)
+        self.btn_list.setToolTip("Todas las canciones, carpetas, artistas y géneros (para elegir qué reproducir)")
         self.btn_fx = GlyphButton("fx")
         self.btn_fx.setToolTip("Ajustes de la canción: graves, agudos, tempo, tono, velocidad, bucle, eco…")
         self.btn_fx.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -5260,15 +5261,38 @@ class Main(QMainWindow):
         if user:
             self.expand_player()
 
+    def toggle_library(self):
+        """Botón ☰ de la barra: abre a la derecha la lista para elegir qué reproducir (todas las canciones, carpetas,
+        artistas y géneros); otro clic la cierra. La lista de reproducción propia sigue en el botón redondo ☰."""
+        inner = getattr(self.mobile, "inner", None) if self.mobile is not None else None
+        if inner is None:
+            self.show_playlist()
+            return
+        if getattr(self, "mini", None) is not None and self.mini.in_use():
+            self.exit_mini()
+        if self.mobile.isVisible() and inner.lib.isVisible() and not getattr(self.mobile, "_closing", False):
+            self.mobile.close_panel()
+            return
+        if not self.mobile.isVisible():
+            self.mobile.open_panel()
+        if not inner.lib.isVisible():
+            inner.open_library()
+
     def toggle_phone(self):
         """Botón de celular de la barra: muestra u oculta el reproductor grande del borde derecho."""
         if self.mobile is None:
             return
         if getattr(self, "mini", None) is not None and self.mini.in_use():
             self.exit_mini()   # estaba en su ventana aparte: vuelve al editor
+        inner = getattr(self.mobile, "inner", None)
         if self.mobile.isVisible() and not getattr(self.mobile, "_closing", False):
-            self.mobile.close_panel()
+            if inner is not None and inner.lib.isVisible():
+                inner.close_library()   # estaba mostrando la lista: pasa al reproductor
+            else:
+                self.mobile.close_panel()
         else:
+            if inner is not None and inner.lib.isVisible():
+                inner.close_library()
             self.mobile.open_panel()
 
     def open_cover_window(self):

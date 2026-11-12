@@ -779,3 +779,11 @@ VERSIÓN 2.26
  - Dos botones nuevos en la barra, junto a los efectos:
      celular   -> modo celular: abre o cierra el reproductor grande de la derecha;
      ventanita -> modo ventana: ventanita con solo la portada (otro clic la cierra).
+
+VERSIÓN 2.27
+------------
+ - Botón ✕ arriba a la derecha en el reproductor separado y en la ventanita de portada: lo cierra y
+   vuelves solo al editor.
+ - El botón ☰ de la barra de reproducción abre (a la derecha) la lista para elegir qué reproducir:
+   todas las canciones, carpetas, artistas y géneros. Otro clic la cierra.
+   La lista de reproducción propia sigue en el botón redondo ☰ de abajo a la derecha.

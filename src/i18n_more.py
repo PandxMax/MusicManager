@@ -1679,3 +1679,8 @@ ROWS += [
     ('<b>Reproductor</b>', '<b>Player</b>', '<b>Плеер</b>'),
     ('En la barra de reproducción, el botón de celular abre el reproductor grande y el de ventanita deja solo la portada en una ventana pequeña.', 'In the playback bar, the phone button opens the big player and the small-window button leaves just the cover in a small window.', 'На панели воспроизведения кнопка телефона открывает большой плеер, а кнопка окна — маленькое окно с обложкой.'),
 ]
+ROWS += [
+    ('Botón ✕ en el reproductor separado y en la ventanita de portada: los cierra y vuelves solo al editor. El botón ☰ de la barra ahora abre la lista para elegir qué reproducir (todas las canciones, carpetas, artistas y géneros); la lista de reproducción propia sigue en el botón redondo.', '✕ button on the detached player and on the cover window: closes them and you go back to just the editor. The ☰ button in the bar now opens the list to choose what to play (all songs, folders, artists and genres); your own playlist is still in the round button.', 'Кнопка ✕ в отдельном плеере и окне обложки. Кнопка ☰ на панели открывает список для выбора музыки.'),
+    ('Cerrar y volver al editor', 'Close and go back to the editor', 'Закрыть и вернуться в редактор'),
+    ('Todas las canciones, carpetas, artistas y géneros (para elegir qué reproducir)', 'All songs, folders, artists and genres (to choose what to play)', 'Все песни, папки, исполнители и жанры (выбор для воспроизведения)'),
+]

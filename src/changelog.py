@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.27', [
+        'Botón ✕ en el reproductor separado y en la ventanita de portada: los cierra y vuelves solo al editor. El botón ☰ de la barra ahora abre la lista para elegir qué reproducir (todas las canciones, carpetas, artistas y géneros); la lista de reproducción propia sigue en el botón redondo.',
+    ]),
     ('2.26', [
         'El reproductor vuelve a ser siempre la barra clásica de abajo (se quitó la elección de estilo en Ajustes). En la barra hay dos botones nuevos: el de celular abre o cierra el reproductor grande (modo celular) y el de ventanita abre el modo ventana, con solo la portada.',
     ]),
