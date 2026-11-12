@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.28"
+APP_VERSION = "2.29"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.28 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.29 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5300,15 +5300,10 @@ class Main(QMainWindow):
         """Botón de ventanita de la barra: la ventanita «solo la portada», con el editor abierto."""
         if self.player is None:
             return
-        self.cfg.setValue("mini_compact", 1)
-        if self.mini is not None and self.mini.in_use():
-            if self.mini.compact.isVisible():   # ya estaba: se cierra (el botón la abre y la cierra)
-                self.exit_mini()
-                return
-            self.set_mini_detached(True)
-            self.mini.enter_compact()
-        else:
-            self.enter_mini(True)
+        if self.mini is not None and self.mini.in_use() and self.mini.compact.isVisible():
+            self.exit_mini()   # ya estaba: se cierra (el botón la abre y la cierra)
+            return
+        self.enter_mini(True, compact=True)
 
     def expand_player(self):
         """Con el estilo celular, al reproducir (doble clic, «Reproducir»…) se despliega el reproductor grande."""
@@ -5404,7 +5399,7 @@ class Main(QMainWindow):
                 inner.set_viz(path, arr)
 
     # ------------------------------------------------- Modo reproductor
-    def enter_mini(self, detached=False):
+    def enter_mini(self, detached=False, compact=False):
         """Modo reproductor: una ventana aparte con el reproductor. detached=True: el editor sigue abierto (dos
         ventanas, cada una en la barra de tareas); False: el editor se esconde y queda solo el reproductor."""
         if self.player is None:
@@ -5413,8 +5408,14 @@ class Main(QMainWindow):
         import miniplayer
         if self.mini is None:
             self.mini = miniplayer.MiniPlayer(self, inspect_file, tech_info, read_tags, AUDIO_EXT, find_folder_image)
+        # compact=True: la ventanita «solo la portada»; False: el reproductor completo (estilo celular)
+        self.cfg.setValue("mini_compact", 1 if compact else 0)
         if self.mini.in_use():
             self.set_mini_detached(detached)
+            if compact and not self.mini.compact.isVisible():
+                self.mini.enter_compact()
+            elif not compact and self.mini.compact.isVisible():
+                self.mini.leave_compact()
             return
         self._mini_was_max = self.isMaximized()
         self.mini_detached = bool(detached)

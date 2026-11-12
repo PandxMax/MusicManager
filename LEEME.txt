@@ -794,3 +794,8 @@ VERSIÓN 2.28
  - El botón redondo ☰ de abajo a la derecha abre la lista para elegir qué reproducir (todas las
    canciones, carpetas, artistas y géneros); otro clic la cierra.
  - La lista de reproducción propia: Reproducción → Lista de reproducción.
+
+VERSIÓN 2.29
+------------
+ - Corregido: desde el modo celular, «Separar» y «Solo el reproductor» abren el reproductor completo
+   (antes, tras usar el modo ventana, abrían siempre la ventanita de portada).

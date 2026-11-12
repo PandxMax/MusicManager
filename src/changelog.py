@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.29', [
+        'Corregido: los botones del modo celular para separar el reproductor (o dejar solo el reproductor) vuelven a abrir el reproductor completo; antes, después de usar el modo ventana, abrían siempre la ventanita de portada.',
+    ]),
     ('2.28', [
         'Se quitó el botón ☰ de la barra de reproducción. El botón redondo ☰ (abajo a la derecha) es ahora el que abre la lista para elegir qué reproducir: todas las canciones, carpetas, artistas y géneros. La lista de reproducción propia está en Reproducción → Lista de reproducción.',
     ]),
