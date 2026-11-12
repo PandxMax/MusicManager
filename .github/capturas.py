@@ -718,10 +718,38 @@ try:
             break
     wait(800)
     print("boton redondo abre la biblioteca:", "boton de la barra quitado:", not w.btn_list.isVisible(), w.mobile.isVisible(), inn.lib.isVisible(), len(inn.lib.files), flush=True)
+    R = mm.Qt.ItemDataRole.UserRole
+    kinds = lambda: [inn.lib.list.item(i).data(R) for i in range(min(6, inn.lib.list.count()))]
+    print("boton redondo escondido con el panel abierto:", not w.pl_fab.isVisible(), flush=True)
+    # se abre donde está la canción que suena
+    cur = w.playing_path
+    vis = [inn.lib.list.itemAt(10, y) for y in range(10, inn.lib.list.viewport().height(), 20)]
+    print("canción que suena a la vista:", any(it is not None and it.data(R + 1) == cur for it in vis), flush=True)
+    # reproducir una carpeta entera
+    inn.lib.set_tab("folders")
+    rit = next(inn.lib.list.item(i) for i in range(inn.lib.list.count())
+               if os.path.normcase(inn.lib.list.item(i).data(R + 1) or "") == os.path.normcase(os.path.normpath(root)))
+    inn.lib.on_click(rit)
+    wait(400)
+    sub = next(inn.lib.list.item(i) for i in range(inn.lib.list.count()) if inn.lib.list.item(i).data(R + 2) == "Folk andino")
+    inn.lib.on_click(sub)
+    wait(400)
+    print("dentro de carpeta:", kinds(), ascii(inn.lib.list.item(0).data(R + 2)), ascii(inn.lib.list.item(0).data(R + 3)), flush=True)
+    shot(w.mobile, "s_lib_reproducir_carpeta")
+    inn.lib.on_click(inn.lib.list.item(0))
+    wait(1000)
+    print("reproducir carpeta:", ascii(os.path.basename(w.playing_path)), "lista:", len(w.mini_seq or []), ascii(inn.cap2.text()), flush=True)
+    QTest.mouseClick(inn.lib.b_queue, Qt.MouseButton.LeftButton)
+    wait(500)
+    print("en reproduccion:", ascii(inn.lib.h_title.text()), inn.lib.list.count(), ascii(inn.lib.h_sub.text()), flush=True)
+    shot(w.mobile, "s_lib_en_reproduccion")
+    QTest.mouseClick(inn.lib.b_queue, Qt.MouseButton.LeftButton)
+    wait(300)
     shot(w, "s_barra_lista")
-    QTest.mouseClick(w.pl_fab, Qt.MouseButton.LeftButton)
+    w.mobile.close_panel()
     wait(900)
-    print("boton lista otra vez (cierra):", not w.mobile.isVisible(), flush=True)
+    print("panel cerrado, boton redondo de vuelta en la esquina:", w.pl_fab.isVisible(),
+          w.pl_fab.x() + w.pl_fab.width() + 16 == w.centralWidget().width(), flush=True)
     w.enter_mini(True)
     wait(800)
     shot(w.mini, "s_mini_x")

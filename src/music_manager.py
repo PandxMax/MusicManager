@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.29"
+APP_VERSION = "2.30"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.29 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.30 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5757,8 +5757,11 @@ class Main(QMainWindow):
         tl = r.mapTo(c, QPoint(0, 0))
         self.pl_panel.setGeometry(tl.x(), tl.y(), max(300, r.width()), max(200, c.height() - tl.y()))
         mob = getattr(self, "mobile", None)
-        right = mob.width() if mob is not None and mob.isVisible() else 0
-        self.pl_fab.move(c.width() - right - self.pl_fab.width() - 16, c.height() - self.pl_fab.height() - 12)
+        # el botón redondo va siempre en la esquina de abajo a la derecha; con el reproductor grande abierto se
+        # esconde (ahí ya está «Cola»), en vez de quedar flotando en medio de la ventana
+        panel_open = mob is not None and mob.isVisible()
+        self.pl_fab.move(c.width() - self.pl_fab.width() - 16, c.height() - self.pl_fab.height() - 12)
+        self.pl_fab.setVisible(not panel_open and self.player_bar.isVisible())
         if self.pl_panel.isVisible():
             self.pl_panel.raise_()
         self.pl_fab.raise_()

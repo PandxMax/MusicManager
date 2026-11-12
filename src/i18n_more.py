@@ -1686,3 +1686,13 @@ ROWS += [
 ]
 ROWS += [('Se quitó el botón ☰ de la barra de reproducción. El botón redondo ☰ (abajo a la derecha) es ahora el que abre la lista para elegir qué reproducir: todas las canciones, carpetas, artistas y géneros. La lista de reproducción propia está en Reproducción → Lista de reproducción.', 'The ☰ button was removed from the playback bar. The round ☰ button (bottom right) now opens the list to choose what to play: all songs, folders, artists and genres. Your own playlist is in Playback → Playlist.', 'Кнопка ☰ убрана с панели. Круглая кнопка ☰ открывает список для выбора музыки.')]
 ROWS += [('Corregido: los botones del modo celular para separar el reproductor (o dejar solo el reproductor) vuelven a abrir el reproductor completo; antes, después de usar el modo ventana, abrían siempre la ventanita de portada.', 'Fixed: the phone-mode buttons to detach the player (or leave only the player) open the full player again; before, after using window mode, they always opened the small cover window.', 'Исправлено: кнопки отделения плеера снова открывают полный плеер.')]
+ROWS += [
+    ('Lista para reproducir: se abre donde está la canción que suena; dentro de una carpeta (o de un artista o género) hay una fila «Reproducir esta carpeta» que la pone entera, con sus subcarpetas; y arriba hay un botón para ver qué canciones están en la lista de reproducción. El botón redondo ☰ queda siempre en su esquina (ya no flota en medio) y se esconde mientras el reproductor grande está abierto.', 'List to play: it opens where the playing song is; inside a folder (or an artist or genre) there is a “Play this folder” row that plays all of it, subfolders included; and at the top there is a button to see which songs are in the play queue. The round ☰ button always stays in its corner and hides while the big player is open.', 'Список: открывается на играющей песне; «Играть эту папку»; кнопка просмотра очереди. Круглая кнопка ☰ остаётся в углу.'),
+    ('Ver qué canciones están en la lista de reproducción (lo que va a sonar)', 'See which songs are in the play queue (what will play)', 'Показать песни в очереди воспроизведения'),
+    ('En reproducción', 'Now playing', 'Сейчас играет'),
+    ('en el orden en que van a sonar', 'in the order they will play', 'в порядке воспроизведения'),
+    ('Reproducir esta carpeta', 'Play this folder', 'Играть эту папку'),
+    ('Reproducir este artista', 'Play this artist', 'Играть этого исполнителя'),
+    ('Reproducir este género', 'Play this genre', 'Играть этот жанр'),
+    ('incluye las subcarpetas', 'includes subfolders', 'включая подпапки'),
+]

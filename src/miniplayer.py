@@ -578,6 +578,10 @@ class RowDelegate(QStyledItemDelegate):
         r = QRectF(opt.rect).adjusted(2, 1, -4, -1)
         kind = idx.data(KIND_R)
         playing = kind == "song" and idx.data(KEY_R) == self.page.main.playing_path
+        if kind == "playall":   # fila de acción: se nota que es un botón
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(255, 255, 255, 60 if opt.state & QStyle.StateFlag.State_MouseOver else 36))
+            p.drawRoundedRect(r, 12, 12)
         if opt.state & QStyle.StateFlag.State_MouseOver or playing:
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(255, 255, 255, 34 if playing else 20))
@@ -606,7 +610,8 @@ class RowDelegate(QStyledItemDelegate):
                 p.restore()
         else:
             p.fillPath(path, QColor(255, 255, 255, 26))
-            glyph = {"song": "note", "folder": "folder", "artist": "person", "genre": "tag", "info": "info"}.get(kind, "note")
+            glyph = {"song": "note", "folder": "folder", "artist": "person", "genre": "tag", "info": "info",
+                     "playall": "play"}.get(kind, "note")
             p.save()
             icons.draw_glyph(p, glyph, ic.adjusted(11, 11, -11, -11), QColor(255, 255, 255, 200))
             p.restore()
@@ -752,6 +757,9 @@ class LibraryPage(QWidget):
         self.h_title = QLabel(T("Biblioteca"))
         self.h_title.setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: 800; background: transparent; }")
         self.h_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.b_queue = IconBtn("queue", 32, pad=0.25)
+        self.b_queue.setToolTip(T("Ver qué canciones están en la lista de reproducción (lo que va a sonar)"))
+        self.b_queue.clicked.connect(lambda: self.set_tab("queue" if self.tab != "queue" else "songs"))
         self.b_ref = IconBtn("refresh", 32, pad=0.27)
         self.b_ref.setToolTip(T("Volver a leer las carpetas"))
         self.b_ref.clicked.connect(lambda: self.open_for(force=True))
@@ -760,6 +768,7 @@ class LibraryPage(QWidget):
         self.b_close.clicked.connect(self.mini.close_library)
         head.addWidget(self.b_back)
         head.addWidget(self.h_title, 1)
+        head.addWidget(self.b_queue)
         head.addWidget(self.b_ref)
         head.addWidget(self.b_close)
         v.addLayout(head)
@@ -945,9 +954,12 @@ class LibraryPage(QWidget):
             self.update_sub()
             return
         self.index_folders()
+        first = self.list.count() <= 1
         if self.stack:   # si la carpeta en la que estabas ya no existe, se vuelve atrás
             self.stack = [x for x in self.stack if x[0] != "folder" or x[1] in self.children]
         self.render(keep=True)
+        if first:
+            self.focus_playing()
 
     def on_progress(self, w, n, total):
         if w is not self.worker:
@@ -1004,11 +1016,40 @@ class LibraryPage(QWidget):
         self.tab = key
         self.stack = []
         for k, b in self.chips.items():
+            b.setAutoExclusive(False)
             b.setChecked(k == key)
+        self.b_queue.set_active(key == "queue")
         self.search.blockSignals(True)
         self.search.clear()
         self.search.blockSignals(False)
         self.render()
+        if key in ("queue", "songs"):
+            self.focus_playing()
+
+    def focus_playing(self):
+        """Deja a la vista (centrada) la canción que está sonando, si está en la lista que se muestra."""
+        cur = self.main.playing_path
+        if not cur:
+            return
+        for i in range(self.list.count()):
+            it = self.list.item(i)
+            if it.data(KIND_R) == "song" and it.data(KEY_R) == cur:
+                self.list.doItemsLayout()
+                self.list.scrollToItem(it, QListWidget.ScrollHint.PositionAtCenter)
+                return
+
+    def members_of(self, top):
+        """Todas las canciones de una carpeta (con sus subcarpetas), de un artista o de un género."""
+        if top[0] == "folder":
+            out, todo = [], [top[1]]
+            while todo:
+                d = todo.pop(0)
+                out += self.direct.get(d, [])
+                todo = list(self.children.get(d, ())) + todo
+            return out
+        rows = [self.song_row(f) for f in self.groups(1 if top[0] == "artist" else 3).get(top[1], [])]
+        rows.sort(key=lambda r: (r[3].lower(), r[2].lower()))
+        return [r[1] for r in rows]
 
     def go_back(self):
         if self.stack:
@@ -1023,10 +1064,18 @@ class LibraryPage(QWidget):
     def on_click(self, it):
         kind, key = it.data(KIND_R), it.data(KEY_R)
         if kind == "song":
-            seq = [self.list.item(i).data(KEY_R) for i in range(self.list.count())
-                   if self.list.item(i).data(KIND_R) == "song"]
+            if self.tab == "queue":   # ya es la lista que suena: solo salta a esa canción
+                seq, _pl = self.main.play_seq()
+            else:
+                seq = [self.list.item(i).data(KEY_R) for i in range(self.list.count())
+                       if self.list.item(i).data(KIND_R) == "song"]
             self.mini.play_from_library(key, seq)
             self.list.viewport().update()
+        elif kind == "playall":
+            seq = self.members_of(self.stack[-1]) if self.stack else []
+            if seq:
+                self.mini.play_from_library(seq[0], seq)
+                self.list.viewport().update()
         elif kind in ("folder", "artist", "genre"):
             self.stack.append((kind, key))
             self.search.blockSignals(True)
@@ -1060,6 +1109,8 @@ class LibraryPage(QWidget):
                 if subs:
                     txt = T(f"{subs} carpetas") + "  ·  " + T(f"{self.fcount.get(top[1], 0)} canciones en total") \
                         + ("  ·  " + T(f"{cnt} aquí") if cnt else "")
+        elif self.tab == "queue":
+            txt = T(f"{getattr(self, '_shown_songs', 0)} canciones") + "  ·  " + T("en el orden en que van a sonar")
         elif self.tab in ("artists", "genres") and self.files:
             g = getattr(self, "_shown_groups", 0)
             what = {"artists": T(f"{g} artistas"), "genres": T(f"{g} géneros")}[self.tab]
@@ -1081,7 +1132,7 @@ class LibraryPage(QWidget):
         rows = []
         self._shown_groups = 0
         if top is None:
-            self.h_title.setText({"songs": T("Todas las canciones"), "folders": T("Carpetas"),
+            self.h_title.setText({"songs": T("Todas las canciones"), "folders": T("Carpetas"), "queue": T("En reproducción"),
                                   "artists": T("Artistas"), "genres": T("Géneros")}.get(self.tab, T("Biblioteca")))
         else:
             self.h_title.setText(os.path.basename(os.path.normpath(top[1])) if top[0] == "folder"
@@ -1101,6 +1152,12 @@ class LibraryPage(QWidget):
             elif top is not None and top[0] == "folder":   # dentro de una carpeta: subcarpetas y luego canciones
                 rows = [self.folder_row(d) for d in self.children.get(top[1], ())]
                 rows += [self.song_row(f) for f in self.direct.get(top[1], [])]
+            elif self.tab == "queue":   # lo que está en la lista de reproducción ahora mismo, en su orden
+                try:
+                    seq, _pl = self.main.play_seq()
+                except Exception:
+                    seq = []
+                rows = [self.song_row(f) for f in seq]
             else:
                 idx = 1 if self.tab == "artists" else 3
                 gr = self.groups(idx)
@@ -1112,6 +1169,14 @@ class LibraryPage(QWidget):
                 if not self.loaded:
                     rows.insert(0, ("info", "", T("Leyendo etiquetas…"), T(f"{self.read_pct} % — la lista se completa sola"),
                                     "", None))
+        if top is not None and self.files and not q:   # arriba de una carpeta, artista o género: reproducirlo entero
+            n_all = self.fcount.get(top[1], 0) if top[0] == "folder" else len(rows)
+            if n_all:
+                what = {"folder": T("Reproducir esta carpeta"), "artist": T("Reproducir este artista"),
+                        "genre": T("Reproducir este género")}[top[0]]
+                rows.insert(0, ("playall", top[1], what, T(f"{n_all} canciones") +
+                                (" · " + T("incluye las subcarpetas") if top[0] == "folder" and self.children.get(top[1]) else ""),
+                                "", None))
         if q:
             rows = [r for r in rows if r[0] == "info" or q in r[2].lower() or q in r[3].lower()
                     or (r[0] == "song" and q in os.path.basename(r[1]).lower())]
@@ -2328,6 +2393,7 @@ class MiniPlayer(QWidget):
         self.lib.open_for()
         self.lib.show()
         self.lib.raise_()
+        QTimer.singleShot(0, self.lib.focus_playing)   # se abre donde está la canción que suena
         self.a_queue.set_active(True)
 
     def close_library(self):

@@ -370,6 +370,7 @@ class MobilePlayer(QFrame):
         self.anim.start()
         self.place_tab()
         self.main.cfg.setValue("mobile_open", 1)
+        self.main.layout_overlay()
 
     def close_panel(self):
         par = self.parentWidget()
@@ -391,6 +392,7 @@ class MobilePlayer(QFrame):
                 self.setFixedHeight(par.height())
                 self.move(par.width() - self.width(), 0)
         self.place_tab()
+        self.main.layout_overlay()
 
     # ------------------------------------------------------------ fondo
     def paintEvent(self, _):

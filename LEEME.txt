@@ -799,3 +799,13 @@ VERSIÓN 2.29
 ------------
  - Corregido: desde el modo celular, «Separar» y «Solo el reproductor» abren el reproductor completo
    (antes, tras usar el modo ventana, abrían siempre la ventanita de portada).
+
+VERSIÓN 2.30
+------------
+ - La lista para reproducir se abre donde está la canción que suena (no desde el principio).
+ - Dentro de una carpeta, artista o género: primera fila «Reproducir esta carpeta / artista / género»
+   (la carpeta entera, con sus subcarpetas).
+ - Botón nuevo arriba de la lista (líneas con nota): muestra qué canciones están en la lista de
+   reproducción, en el orden en que van a sonar.
+ - El botón redondo ☰ queda siempre en la esquina de abajo a la derecha y se esconde mientras el
+   reproductor grande está abierto (ya no queda flotando en medio).

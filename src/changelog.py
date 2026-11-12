@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.30', [
+        'Lista para reproducir: se abre donde está la canción que suena; dentro de una carpeta (o de un artista o género) hay una fila «Reproducir esta carpeta» que la pone entera, con sus subcarpetas; y arriba hay un botón para ver qué canciones están en la lista de reproducción. El botón redondo ☰ queda siempre en su esquina (ya no flota en medio) y se esconde mientras el reproductor grande está abierto.',
+    ]),
     ('2.29', [
         'Corregido: los botones del modo celular para separar el reproductor (o dejar solo el reproductor) vuelven a abrir el reproductor completo; antes, después de usar el modo ventana, abrían siempre la ventanita de portada.',
     ]),
