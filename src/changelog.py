@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.26', [
+        'El reproductor vuelve a ser siempre la barra clásica de abajo (se quitó la elección de estilo en Ajustes). En la barra hay dos botones nuevos: el de celular abre o cierra el reproductor grande (modo celular) y el de ventanita abre el modo ventana, con solo la portada.',
+    ]),
     ('2.25', [
         'Reproductor separado: el botón de arriba a la izquierda ahora es «Ocultar editor» (queda solo el reproductor) y, con el editor escondido, «Mostrar editor»; en el panel del editor hay además un botón para dejar solo el reproductor. Ventanita «solo la portada»: cambiar su tamaño ya es fluido (no parpadea).',
     ]),

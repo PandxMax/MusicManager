@@ -772,3 +772,10 @@ VERSIÓN 2.25
  - Panel del editor: dos botones arriba a la derecha, «Solo el reproductor» (esconde el editor) y
    «Separar» (dos ventanas).
  - Ventanita «solo la portada»: cambiar el tamaño es fluido, ya no parpadea.
+
+VERSIÓN 2.26
+------------
+ - El reproductor es siempre la barra clásica de abajo. Ya no se elige el estilo en Ajustes.
+ - Dos botones nuevos en la barra, junto a los efectos:
+     celular   -> modo celular: abre o cierra el reproductor grande de la derecha;
+     ventanita -> modo ventana: ventanita con solo la portada (otro clic la cierra).

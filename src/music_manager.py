@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.25"
+APP_VERSION = "2.26"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.25 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.26 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4076,7 +4076,7 @@ class Main(QMainWindow):
             except Exception:
                 import traceback
                 traceback.print_exc()
-            QTimer.singleShot(300, lambda: self.set_player_style(str(self.cfg.value("player_style", "classic")), first=True))
+            QTimer.singleShot(300, lambda: self.set_player_style("classic", first=True))
         self.statusBar().addPermanentWidget(self.player_bar)   # reproductor en la línea de estado, a la derecha
         self.statusBar().setSizeGripEnabled(False)
         self.wide_viz = WideViz(self.statusBar(), self.viz)
@@ -5212,10 +5212,15 @@ class Main(QMainWindow):
         h.addWidget(seekbox)
         h.addWidget(self.time_lbl)
         h.addWidget(self.btn_fx)
+        self.btn_phone = GlyphButton("phone")
+        self.btn_phone.setToolTip("Modo celular: abre o cierra el reproductor grande (a la derecha)")
+        self.btn_phone.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_phone.clicked.connect(self.toggle_phone)
+        h.addWidget(self.btn_phone)
         self.btn_mini = GlyphButton("mini")
-        self.btn_mini.setToolTip("Modo reproductor: esconde el editor y deja solo el reproductor (se puede mover) · Ctrl+M")
+        self.btn_mini.setToolTip("Modo ventana: una ventanita con solo la portada y los botones (se puede mover y agrandar)")
         self.btn_mini.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_mini.clicked.connect(lambda: self.enter_mini(False))
+        self.btn_mini.clicked.connect(self.open_cover_window)
         h.addWidget(self.btn_mini)
         self.volbox = VolBox(self.btn_mute, self.vol)
         h.addWidget(self.volbox)
@@ -5254,6 +5259,31 @@ class Main(QMainWindow):
         self.play_file(path)
         if user:
             self.expand_player()
+
+    def toggle_phone(self):
+        """Botón de celular de la barra: muestra u oculta el reproductor grande del borde derecho."""
+        if self.mobile is None:
+            return
+        if getattr(self, "mini", None) is not None and self.mini.in_use():
+            self.exit_mini()   # estaba en su ventana aparte: vuelve al editor
+        if self.mobile.isVisible() and not getattr(self.mobile, "_closing", False):
+            self.mobile.close_panel()
+        else:
+            self.mobile.open_panel()
+
+    def open_cover_window(self):
+        """Botón de ventanita de la barra: la ventanita «solo la portada», con el editor abierto."""
+        if self.player is None:
+            return
+        self.cfg.setValue("mini_compact", 1)
+        if self.mini is not None and self.mini.in_use():
+            if self.mini.compact.isVisible():   # ya estaba: se cierra (el botón la abre y la cierra)
+                self.exit_mini()
+                return
+            self.set_mini_detached(True)
+            self.mini.enter_compact()
+        else:
+            self.enter_mini(True)
 
     def expand_player(self):
         """Con el estilo celular, al reproducir (doble clic, «Reproducir»…) se despliega el reproductor grande."""
@@ -8512,26 +8542,14 @@ class Main(QMainWindow):
             chk("Mostrar la guía rápida cada vez que se inicia", "guide_every", 0),
             fold_chk,
             QLabel(" "), QLabel("<b>Árboles de carpetas</b>"), r_tn, r_td))
-        # Reproductor: barra clásica o estilo celular (solo uno a la vez)
+        # Reproductor (siempre la barra clásica; el modo celular y el modo ventana se abren con sus botones de la barra)
         snap_style = getattr(self, "player_style", "classic")
-        r_classic = QRadioButton("Barra de reproducción abajo (clásico)")
-        r_mobile = QRadioButton("Reproductor estilo celular (sale desde el borde derecho)")
-        grp_ps = QButtonGroup(dlg)
-        grp_ps.addButton(r_classic)
-        grp_ps.addButton(r_mobile)
-        (r_mobile if snap_style == "mobile" else r_classic).setChecked(True)
-        if self.mobile is None:
-            r_mobile.setEnabled(False)
-        r_classic.toggled.connect(lambda on: on and self.set_player_style("classic"))
-        r_mobile.toggled.connect(lambda on: on and self.set_player_style("mobile"))
-        hint_ps = QLabel("Solo se usa uno a la vez. En el estilo celular, la flechita del borde derecho lo abre y lo cierra.")
+        hint_ps = QLabel("En la barra de reproducción, el botón de celular abre el reproductor grande y el de ventanita deja "
+                         "solo la portada en una ventana pequeña.")
         hint_ps.setWordWrap(True)
         hint_ps.setObjectName("hint")
-        lbl_ps = QLabel("<b>Estilo del reproductor</b>")
-        add_page("reproductor", "Reproductor", page(lbl_ps, r_classic, r_mobile, hint_ps, QLabel(" "),
-                                                    chk("Pasar a la siguiente canción al terminar", "autonext", 1),
-                                                    chk("Estilo celular: abrir el reproductor grande al reproducir una canción",
-                                                        "auto_expand", 1)))
+        add_page("reproductor", "Reproductor", page(QLabel("<b>Reproductor</b>"),
+                                                    chk("Pasar a la siguiente canción al terminar", "autonext", 1), hint_ps))
         # Atajos de música
         hk_rows = []
         for hk_key, hk_def, hk_lab in HOTKEYS:

@@ -425,6 +425,9 @@ def draw_glyph(p, kind, rect, col):
         solid()
         for x, h in ((4, 7), (9.5, 14), (15, 10)):
             p.drawRoundedRect(QRectF(x, 20 - h, 4.5, h), 2, 2)
+    elif k == "phone":   # celular
+        p.drawRoundedRect(QRectF(7, 2.8, 10, 18.4), 2.4, 2.4)
+        line((10.6, 18), (13.4, 18))
     elif k == "morev":   # tres puntos en vertical (menú)
         solid()
         for y in (5.5, 12, 18.5):

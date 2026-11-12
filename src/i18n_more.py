@@ -1672,3 +1672,10 @@ ROWS += [
     ('Solo el reproductor: esconde el editor · Ctrl+M', 'Player only: hides the editor · Ctrl+M', 'Только плеер: скрывает редактор · Ctrl+M'),
     ('Cerrar el reproductor y volver al editor', 'Close the player and go back to the editor', 'Закрыть плеер и вернуться в редактор'),
 ]
+ROWS += [
+    ('El reproductor vuelve a ser siempre la barra clásica de abajo (se quitó la elección de estilo en Ajustes). En la barra hay dos botones nuevos: el de celular abre o cierra el reproductor grande (modo celular) y el de ventanita abre el modo ventana, con solo la portada.', 'The player is always the classic bar at the bottom again (the style choice was removed from Settings). The bar has two new buttons: the phone one opens or closes the big player (phone mode) and the small-window one opens window mode, with just the cover.', 'Плеер снова всегда классическая панель внизу. Две новые кнопки: «телефон» открывает большой плеер, «окно» — режим только обложки.'),
+    ('Modo celular: abre o cierra el reproductor grande (a la derecha)', 'Phone mode: opens or closes the big player (on the right)', 'Режим телефона: открывает или закрывает большой плеер (справа)'),
+    ('Modo ventana: una ventanita con solo la portada y los botones (se puede mover y agrandar)', 'Window mode: a small window with just the cover and the buttons (you can move and resize it)', 'Режим окна: маленькое окно только с обложкой и кнопками'),
+    ('<b>Reproductor</b>', '<b>Player</b>', '<b>Плеер</b>'),
+    ('En la barra de reproducción, el botón de celular abre el reproductor grande y el de ventanita deja solo la portada en una ventana pequeña.', 'In the playback bar, the phone button opens the big player and the small-window button leaves just the cover in a small window.', 'На панели воспроизведения кнопка телефона открывает большой плеер, а кнопка окна — маленькое окно с обложкой.'),
+]
