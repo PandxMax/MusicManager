@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.28', [
+        'Se quitó el botón ☰ de la barra de reproducción. El botón redondo ☰ (abajo a la derecha) es ahora el que abre la lista para elegir qué reproducir: todas las canciones, carpetas, artistas y géneros. La lista de reproducción propia está en Reproducción → Lista de reproducción.',
+    ]),
     ('2.27', [
         'Botón ✕ en el reproductor separado y en la ventanita de portada: los cierra y vuelves solo al editor. El botón ☰ de la barra ahora abre la lista para elegir qué reproducir (todas las canciones, carpetas, artistas y géneros); la lista de reproducción propia sigue en el botón redondo.',
     ]),

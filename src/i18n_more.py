@@ -1684,3 +1684,4 @@ ROWS += [
     ('Cerrar y volver al editor', 'Close and go back to the editor', 'Закрыть и вернуться в редактор'),
     ('Todas las canciones, carpetas, artistas y géneros (para elegir qué reproducir)', 'All songs, folders, artists and genres (to choose what to play)', 'Все песни, папки, исполнители и жанры (выбор для воспроизведения)'),
 ]
+ROWS += [('Se quitó el botón ☰ de la barra de reproducción. El botón redondo ☰ (abajo a la derecha) es ahora el que abre la lista para elegir qué reproducir: todas las canciones, carpetas, artistas y géneros. La lista de reproducción propia está en Reproducción → Lista de reproducción.', 'The ☰ button was removed from the playback bar. The round ☰ button (bottom right) now opens the list to choose what to play: all songs, folders, artists and genres. Your own playlist is in Playback → Playlist.', 'Кнопка ☰ убрана с панели. Круглая кнопка ☰ открывает список для выбора музыки.')]

@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.27"
+APP_VERSION = "2.28"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.27 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.28 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -5198,7 +5198,8 @@ class Main(QMainWindow):
         self.btn_fx.setToolTip("Ajustes de la canción: graves, agudos, tempo, tono, velocidad, bucle, eco…")
         self.btn_fx.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_fx.clicked.connect(self.open_fx)
-        h.addWidget(self.btn_list)
+        self.btn_list.setParent(bar)   # ya no va en la barra (lo hace el botón redondo ☰); se conserva escondido
+        self.btn_list.hide()
         h.addWidget(self.btn_prev)
         h.addWidget(self.btn_play)
         h.addWidget(self.btn_next)
@@ -5731,13 +5732,13 @@ class Main(QMainWindow):
         fab.setObjectName("fab")
         fab.setFixedSize(40, 40)
         fab.setCursor(Qt.CursorShape.PointingHandCursor)
-        fab.setToolTip("Lista de reproducción")
+        fab.setToolTip("Todas las canciones, carpetas, artistas y géneros (para elegir qué reproducir)")
         sh = QGraphicsDropShadowEffect(fab)
         sh.setBlurRadius(18)
         sh.setOffset(0, 3)
         sh.setColor(QColor(0, 0, 0, 150))
         fab.setGraphicsEffect(sh)
-        fab.clicked.connect(self.show_playlist)
+        fab.clicked.connect(self.toggle_library)
         self.pl_fab = fab
         central.installEventFilter(self)
         self.main_split.splitterMoved.connect(lambda *a: self.layout_overlay())

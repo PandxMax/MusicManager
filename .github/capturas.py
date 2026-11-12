@@ -711,15 +711,15 @@ try:
     QTest.mouseClick(w.btn_phone, Qt.MouseButton.LeftButton)
     wait(900)
     print("boton celular abre/cierra:", o1, not w.mobile.isVisible(), flush=True)
-    QTest.mouseClick(w.btn_list, Qt.MouseButton.LeftButton)
+    QTest.mouseClick(w.pl_fab, Qt.MouseButton.LeftButton)
     for _ in range(60):
         wait(250)
         if inn.lib.loaded:
             break
     wait(800)
-    print("boton lista abre la biblioteca:", w.mobile.isVisible(), inn.lib.isVisible(), len(inn.lib.files), flush=True)
+    print("boton redondo abre la biblioteca:", "boton de la barra quitado:", not w.btn_list.isVisible(), w.mobile.isVisible(), inn.lib.isVisible(), len(inn.lib.files), flush=True)
     shot(w, "s_barra_lista")
-    QTest.mouseClick(w.btn_list, Qt.MouseButton.LeftButton)
+    QTest.mouseClick(w.pl_fab, Qt.MouseButton.LeftButton)
     wait(900)
     print("boton lista otra vez (cierra):", not w.mobile.isVisible(), flush=True)
     w.enter_mini(True)
