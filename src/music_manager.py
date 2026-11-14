@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.30"
+APP_VERSION = "2.31"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.30 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.31 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3306,6 +3306,8 @@ class MusicKeys(QObject):
         if sys.platform != "win32":
             return
         want = self.want_global()
+        self.watch = want
+        self.start_poll(bool(want))
         if want == self.registered:
             return
         try:
@@ -3326,7 +3328,48 @@ class MusicKeys(QObject):
         except Exception:
             note_quiet()
 
+    # ---- segunda vía: mirar el teclado directamente. Algunos juegos a pantalla completa (League of Legends y
+    # otros) le piden a Windows que no avise de los atajos de los demás programas; ahí el registro normal no
+    # llega, pero el estado de la tecla sí se puede leer. Si las dos vías ven la misma pulsación, cuenta una vez.
+    def start_poll(self, on):
+        if getattr(self, "poll", None) is None:
+            self.poll = QTimer(self)
+            self.poll.setInterval(35)
+            self.poll.timeout.connect(self.poll_keys)
+            self.down, self.last_fire = {}, {}
+        if on and not self.poll.isActive():
+            self.down = {}
+            self.poll.start()
+        elif not on and self.poll.isActive():
+            self.poll.stop()
+
+    def poll_keys(self):
+        try:
+            import ctypes
+            gk = ctypes.windll.user32.GetAsyncKeyState
+            held = lambda vk: bool(gk(vk) & 0x8000)
+            mods_now = (1 if held(0x12) else 0) | (2 if held(0x11) else 0) | (4 if held(0x10) else 0) | \
+                       (8 if (held(0x5B) or held(0x5C)) else 0)
+            for act, (m, vk) in getattr(self, "watch", {}).items():
+                is_down = held(vk) and (m & 0xF) == mods_now
+                was = self.down.get(act, False)
+                self.down[act] = is_down
+                if is_down and not was:
+                    self.fire(act)
+        except Exception:
+            note_quiet()
+
+    def fire(self, act):
+        """Una pulsación = una acción, venga por el registro de Windows, por la lectura directa o por las dos."""
+        now = time.monotonic()
+        if now - self.last_fire.get(act, 0) < 0.30:
+            return
+        self.last_fire[act] = now
+        self.run_action(act)
+
     def release_global(self):
+        if getattr(self, "poll", None) is not None:
+            self.poll.stop()
         try:
             import ctypes
             hwnd = int(self.main.winId())
@@ -3364,7 +3407,10 @@ class MusicKeys(QObject):
         if act is None or self.main.player is None:
             return False
         if not ev.isAutoRepeat():
-            self.run_action(act)
+            if getattr(self, "poll", None) is not None and self.poll.isActive():
+                self.fire(act)   # también la ve la lectura directa: que cuente una sola vez
+            else:
+                self.run_action(act)
         return True
 
 
@@ -3383,7 +3429,7 @@ class HotkeyFilter(QAbstractNativeEventFilter):
                 if msg.message == 0x0312:   # WM_HOTKEY
                     for act, hid in MusicKeys.IDS.items():
                         if msg.wParam == hid:
-                            QTimer.singleShot(0, lambda a=act: self.keys.run_action(a))
+                            QTimer.singleShot(0, lambda a=act: self.keys.fire(a))
                             return True, 0
         except Exception:
             note_quiet()

@@ -809,3 +809,11 @@ VERSIÓN 2.30
    reproducción, en el orden en que van a sonar.
  - El botón redondo ☰ queda siempre en la esquina de abajo a la derecha y se esconde mientras el
    reproductor grande está abierto (ya no queda flotando en medio).
+
+VERSIÓN 2.31
+------------
+ - Atajos de música dentro de juegos: algunos juegos a pantalla completa (League of Legends y otros)
+   bloquean los atajos de los demás programas. Ahora, además, el programa lee el teclado directamente,
+   así que AvPág / RePág / Pausa deberían funcionar también ahí.
+   Si aun así no responde, el juego corre como administrador: abre Music Manager con clic derecho →
+   «Ejecutar como administrador».

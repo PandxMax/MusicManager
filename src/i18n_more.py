@@ -1696,3 +1696,4 @@ ROWS += [
     ('Reproducir este género', 'Play this genre', 'Играть этот жанр'),
     ('incluye las subcarpetas', 'includes subfolders', 'включая подпапки'),
 ]
+ROWS += [('Atajos de música en juegos: algunos juegos a pantalla completa (como League of Legends) bloquean los atajos de otros programas; ahora el programa también lee el teclado directamente, así que AvPág, RePág y Pausa deberían funcionar ahí. Si el juego se ejecuta como administrador, puede hacer falta abrir Music Manager también como administrador.', "Music shortcuts in games: some full-screen games (like League of Legends) block other programs' shortcuts; the program now also reads the keyboard directly, so PgDn, PgUp and Pause should work there. If the game runs as administrator, you may need to open Music Manager as administrator too.", 'Клавиши музыки в играх: программа теперь читает клавиатуру напрямую.')]

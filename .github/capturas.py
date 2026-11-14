@@ -407,6 +407,23 @@ try:
     ctypes.windll.user32.keybd_event(0x21, 0, 2, 0)
     wait(1200)
     print("global AvPag/RePag:", ascii(os.path.basename(fl[5])), "->", ascii(g1), "->", ascii(os.path.basename(w.playing_path)), flush=True)
+    # una pulsación con las dos vías activas debe contar UNA vez
+    b0 = os.path.basename(w.playing_path)
+    ctypes.windll.user32.keybd_event(0x22, 0, 0, 0)
+    wait(120)
+    ctypes.windll.user32.keybd_event(0x22, 0, 2, 0)
+    wait(1200)
+    b1 = os.path.basename(w.playing_path)
+    # como en un juego que bloquea los atajos: sin registro de Windows, solo la lectura directa del teclado
+    for act in list(w.music_keys.registered):
+        ctypes.windll.user32.UnregisterHotKey(int(w.winId()), w.music_keys.IDS[act])
+    ctypes.windll.user32.keybd_event(0x22, 0, 0, 0)
+    wait(150)
+    ctypes.windll.user32.keybd_event(0x22, 0, 2, 0)
+    wait(1200)
+    b2 = os.path.basename(w.playing_path)
+    print("una pulsacion = un salto:", ascii(b0), "->", ascii(b1), "| sin registro (como en un juego):", ascii(b2),
+          "sondeo activo:", w.music_keys.poll.isActive(), flush=True)
     w.player.stop()
     wait(500)
     print("sin musica, teclas libres:", w.music_keys.registered == {}, flush=True)

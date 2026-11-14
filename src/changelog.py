@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.31', [
+        'Atajos de música en juegos: algunos juegos a pantalla completa (como League of Legends) bloquean los atajos de otros programas; ahora el programa también lee el teclado directamente, así que AvPág, RePág y Pausa deberían funcionar ahí. Si el juego se ejecuta como administrador, puede hacer falta abrir Music Manager también como administrador.',
+    ]),
     ('2.30', [
         'Lista para reproducir: se abre donde está la canción que suena; dentro de una carpeta (o de un artista o género) hay una fila «Reproducir esta carpeta» que la pone entera, con sus subcarpetas; y arriba hay un botón para ver qué canciones están en la lista de reproducción. El botón redondo ☰ queda siempre en su esquina (ya no flota en medio) y se esconde mientras el reproductor grande está abierto.',
     ]),
