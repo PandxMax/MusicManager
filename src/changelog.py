@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.34', [
+        'Pantallas grandes: la columna de la portada, la portada, la barra de progreso y el reproductor grande (modo celular) crecen con la ventana en vez de quedarse pequeños. En pantallas normales todo queda igual que antes.',
+    ]),
     ('2.33', [
         'Espectrograma: las canciones «Hi-Res real» se marcan en azul, para distinguirlas de la alta fidelidad normal (verde).',
     ]),

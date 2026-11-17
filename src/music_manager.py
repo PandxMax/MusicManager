@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.33"
+APP_VERSION = "2.34"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.33 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.34 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -1491,6 +1491,16 @@ class VizBar(QWidget):
     def set_data(self, arr, fps):
         self.data, self.fps = arr, fps
 
+    def set_width(self, px):
+        """Pantallas grandes: más cuadritos (la barra de progreso se alarga con ellos)."""
+        cols = max(32, (int(px) - 4) // self.cell)
+        if cols == self.COLS:
+            return
+        self.COLS = cols
+        self.lvl = (self.lvl + [0.0] * cols)[:cols]
+        self.parts = []
+        self.setFixedSize(cols * self.cell + 4, 38)
+
     def set_state(self, st):
         import random
         if st == self.state:
@@ -1518,7 +1528,7 @@ class VizBar(QWidget):
                 row = self.data[i]
             for c in range(self.COLS):
                 if row is not None:
-                    tgt = float(row[c]) ** 1.4 * self.rows
+                    tgt = float(row[c * len(row) // self.COLS]) ** 1.4 * self.rows
                 else:   # mientras se analiza la canción: movimiento suave
                     tgt = (0.25 + 0.2 * math.sin(self.t * 4 + c * 0.6) + 0.15 * math.sin(self.t * 7 + c)) * self.rows
                 self.lvl[c] = tgt if tgt > self.lvl[c] else max(tgt, self.lvl[c] - 9 * dt)
@@ -3878,6 +3888,7 @@ class Main(QMainWindow):
         self.status_lbl.hide()
         cover_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         cover_box.setMinimumHeight(COVER + 14 + 22 + 22)   # no se puede encoger hasta tapar la portada
+        self.cover_box, self.cover_px, self._cover_src = cover_box, COVER, None
 
         ai_box = QGroupBox("Reconocer géneros con IA")
         av = QVBoxLayout(ai_box)
@@ -3956,7 +3967,7 @@ class Main(QMainWindow):
         self.right_stack.addWidget(self.lyr_box)  # 1: letra
         rv.addLayout(tabs_row)
         rv.addWidget(self.right_stack, 1)
-        rightlow.setMinimumWidth(330)
+        rightlow.setMinimumWidth(280)
 
         # la portada queda arriba a la derecha, siempre de su tamaño (no se estira)
         coverw = QWidget()
@@ -3988,8 +3999,9 @@ class Main(QMainWindow):
         web_row.addStretch(1)
         cvw.addLayout(web_row)
         cvw.addStretch(1)
-        coverw.setMinimumWidth(330)
+        coverw.setMinimumWidth(280)
         coverw.setMinimumHeight(cover_box.minimumHeight() + 46)   # la fila de arriba no puede aplastar la portada
+        self.cover_extra = 46
         self.cover_col = coverw
 
         top_split = QSplitter(Qt.Orientation.Horizontal)       # fila de arriba: lista | portada
@@ -6482,6 +6494,7 @@ class Main(QMainWindow):
     def show_current(self, path, n):
         self._loading = True
         if not path:
+            self._cover_src = None
             self.cover_lbl.clear()
             self.cover_lbl.setText("Selecciona una canción")
             self.info_lbl.setText("")
@@ -6508,9 +6521,10 @@ class Main(QMainWindow):
                     data = None
         pm = QPixmap()
         if data and pm.loadFromData(data):
-            self.cover_lbl.setPixmap(rounded_pm(pm.scaled(COVER, COVER, Qt.AspectRatioMode.KeepAspectRatio,
-                                                          Qt.TransformationMode.SmoothTransformation)))
+            self._cover_src = pm
+            self.show_cover_pm()
         else:
+            self._cover_src = None
             self.cover_lbl.clear()
             self.cover_lbl.setText("Sin portada")
         lyr = pend["lyrics"] if "lyrics" in pend else d["lyrics"]
@@ -7696,7 +7710,8 @@ class Main(QMainWindow):
             self.bottom_stack.setMaximumHeight(16777215)
 
     def bottom_row_h(self):
-        return max(self.bottom_w.sizeHint().height() + 6, 290)
+        # en ventanas altas la fila de abajo (metadatos, Géneros/Letra) gana algo de espacio
+        return max(self.bottom_w.sizeHint().height() + 6, 290, int(self.height() * 0.3))
 
     def set_meta_fold(self, on):
         """Ajustes → General: permitir (o no) ocultar los metadatos con la barrita."""
@@ -7751,6 +7766,68 @@ class Main(QMainWindow):
     def style_splitter(self, sp):
         sp.setHandleWidth(9)
         sp.setChildrenCollapsible(False)
+
+    def show_cover_pm(self):
+        pm = getattr(self, "_cover_src", None)
+        if pm is not None and not pm.isNull():
+            s = self.cover_px
+            self.cover_lbl.setPixmap(rounded_pm(pm.scaled(s, s, Qt.AspectRatioMode.KeepAspectRatio,
+                                                          Qt.TransformationMode.SmoothTransformation)))
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        t = getattr(self, "_adapt_t", None)
+        if t is None:
+            t = self._adapt_t = QTimer(self)
+            t.setSingleShot(True)
+            t.setInterval(60)
+            t.timeout.connect(self.adapt_size)
+        t.start()
+
+    def adapt_size(self):
+        """Pantallas grandes: la columna de la portada, la portada y la barra de progreso crecen con la ventana.
+        Hasta ~1650 px de ancho todo queda exactamente como siempre."""
+        if not hasattr(self, "cover_box"):
+            return
+        W, H = self.width(), self.height()
+        # pantallas pequeñas (menos de ~1300 px): la columna y el árbol ceden sitio a los campos de texto
+        colw = int(max(330, min(520, W * 0.2))) if W >= 1300 else int(max(280, 330 - (1300 - W) * 0.2))
+        if W < 1300:
+            ms = self.main_split.sizes()
+            tw = int(max(210, W * 0.21))
+            if len(ms) == 2 and ms[0] > tw and getattr(self, "_small_w", 0) != W:
+                self._small_w = W
+                self.main_split.setSizes([tw, sum(ms) - tw])
+        side = int(max(COVER, min(380, colw - 130, H - 560)))
+        if side != self.cover_px:
+            self.cover_px = side
+            self.cover_lbl.setFixedSize(side, side)
+            self.info_lbl.setMaximumWidth(side + 24)
+            self.cover_box.setMinimumHeight(side + 14 + 22 + 22)
+            self.cover_w.setMinimumHeight(self.cover_box.minimumHeight() + self.cover_extra)
+            self.show_cover_pm()
+        if getattr(self, "_colw", 0) != colw:
+            self._colw = colw
+            sp = self.top_split if self.meta_open else self.fold_split
+            tot = sum(sp.sizes())
+            if tot > colw + 300:
+                sizes = [tot - colw, colw]
+                sp.setSizes(sizes)
+                if self.meta_open:
+                    self.bottom_split.setSizes(sizes)
+        viz = getattr(self, "viz", None)
+        if viz is not None:
+            viz.set_width(max(260, min(620, 260 + (W - 1500) * 0.35)))
+            if self.seek.width() != viz.width():
+                self.seek.setFixedWidth(viz.width())
+        hb = self.bottom_row_h()
+        if getattr(self, "_rowh", 0) != hb:
+            self._rowh = hb
+            if getattr(self, "spec_pane", None) is None and self.meta_open:
+                self.set_rows_locked(True)
+            elif not self.meta_open:
+                self.rightlow.setFixedHeight(hb)
+        QTimer.singleShot(0, self.layout_overlay)
 
     def fit_to_screen(self):
         """Si la ventana (por tamaño guardado o cambio de pantalla) no cabe, la ajusta y la mete en la pantalla."""

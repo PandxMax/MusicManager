@@ -1040,6 +1040,34 @@ try:
 except Exception:
     print("FALLO mini", ascii(traceback.format_exc()), flush=True)
 
+# pantallas grandes: cómo se ve el editor a distintos tamaños
+try:
+    sc = QApplication.primaryScreen()
+    print("pantalla:", sc.geometry().width(), sc.geometry().height(), "dpr", sc.devicePixelRatio(), flush=True)
+    w.showNormal()
+    w.load_folder(os.path.join(root, "Synthpop", "Aurora Norte"))
+    wait(800)
+    w.list.clearSelection()
+    w.list.item(0).setSelected(True)
+    w.on_select()
+    for (ww, hh) in [(1500, 840), (1920, 1040), (2560, 1400), (3440, 1400), (1000, 700)]:
+        w.setMaximumSize(16777215, 16777215)
+        w.resize(ww, hh)
+        wait(1500)
+        print("tam", ww, hh, "->", w.width(), w.height(), "portada", w.cover_px, w.cover_lbl.width(),
+              "columna", w.cover_w.width(), "barra", w.seek.width(), w.viz.width(), "fila", w.bottom_stack.height(), flush=True)
+        shot(w, "z_grande_%d" % ww)
+    w.resize(3440, 1400)
+    wait(1200)
+    w.toggle_phone()
+    wait(1500)
+    shot(w, "z_grande_celular")
+    w.toggle_phone()
+    wait(800)
+    w.resize(1500, 840)
+    wait(600)
+except Exception:
+    print("FALLO grande", ascii(traceback.format_exc()), flush=True)
 w.set_theme("light")
 wait(1200)
 shot(w, "10_principal_claro")

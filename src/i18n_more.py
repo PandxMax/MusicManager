@@ -1712,3 +1712,9 @@ ROWS += [
      "Spectrogram: \"True Hi-Res\" songs are marked in blue, to tell them apart from regular high fidelity (green).",
      "Спектрограмма: композиции «настоящий Hi-Res» отмечаются синим, чтобы отличать их от обычного высокого качества (зелёный)."),
 ]
+
+ROWS += [
+    ('Pantallas grandes: la columna de la portada, la portada, la barra de progreso y el reproductor grande (modo celular) crecen con la ventana en vez de quedarse pequeños. En pantallas normales todo queda igual que antes.',
+     "Large screens: the cover column, the cover, the progress bar and the big player (phone mode) grow with the window instead of staying small. On normal screens everything stays as before.",
+     "Большие экраны: колонка обложки, обложка, полоса прогресса и большой плеер (режим телефона) растут вместе с окном, а не остаются маленькими. На обычных экранах всё как прежде."),
+]

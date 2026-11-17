@@ -336,6 +336,11 @@ class MobilePlayer(QFrame):
         if par is None:
             return
         self.setFixedHeight(par.height())
+        if self.anim.state() != QPropertyAnimation.State.Running:
+            w = int(max(380, min(520, par.width() * 0.2)))   # pantallas grandes: el panel crece un poco
+            if w != self.width():
+                self.WIDTH = w
+                self.setFixedWidth(w)
         if self.isVisible() and self.anim.state() != QPropertyAnimation.State.Running and not self._closing:
             self.move(par.width() - self.width(), 0)
         self.place_tab()
