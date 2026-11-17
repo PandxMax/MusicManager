@@ -1706,3 +1706,9 @@ ROWS += [
      "Spectrogram: peak, RMS and clipping are now measured on each channel of the file. They used to read up to 3 dB too high on stereo songs, showing clipping that wasn't there.",
      "Спектрограмма: пик, RMS и клиппинг теперь измеряются в каждом канале файла. Раньше в стереозаписях они завышались до 3 дБ и показывался несуществующий клиппинг."),
 ]
+
+ROWS += [
+    ('Espectrograma: las canciones «Hi-Res real» se marcan en azul, para distinguirlas de la alta fidelidad normal (verde).',
+     "Spectrogram: \"True Hi-Res\" songs are marked in blue, to tell them apart from regular high fidelity (green).",
+     "Спектрограмма: композиции «настоящий Hi-Res» отмечаются синим, чтобы отличать их от обычного высокого качества (зелёный)."),
+]

@@ -825,3 +825,8 @@ VERSIÓN 2.32
    llegue al tope del formato.
  - Espectrograma: el pico, el RMS y los recortes se miden ahora en cada canal del archivo. Antes
    salían hasta 3 dB más altos de lo real en canciones estéreo y aparecían recortes que no existían.
+
+VERSIÓN 2.33
+------------
+ - Espectrograma: las canciones «Hi-Res real» se marcan en azul, para distinguirlas de la alta
+   fidelidad normal (verde).

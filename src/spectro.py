@@ -227,7 +227,7 @@ def verdict(r):
                 why.append(f"Es {sr/1000:g} kHz / {bits} bits, pero el contenido llega a {cutoff/1000:.1f} kHz: "
                            "probablemente sea calidad CD dentro de un contenedor Hi-Res.")
             elif hires and cutoff > 22500:
-                level, tag = "alta", "Alta fidelidad · Hi-Res real"
+                level, tag = "hires", "Alta fidelidad · Hi-Res real"
                 why.append(f"Formato sin pérdida a {sr/1000:g} kHz / {bits} bits y con contenido hasta {cutoff/1000:.1f} kHz.")
             elif hires:
                 level, tag = "alta", "Alta fidelidad (sin pérdida)"
@@ -280,7 +280,7 @@ def _lut():
 
 LUT = _lut()
 CURVE_COLORS = ["#7C5CFF", "#22D3EE", "#F59E0B", "#F43F5E", "#34D399", "#E879F9", "#A3E635", "#60A5FA"]
-LEVEL_COLOR = {"alta": "#22C55E", "normal": "#F59E0B", "baja": "#EF4444"}
+LEVEL_COLOR = {"hires": "#0EA5E9", "alta": "#22C55E", "normal": "#F59E0B", "baja": "#EF4444"}
 
 
 def spec_image(S, fmax_ratio):

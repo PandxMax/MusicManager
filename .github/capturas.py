@@ -539,7 +539,20 @@ try:
     print("hires:", r["sr"], round(r["cutoff"]), "pico %.2f" % r["peak"], "clip %.3f" % r["clipped"], ascii(r["verdict"]),
           "tip:", bool(spectro.fake_lossless_tip(r)), flush=True)
     assert "Hi-Res real" in r["verdict"] and not spectro.fake_lossless_tip(r) and r["peak"] <= 0.01
-    os.remove(hr)
+    assert r["level"] == "hires" and spectro.LEVEL_COLOR["hires"] != spectro.LEVEL_COLOR["alta"]
+    hd = os.path.join(root, "HiRes")
+    os.makedirs(hd, exist_ok=True)
+    hr2 = os.path.join(hd, "01. Hi-Res real.flac")
+    os.replace(hr, hr2)
+    w.load_folder(hd)
+    wait(800)
+    w.list.clearSelection()
+    w.list.item(0).setSelected(True)
+    w.on_select()
+    w.open_spectrum()
+    wait(9000)
+    shot(w, "s_espectro_hires")
+    w.close_spectrum()
 except Exception:
     print("FALLO hires", ascii(traceback.format_exc()), flush=True)
 # buscar en una carpeta grande con subcarpetas (modo iconos)
