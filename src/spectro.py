@@ -62,10 +62,36 @@ def decode_mono(path, rate):
     if not exe:
         raise RuntimeError("No se encontró ffmpeg. Instala el paquete «imageio-ffmpeg» (pip install imageio-ffmpeg).")
     p = _run([exe, "-nostdin", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", str(rate),
-              "-f", "f32le", "-"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+              "-rematrix_maxval", "1.0", "-f", "f32le", "-"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if p.returncode != 0 or not p.stdout:
         raise RuntimeError("No se pudo decodificar el audio: " + p.stderr.decode("utf-8", "ignore")[-200:])
     return np.frombuffer(p.stdout, dtype=np.float32)
+
+
+def decode_channels(path, rate, ch):
+    """Audio con sus canales originales, sin mezclar: matriz (muestras, canales)."""
+    exe = ffmpeg_exe()
+    if not exe:
+        raise RuntimeError("No se encontró ffmpeg. Instala el paquete «imageio-ffmpeg» (pip install imageio-ffmpeg).")
+    p = _run([exe, "-nostdin", "-v", "error", "-i", path, "-vn", "-ac", str(ch), "-ar", str(rate),
+              "-rematrix_maxval", "1.0", "-f", "f32le", "-"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0 or not p.stdout:
+        raise RuntimeError("No se pudo decodificar el audio: " + p.stderr.decode("utf-8", "ignore")[-200:])
+    a = np.frombuffer(p.stdout, dtype=np.float32)
+    return a[:len(a) // ch * ch].reshape(-1, ch)
+
+
+def probe_channels(path):
+    exe = ffmpeg_exe()
+    try:
+        p = _run([exe, "-nostdin", "-i", path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        m = re.search(r"\d{4,6} Hz, ([^,\n]+)", p.stderr.decode("utf-8", "ignore"))
+        if m:
+            w = m.group(1).strip().lower()
+            return {"mono": 1, "stereo": 2}.get(w, 0)
+    except Exception:
+        pass
+    return 0
 
 
 def probe_rate(path):
@@ -84,7 +110,27 @@ def probe_rate(path):
 def analyze(path, max_frames=1100):
     info = file_info(path)
     sr = info["sr"] or probe_rate(path)
-    x = decode_mono(path, sr)
+    # Los niveles (pico, RMS, recortes) se miden en cada canal tal como está en el archivo;
+    # la mezcla mono (promedio) solo se usa para dibujar el espectrograma.
+    ch = info["channels"] or probe_channels(path)
+    if ch in (1, 2):
+        raw = decode_channels(path, sr, ch)
+        lo, hi = float(raw.min()), float(raw.max())
+        peak_lin = max(abs(lo), abs(hi))
+        sq, clip_n = 0.0, 0
+        for i in range(0, len(raw), 1 << 20):   # por trozos, para no duplicar la memoria
+            blk = raw[i:i + (1 << 20)]
+            sq += float(np.sum(blk.astype(np.float64) ** 2))
+            clip_n += int(np.count_nonzero(np.abs(blk) >= 0.999))
+        rms_lin = math.sqrt(sq / max(1, raw.size))
+        clipped = 100.0 * clip_n / max(1, raw.size)
+        x = raw[:, 0] if ch == 1 else raw.mean(axis=1, dtype=np.float32)
+        del raw
+    else:   # más de dos canales (o no se sabe): mezcla normalizada de ffmpeg
+        x = decode_mono(path, sr)
+        peak_lin = float(np.max(np.abs(x))) if len(x) else 0.0
+        rms_lin = float(np.sqrt(np.mean(x.astype(np.float64) ** 2))) if len(x) else 0.0
+        clipped = float(np.mean(np.abs(x) >= 0.999)) * 100 if len(x) else 0.0
     if len(x) < FFT:
         x = np.pad(x, (0, FFT - len(x)))
     n = len(x)
@@ -126,9 +172,8 @@ def analyze(path, max_frames=1100):
     steep = (a - b) >= 25.0 and cutoff < nyq * 0.97
 
     # Niveles
-    peak = float(20 * np.log10(max(float(np.max(np.abs(x))), 1e-9)))
-    rms = float(20 * np.log10(max(float(np.sqrt(np.mean(x.astype(np.float64) ** 2))), 1e-9)))
-    clipped = float(np.mean(np.abs(x) >= 0.999)) * 100
+    peak = float(20 * np.log10(max(peak_lin, 1e-9)))
+    rms = float(20 * np.log10(max(rms_lin, 1e-9)))
     w = int(sr * 0.4)
     blocks = max(1, n // w)
     br = np.sqrt(np.mean(x[:blocks * w].reshape(blocks, w).astype(np.float64) ** 2, axis=1))
@@ -170,12 +215,18 @@ def verdict(r):
     lossless = codec in ("FLAC", "ALAC") or info["ext"] in LOSSLESS_EXT
     br = info["bitrate"] / 1000.0
     why = []
-    full = cutoff >= 0.9 * nyq
+    # Los formatos con pérdida cortan por debajo de ~21 kHz. Un archivo Hi-Res (más de 48 kHz) con
+    # contenido por encima de eso no puede venir de un MP3/AAC aunque no llegue al tope de su formato.
+    full = cutoff >= 0.9 * nyq or (sr > 48000 and cutoff >= 21000)
     if lossless:
         bits = info["bits"] or 16
         if full:
             hires = sr > 48000 or bits > 16
-            if hires and cutoff > 22500:
+            if sr > 48000 and cutoff <= 28000:
+                level, tag = "alta", "Alta fidelidad (sin pérdida)"
+                why.append(f"Es {sr/1000:g} kHz / {bits} bits, pero el contenido llega a {cutoff/1000:.1f} kHz: "
+                           "probablemente sea calidad CD dentro de un contenedor Hi-Res.")
+            elif hires and cutoff > 22500:
                 level, tag = "alta", "Alta fidelidad · Hi-Res real"
                 why.append(f"Formato sin pérdida a {sr/1000:g} kHz / {bits} bits y con contenido hasta {cutoff/1000:.1f} kHz.")
             elif hires:
@@ -598,7 +649,7 @@ class SpectrumDialog(QWidget):
                 out.append(f"<p>💡 <b>{T('Recomendación')}:</b> {rec}</p>")
         out.append(T("<hr><p><small>Cómo leerlo: el eje vertical es la frecuencia (kHz) y el color es el volumen (dBFS). "
                      "Un corte horizontal brusco indica compresión con pérdida (MP3, AAC…) o un archivo convertido desde ella. "
-                     "El análisis se hace sobre la mezcla mono. Es una estimación, no una prueba definitiva.</small></p>"))
+                     "El espectrograma se dibuja sobre la mezcla mono; el pico y los recortes se miden en cada canal. Es una estimación, no una prueba definitiva.</small></p>"))
         self.txt.setHtml("".join(out))
 
     def apply_fmax(self):

@@ -352,9 +352,9 @@ ROWS = [
     ("Masterizado muy fuerte (poca dinámica).", "Very loud mastering (little dynamics).", "Очень громкий мастеринг (мало динамики)."),
     ("Analizando… %v / %m", "Analyzing… %v / %m", "Анализ… %v / %m"), ("Corte (kHz)", "Cutoff (kHz)", "Срез (кГц)"),
     ("Pico (dB)", "Peak (dB)", "Пик (дБ)"), ("Rango din. (dB)", "Dyn. range (dB)", "Дин. диапазон (дБ)"),
-    ("<hr><p><small>Cómo leerlo: el eje vertical es la frecuencia (kHz) y el color es el volumen (dBFS). Un corte horizontal brusco indica compresión con pérdida (MP3, AAC…) o un archivo convertido desde ella. El análisis se hace sobre la mezcla mono. Es una estimación, no una prueba definitiva.</small></p>",
-     "<hr><p><small>How to read it: the vertical axis is frequency (kHz) and color is loudness (dBFS). A sharp horizontal cutoff means lossy compression (MP3, AAC…) or a file converted from it. The analysis uses the mono mix. It's an estimate, not definitive proof.</small></p>",
-     "<hr><p><small>Как читать: по вертикали — частота (кГц), цвет — громкость (dBFS). Резкий горизонтальный срез означает сжатие с потерями (MP3, AAC…) или файл, преобразованный из него. Анализ ведётся по моно-сумме. Это оценка, а не окончательное доказательство.</small></p>"),
+    ("<hr><p><small>Cómo leerlo: el eje vertical es la frecuencia (kHz) y el color es el volumen (dBFS). Un corte horizontal brusco indica compresión con pérdida (MP3, AAC…) o un archivo convertido desde ella. El espectrograma se dibuja sobre la mezcla mono; el pico y los recortes se miden en cada canal. Es una estimación, no una prueba definitiva.</small></p>",
+     "<hr><p><small>How to read it: the vertical axis is frequency (kHz) and color is loudness (dBFS). A sharp horizontal cutoff means lossy compression (MP3, AAC…) or a file converted from it. The spectrogram is drawn from the mono mix; peak and clipping are measured on each channel. It's an estimate, not definitive proof.</small></p>",
+     "<hr><p><small>Как читать: по вертикали — частота (кГц), цвет — громкость (dBFS). Резкий горизонтальный срез означает сжатие с потерями (MP3, AAC…) или файл, преобразованный из него. Спектрограмма строится по моно-сумме; пик и клиппинг измеряются в каждом канале. Это оценка, а не окончательное доказательство.</small></p>"),
     ("Guardar imagen", "Save image", "Сохранить изображение"), ("No se pudo decodificar el audio: ", "Couldn't decode the audio: ", "Не удалось декодировать аудио: "),
     ("Sospechoso: sin pérdida, pero con corte", "Suspicious: lossless but with a cutoff", "Подозрительно: без потерь, но со срезом"),
     ("Buena calidad (con pérdida)", "Good quality (lossy)", "Хорошее качество (с потерями)"),
@@ -1697,3 +1697,12 @@ ROWS += [
     ('incluye las subcarpetas', 'includes subfolders', 'включая подпапки'),
 ]
 ROWS += [('Atajos de música en juegos: algunos juegos a pantalla completa (como League of Legends) bloquean los atajos de otros programas; ahora el programa también lee el teclado directamente, así que AvPág, RePág y Pausa deberían funcionar ahí. Si el juego se ejecuta como administrador, puede hacer falta abrir Music Manager también como administrador.', "Music shortcuts in games: some full-screen games (like League of Legends) block other programs' shortcuts; the program now also reads the keyboard directly, so PgDn, PgUp and Pause should work there. If the game runs as administrator, you may need to open Music Manager as administrator too.", 'Клавиши музыки в играх: программа теперь читает клавиатуру напрямую.')]
+
+ROWS += [
+    ('Espectrograma: los FLAC Hi-Res (96 kHz y similares) ya no salen como «Sospechoso» ni se recomienda pasarlos a MP3 cuando su contenido supera lo que puede guardar un MP3, aunque no llegue al tope del formato.',
+     "Spectrogram: Hi-Res FLACs (96 kHz and similar) are no longer flagged as \"Suspicious\" nor recommended for MP3 conversion when their content goes beyond what an MP3 can hold, even if it doesn't reach the format's limit.",
+     "Спектрограмма: Hi-Res FLAC (96 кГц и подобные) больше не помечаются как «Подозрительно» и не предлагаются к конвертации в MP3, если их содержимое выходит за пределы возможностей MP3, даже не доходя до предела формата."),
+    ('Espectrograma: el pico, el RMS y los recortes se miden ahora en cada canal del archivo. Antes salían hasta 3 dB más altos de lo real en canciones estéreo y aparecían recortes que no existían.',
+     "Spectrogram: peak, RMS and clipping are now measured on each channel of the file. They used to read up to 3 dB too high on stereo songs, showing clipping that wasn't there.",
+     "Спектрограмма: пик, RMS и клиппинг теперь измеряются в каждом канале файла. Раньше в стереозаписях они завышались до 3 дБ и показывался несуществующий клиппинг."),
+]

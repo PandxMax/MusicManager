@@ -1,6 +1,10 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.32', [
+        'Espectrograma: los FLAC Hi-Res (96 kHz y similares) ya no salen como «Sospechoso» ni se recomienda pasarlos a MP3 cuando su contenido supera lo que puede guardar un MP3, aunque no llegue al tope del formato.',
+        'Espectrograma: el pico, el RMS y los recortes se miden ahora en cada canal del archivo. Antes salían hasta 3 dB más altos de lo real en canciones estéreo y aparecían recortes que no existían.',
+    ]),
     ('2.31', [
         'Atajos de música en juegos: algunos juegos a pantalla completa (como League of Legends) bloquean los atajos de otros programas; ahora el programa también lee el teclado directamente, así que AvPág, RePág y Pausa deberían funcionar ahí. Si el juego se ejecuta como administrador, puede hacer falta abrir Music Manager también como administrador.',
     ]),

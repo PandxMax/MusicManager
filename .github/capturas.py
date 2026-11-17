@@ -529,6 +529,19 @@ try:
     smoke("open_repair", w.open_repair)
 except Exception:
     print("FALLO flac falso", ascii(traceback.format_exc()), flush=True)
+# Hi-Res real con contenido hasta 36 kHz: no debe salir «Sospechoso»; niveles medidos por canal
+try:
+    import spectro
+    hr = os.path.join(root, "hires36.flac")
+    subprocess.run([ff, "-loglevel", "error", "-f", "lavfi", "-i", "anoisesrc=d=8:c=pink:a=0.9:r=72000", "-ar", "96000",
+                    "-ac", "2", "-sample_fmt", "s32", "-c:a", "flac", "-y", hr], check=True)
+    r = spectro.analyze(hr)
+    print("hires:", r["sr"], round(r["cutoff"]), "pico %.2f" % r["peak"], "clip %.3f" % r["clipped"], ascii(r["verdict"]),
+          "tip:", bool(spectro.fake_lossless_tip(r)), flush=True)
+    assert "Hi-Res real" in r["verdict"] and not spectro.fake_lossless_tip(r) and r["peak"] <= 0.01
+    os.remove(hr)
+except Exception:
+    print("FALLO hires", ascii(traceback.format_exc()), flush=True)
 # buscar en una carpeta grande con subcarpetas (modo iconos)
 try:
     big = os.path.join(root, "Grande")
