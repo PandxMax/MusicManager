@@ -1,6 +1,10 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.35', [
+        'Clics más tranquilos en la lista de canciones y en el árbol de carpetas: un pequeño temblor del ratón al hacer clic (hasta 14 px) ya no sombrea varias canciones o carpetas ni empieza a moverlas.',
+        'Si el botón del ratón «rebota» (dos pulsaciones en menos de 30 ms), ya no cuenta como doble clic: no se abre la carpeta ni se reproduce la canción sin querer.',
+    ]),
     ('2.34', [
         'Pantallas grandes: la columna de la portada, la portada, la barra de progreso y el reproductor grande (modo celular) crecen con la ventana en vez de quedarse pequeños. En pantallas normales todo queda igual que antes.',
     ]),

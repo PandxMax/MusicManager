@@ -1718,3 +1718,12 @@ ROWS += [
      "Large screens: the cover column, the cover, the progress bar and the big player (phone mode) grow with the window instead of staying small. On normal screens everything stays as before.",
      "Большие экраны: колонка обложки, обложка, полоса прогресса и большой плеер (режим телефона) растут вместе с окном, а не остаются маленькими. На обычных экранах всё как прежде."),
 ]
+
+ROWS += [
+    ('Clics más tranquilos en la lista de canciones y en el árbol de carpetas: un pequeño temblor del ratón al hacer clic (hasta 14 px) ya no sombrea varias canciones o carpetas ni empieza a moverlas.',
+     "Calmer clicks in the song list and the folder tree: a small mouse tremor while clicking (up to 14 px) no longer selects several songs or folders or starts moving them.",
+     "Более спокойные щелчки в списке песен и дереве папок: небольшое дрожание мыши при щелчке (до 14 px) больше не выделяет несколько песен или папок и не начинает их перемещать."),
+    ('Si el botón del ratón «rebota» (dos pulsaciones en menos de 30 ms), ya no cuenta como doble clic: no se abre la carpeta ni se reproduce la canción sin querer.',
+     "If the mouse button \"bounces\" (two presses in under 30 ms), it no longer counts as a double click: folders don't open and songs don't start playing by accident.",
+     "Если кнопка мыши «дребезжит» (два нажатия быстрее 30 мс), это больше не считается двойным щелчком: папки не открываются и песни не запускаются случайно."),
+]

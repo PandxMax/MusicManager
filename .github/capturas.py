@@ -1068,6 +1068,67 @@ try:
     wait(600)
 except Exception:
     print("FALLO grande", ascii(traceback.format_exc()), flush=True)
+# clics temblorosos y rebotes del botón del ratón
+try:
+    from PyQt6.QtGui import QMouseEvent
+    from PyQt6.QtCore import QEvent, QPointF
+    w.set_view_mode("list", save=False)
+    wait(500)
+    L, vp = w.list, w.list.viewport()
+    LB, NB, NM = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier
+
+    from PyQt6.QtTest import QTest
+
+    def gesture(p0, p1, ts):
+        QTest.mousePress(vp, LB, NM, p0, 20)
+        for k in range(1, 5):
+            QTest.mouseMove(vp, p0 + (p1 - p0) * k / 4, 10)
+        QTest.mouseRelease(vp, LB, NM, p1, 20)
+        QApplication.processEvents()
+
+    def run_all(tag):
+      L.clearSelection()
+      r0 = L.visualItemRect(L.item(0))
+      r2 = L.visualItemRect(L.item(2))
+      p0 = r0.center()
+      p0.setY(r0.bottom() - 2)
+      p1 = p0 + type(p0)(3, 8)        # temblor de 8 px que cruza a la canción de abajo
+      gesture(p0, p1, 10000)
+      n_trem = len(L.selectedItems())
+      L.clearSelection()
+      gesture(r0.center(), r2.center(), 20000)   # arrastre de verdad hacia abajo: sombrea varias
+      n_drag = len(L.selectedItems())
+      hits = []
+      L.itemDoubleClicked.connect(lambda it: hits.append(1))
+      c = L.visualItemRect(L.item(1)).center()
+      # QTest separa los clics 500 ms a propósito y PyQt no deja fijar la hora del evento: se simula el reloj
+      clock = [1000]
+      mm.ClickGuard.ev_ms = staticmethod(lambda e: clock[0])
+      QTest.mouseClick(vp, LB, NM, c, 50)
+      clock[0] += 10                              # rebote: 10 ms después de soltar
+      QTest.mouseDClick(vp, LB, NM, c, 10)
+      QTest.mouseRelease(vp, LB, NM, c, 5)
+      QApplication.processEvents()
+      n_bounce = len(hits)
+      clock[0] += 1000
+      QTest.mouseClick(vp, LB, NM, c, 50)
+      clock[0] += 120                             # doble clic humano: 120 ms
+      QTest.mouseDClick(vp, LB, NM, c, 10)
+      QTest.mouseRelease(vp, LB, NM, c, 5)
+      QApplication.processEvents()
+      mm.ClickGuard.ev_ms = staticmethod(lambda e: e.timestamp())
+      n_real = len(hits) - n_bounce
+      w.stop_play()
+      print("clics", tag, "temblor", n_trem, "arrastre", n_drag, "rebote", n_bounce, "doble", n_real, flush=True)
+      return n_trem, n_drag, n_bounce, n_real
+    mm.CLICK_SLOP, mm.CHATTER_MS = 0, 0      # como antes de la 2.35
+    old = run_all("antes")
+    mm.CLICK_SLOP, mm.CHATTER_MS = 14, 30
+    n_trem, n_drag, n_bounce, n_real = run_all("ahora")
+    assert n_trem == 1 and n_drag >= 3 and n_bounce == 0 and n_real == 1
+    w.set_view_mode("icons", save=False)
+except Exception:
+    print("FALLO clics", ascii(traceback.format_exc()), flush=True)
 w.set_theme("light")
 wait(1200)
 shot(w, "10_principal_claro")

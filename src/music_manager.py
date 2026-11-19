@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.34"
+APP_VERSION = "2.35"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.34 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.35 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2092,7 +2092,49 @@ class TreeEditDelegate(QStyledItemDelegate):
         editor.setGeometry(QRect(x, r.y() - 1, w, r.height() + 2))
 
 
-class FolderTree(QTreeWidget):
+# Un clic normal casi nunca deja el ratón quieto del todo. Windows considera «arrastre» desde 4 px,
+# así que un temblor de la mano sombreaba varias canciones/carpetas o empezaba a mover archivos.
+CLICK_SLOP = 14      # px que el ratón puede moverse durante un clic sin que cuente como arrastre
+CHATTER_MS = 30      # dos pulsaciones más rápidas que esto son un rebote del botón del ratón, no un doble clic
+
+
+def click_slop():
+    return max(QApplication.startDragDistance(), CLICK_SLOP)
+
+
+class ClickGuard:
+    """Filtra los temblores de un clic y los rebotes del botón (que abrían cosas «solas» con doble clic)."""
+
+    def guard_press(self, e):
+        self._g_org = e.position().toPoint() if e.button() == Qt.MouseButton.LeftButton else None
+        self._g_free = False
+
+    def guard_move(self, e):
+        """True si este movimiento todavía es temblor de un clic y hay que ignorarlo."""
+        org = getattr(self, "_g_org", None)
+        if org is None or getattr(self, "_g_free", True) or not (e.buttons() & Qt.MouseButton.LeftButton):
+            return False
+        if (e.position().toPoint() - org).manhattanLength() < click_slop():
+            return True
+        self._g_free = True
+        return False
+
+    def guard_release(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._g_rel = (self.ev_ms(e), e.position().toPoint())
+        self._g_org = None
+
+    def guard_bounce(self, e):
+        """True si este «doble clic» es en realidad un rebote del botón (llega demasiado rápido)."""
+        last = getattr(self, "_g_rel", None)
+        return last is not None and 0 <= self.ev_ms(e) - last[0] < CHATTER_MS
+
+    @staticmethod
+    def ev_ms(e):
+        return e.timestamp()   # hora del evento en ms, la que da Windows (no la de cuando se procesa)
+
+
+class FolderTree(ClickGuard, QTreeWidget):
     """Árbol de carpetas. Arrastra carpetas o canciones y suéltalas en otra carpeta,
     incluso desde un árbol hacia el otro."""
     dropped = pyqtSignal(list, str)
@@ -2133,13 +2175,23 @@ class FolderTree(QTreeWidget):
             e.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier))
         if self._t_free:
             self.setDragEnabled(False)
+        self.guard_press(e)
         super().mousePressEvent(e)
 
+    def mouseDoubleClickEvent(self, e):
+        if self.guard_bounce(e):   # rebote del botón: cuenta como un solo clic
+            e.accept()
+            return
+        super().mouseDoubleClickEvent(e)
+
     def mouseMoveEvent(self, e):
+        if self.guard_move(e):   # temblor de la mano durante el clic
+            e.accept()
+            return
         pp = getattr(self, "_t_press", None)
         if pp is not None and getattr(self, "_t_free", False) and e.buttons() & Qt.MouseButton.LeftButton:
             d = e.position().toPoint() - pp
-            if d.manhattanLength() >= QApplication.startDragDistance():
+            if d.manhattanLength() >= click_slop():
                 self._t_free = False
                 if abs(d.x()) > abs(d.y()) and self._t_item is not None:   # hacia un lado: arrastrar esa carpeta
                     it = self._t_item
@@ -2154,6 +2206,7 @@ class FolderTree(QTreeWidget):
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e):
+        self.guard_release(e)
         super().mouseReleaseEvent(e)
         self._t_press, self._t_free = None, False
         if not self.dragEnabled():
@@ -2909,7 +2962,7 @@ class SongDelegate(QStyledItemDelegate):
             editor.setGeometry(QRect(x, r.y() + (r.height() - h) // 2, w, h))
 
 
-class SongList(QListWidget):
+class SongList(ClickGuard, QListWidget):
     """Canciones (y subcarpetas) como en un explorador. El arrastre se maneja a mano para
     que funcione siempre: se puede soltar sobre una carpeta de esta lista o de los árboles."""
     dropped = pyqtSignal(list, str)
@@ -3019,6 +3072,7 @@ class SongList(QListWidget):
         if not (QApplication.mouseButtons() & ~Qt.MouseButton.LeftButton) and self.state() != QAbstractItemView.State.NoState:
             self.reset_state()
         self._keep_multi = None
+        self.guard_press(e)
         if e.button() == Qt.MouseButton.LeftButton:
             self._press = e.position().toPoint()
             self._press_item = self.itemAt(self._press)
@@ -3039,9 +3093,12 @@ class SongList(QListWidget):
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e):
+        if self.guard_move(e):   # temblor de la mano durante el clic: ni sombrea ni arrastra
+            e.accept()
+            return
         if (self._press is not None and self._press_item is not None
                 and e.buttons() & Qt.MouseButton.LeftButton
-                and (e.position().toPoint() - self._press).manhattanLength() >= QApplication.startDragDistance()):
+                and (e.position().toPoint() - self._press).manhattanLength() >= click_slop()):
             d = e.position().toPoint() - self._press
             if (self.viewMode() == QListView.ViewMode.ListMode and getattr(self, "_press_unsel", False)
                     and abs(d.y()) >= abs(d.x())):
@@ -3065,6 +3122,9 @@ class SongList(QListWidget):
 
     def mouseDoubleClickEvent(self, e):
         # el doble clic siempre abre/reproduce lo que está bajo el cursor (aunque antes hubiera varias elegidas)
+        if e.button() == Qt.MouseButton.LeftButton and self.guard_bounce(e):
+            e.accept()   # rebote del botón del ratón: no abre ni reproduce nada
+            return
         it = self.itemAt(e.position().toPoint())
         if e.button() == Qt.MouseButton.LeftButton and it is not None:
             self._keep_multi = None
@@ -3077,6 +3137,7 @@ class SongList(QListWidget):
         super().mouseDoubleClickEvent(e)
 
     def mouseReleaseEvent(self, e):
+        self.guard_release(e)
         self._press, self._press_item = None, None
         keep = getattr(self, "_keep_multi", None)
         self._keep_multi = None
