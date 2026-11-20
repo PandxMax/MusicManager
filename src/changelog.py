@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.39', [
+        'Espectrograma: la etiqueta «Posible MP3 de 320» se ve más limpia: solo con borde y texto ámbar (sin el fondo gris), y la explicación aparece al pasar el ratón.',
+    ]),
     ('2.38', [
         'Espectrograma: el veredicto ahora distingue lo seguro de lo dudoso. «Falso sin pérdida: viene de un MP3» solo sale cuando el muro está por debajo de 19.5 kHz, donde ningún estudio corta; solo en ese caso se recomienda convertir.',
         'Espectrograma: un muro entre 19.5 y 20.6 kHz sale como «Posible MP3 de 320 (no se puede asegurar)», en gris y sin botón de convertir, porque así cortan tanto los MP3 de 320 como algunos estudios.',

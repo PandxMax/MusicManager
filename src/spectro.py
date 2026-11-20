@@ -319,7 +319,7 @@ def verdict(r):
                        "encima: es la huella de un MP3/AAC. Convertirlo a FLAC no le devolvió la calidad.")
         else:
             # Entre 19.5 y 20.6 kHz: puede ser un MP3 de 320 o el filtro de un estudio. Desde el espectro no se distingue.
-            level, tag = "posible", "Posible MP3 de 320 (no se puede asegurar)"
+            level, tag = "posible", "Posible MP3 de 320"
             why.append(f"Tiene un muro en {cutoff/1000:.1f} kHz. Así cortan los MP3 de 320 kbps, pero también algunos "
                        "estudios al preparar la grabación: con el espectro no se puede saber cuál de los dos es.")
             why.append("Si es un MP3 de 320, al oído es casi igual que el original; no hace falta hacer nada.")
@@ -362,7 +362,7 @@ def _lut():
 
 LUT = _lut()
 CURVE_COLORS = ["#7C5CFF", "#22D3EE", "#F59E0B", "#F43F5E", "#34D399", "#E879F9", "#A3E635", "#60A5FA"]
-LEVEL_COLOR = {"hires": "#0EA5E9", "alta": "#22C55E", "posible": "#A8A29E", "normal": "#F59E0B", "baja": "#EF4444"}
+LEVEL_COLOR = {"hires": "#0EA5E9", "alta": "#22C55E", "posible": "#F5B841", "normal": "#F59E0B", "baja": "#EF4444"}
 
 
 def spec_image(S, fmax_ratio):
@@ -522,9 +522,13 @@ class Worker(QThread):
                 self.fail.emit(i, str(e))
 
 
-def _badge(text, color):
+def _badge(text, color, outline=False):
     l = QLabel(text)
-    l.setStyleSheet(f"background:{color}; color:white; border-radius:9px; padding:3px 10px; font-weight:bold;")
+    if outline:   # veredicto sin confirmar: solo el borde y el texto, para que no parezca una alarma
+        l.setStyleSheet(f"background:transparent; color:{color}; border:1.5px solid {color}; border-radius:9px; "
+                        "padding:2px 10px; font-weight:bold;")
+    else:
+        l.setStyleSheet(f"background:{color}; color:white; border-radius:9px; padding:3px 10px; font-weight:bold;")
     l.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
     return l
 
@@ -644,7 +648,10 @@ class SpectrumDialog(QWidget):
         head.addWidget(sw)
         t = QLabel(f"<b>{r['name']}</b>"); t.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         head.addWidget(t, 1)
-        head.addWidget(_badge(r["verdict"], LEVEL_COLOR[r["level"]]))
+        b = _badge(T(r["verdict"]), LEVEL_COLOR[r["level"]], outline=r["level"] == "posible")
+        if r["level"] == "posible":
+            b.setToolTip(T("Así cortan los MP3 de 320 kbps, pero también algunos estudios: no se puede asegurar."))
+        head.addWidget(b)
         v.addLayout(head)
         inf = r["info"]
         bits = f" · {inf['bits']} bits" if inf["bits"] else ""

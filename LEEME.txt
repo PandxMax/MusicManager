@@ -869,3 +869,8 @@ VERSIÓN 2.38
  - Espectrograma: un muro entre 19.5 y 20.6 kHz sale como «Posible MP3 de 320 (no se puede
    asegurar)», en gris y sin botón de convertir, porque así cortan tanto los MP3 de 320 como algunos
    estudios.
+
+VERSIÓN 2.39
+------------
+ - Espectrograma: la etiqueta «Posible MP3 de 320» se ve más limpia: solo con borde y texto ámbar
+   (sin el fondo gris), y la explicación aparece al pasar el ratón.

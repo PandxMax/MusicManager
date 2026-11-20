@@ -550,7 +550,8 @@ try:
     print("falso320:", round(r["cutoff"]), ascii(r["verdict"]), r["level"], flush=True)
     assert r["level"] == "posible" and not spectro.fake_lossless_tip(r)
     os.remove(t3)
-    os.remove(cd)
+    os.makedirs(os.path.join(root, "HiRes"), exist_ok=True)
+    os.replace(cd, os.path.join(root, "HiRes", "02. Posible 320.flac"))   # sale en la captura s_espectro_hires
     w.close_spectrum()
     w.list.clearSelection()
     w.list.item(0).setSelected(True)
@@ -575,12 +576,23 @@ try:
     os.replace(hr, hr2)
     w.load_folder(hd)
     wait(800)
-    w.list.clearSelection()
-    w.list.item(0).setSelected(True)
+    w.list.selectAll()
     w.on_select()
     w.open_spectrum()
-    wait(9000)
+    wait(14000)
     shot(w, "s_espectro_hires")
+    try:
+        from PyQt6.QtWidgets import QScrollArea
+        import spectro as _sp
+        dl = w.spec_pane if hasattr(w.spec_pane, "cards") else w.spec_pane.findChild(_sp.SpectrumDialog)
+        card = dl.cards[-1]
+        for sa in w.spec_pane.findChildren(QScrollArea):
+            if sa.widget() is not None and sa.widget().isAncestorOf(card):
+                sa.verticalScrollBar().setValue(card.mapTo(sa.widget(), card.rect().topLeft()).y())
+        wait(800)
+        shot(w, "s_espectro_posible")
+    except Exception:
+        print("FALLO posible", ascii(traceback.format_exc()), flush=True)
     w.close_spectrum()
 except Exception:
     print("FALLO hires", ascii(traceback.format_exc()), flush=True)

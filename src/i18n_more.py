@@ -1775,3 +1775,13 @@ ROWS += [
      "If it is a 320 kbps MP3, it sounds almost the same as the original; there's no need to do anything.",
      "Если это MP3 320, на слух он почти не отличается от оригинала; ничего делать не нужно."),
 ]
+
+ROWS += [
+    ('Espectrograma: la etiqueta «Posible MP3 de 320» se ve más limpia: solo con borde y texto ámbar (sin el fondo gris), y la explicación aparece al pasar el ratón.',
+     "Spectrogram: the \"Possible 320 kbps MP3\" label looks cleaner: just an amber outline and text (no gray background), and the explanation shows on hover.",
+     "Спектрограмма: метка «Возможно MP3 320» выглядит аккуратнее: только янтарная рамка и текст (без серого фона), а пояснение появляется при наведении."),
+    ("Posible MP3 de 320", "Possible 320 kbps MP3", "Возможно MP3 320"),
+    ("Así cortan los MP3 de 320 kbps, pero también algunos estudios: no se puede asegurar.",
+     "320 kbps MP3s cut like this, but so do some studios: it can't be confirmed.",
+     "Так режут MP3 320 кбит/с, но и некоторые студии: подтвердить нельзя."),
+]
