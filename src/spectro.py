@@ -8,6 +8,9 @@ import mutagen
 
 FFT = 4096
 DB_MIN = -120.0
+# El MP3 más alto (LAME a 320 kbps) corta en unos 20.5 kHz. Un muro por encima de esto es el filtro que se aplica
+# en el estudio al pasar de 48/96 kHz a 44.1 kHz, no una compresión con pérdida.
+LOSSY_MAX = 20600.0
 LOSSLESS_EXT = {".flac", ".wav", ".aiff", ".aif", ".ape", ".wv"}
 
 
@@ -159,6 +162,11 @@ def analyze(path, max_frames=1100):
     sm = np.convolve(pad, np.ones(k) / k, mode="valid")
 
     wall = find_wall(S, freqs, hz_per_bin, nyq)
+    if wall >= min(LOSSY_MAX, nyq * 0.95):   # el filtro del estudio al pasar a 44.1/48 kHz, no un MP3
+        wall_hi = wall
+        wall = 0.0
+    else:
+        wall_hi = 0.0
     if wall:   # corte de compresión con pérdida: un muro recto con silencio digital encima
         cutoff, steep = wall, True
     else:      # sin muro: hasta dónde llega el contenido (aunque sea débil)
@@ -180,7 +188,7 @@ def analyze(path, max_frames=1100):
 
     res = {"path": path, "name": os.path.basename(path), "info": info, "sr": sr, "nyq": nyq,
            "duration": duration, "S": S, "freqs": freqs, "mean": mean, "p90": p90,
-           "cutoff": cutoff, "steep": steep, "peak": peak, "rms": rms, "clipped": clipped, "dyn": dyn}
+           "cutoff": cutoff, "steep": steep, "wall_hi": wall_hi, "peak": peak, "rms": rms, "clipped": clipped, "dyn": dyn}
     res.update(verdict(res))
     return res
 
@@ -231,8 +239,7 @@ def _wall_on(med, freqs, hz_per_bin, nyq):
     j = bi - gap - 1
     while j < top - 1 and med[j] >= mid:
         j += 1
-    f = float(freqs[j])
-    return 0.0 if f >= min(21000.0, nyq * 0.95) else f
+    return float(freqs[j])
 
 
 def mp3_kbps_for(cutoff):
@@ -277,7 +284,7 @@ def verdict(r):
     why = []
     # Los formatos con pérdida cortan por debajo de ~21 kHz. Un archivo Hi-Res (más de 48 kHz) con
     # contenido por encima de eso no puede venir de un MP3/AAC aunque no llegue al tope de su formato.
-    full = not r["steep"] or cutoff >= min(21000, 0.95 * nyq) or (sr > 48000 and cutoff >= 21000)
+    full = not r["steep"] or (sr > 48000 and cutoff >= 21000)
     if lossless:
         bits = info["bits"] or 16
         if full and not r["steep"] and cutoff < 15000:
@@ -300,6 +307,9 @@ def verdict(r):
             else:
                 level, tag = "alta", "Alta fidelidad (calidad CD sin pérdida)"
                 why.append(f"Sin pérdida y con contenido hasta {cutoff/1000:.1f} kHz (cerca del límite de {nyq/1000:.1f} kHz).")
+            if r.get("wall_hi"):
+                why.append(f"El corte en {r['wall_hi']/1000:.1f} kHz es el filtro que se usa al pasar la grabación del estudio "
+                           "a 44.1/48 kHz; los MP3 cortan antes (como mucho en unos 20.5 kHz).")
         else:
             level, tag = "normal", "Sospechoso: sin pérdida, pero con corte"
             why.append(f"El archivo es {codec or 'sin pérdida'}, pero el audio se corta en {cutoff/1000:.1f} kHz"

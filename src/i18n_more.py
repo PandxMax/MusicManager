@@ -1746,3 +1746,12 @@ ROWS += [
      "There is almost no sound above %s kHz, so there is no way to check whether it comes from an MP3. It may be an old or very dark recording.",
      "Выше %s кГц почти нет звука, поэтому нельзя проверить, не из MP3 ли она. Возможно, это старая или очень «тёмная» запись."),
 ]
+
+ROWS += [
+    ('Espectrograma: un corte por encima de 20.6 kHz ya no cuenta como «Sospechoso». Los MP3 cortan como mucho en unos 20.5 kHz; un muro más arriba (por ejemplo en 20.9 kHz) es el filtro que se usa en el estudio al pasar la grabación a 44.1 kHz.',
+     "Spectrogram: a cutoff above 20.6 kHz no longer counts as \"Suspicious\". MP3s cut at about 20.5 kHz at most; a wall higher up (for example at 20.9 kHz) is the filter used in the studio when the recording is converted to 44.1 kHz.",
+     "Спектрограмма: срез выше 20,6 кГц больше не считается «Подозрительно». MP3 обрезают максимум около 20,5 кГц; стена выше (например, на 20,9 кГц) — это фильтр, который применяют в студии при переводе записи в 44,1 кГц."),
+    ("El corte en %s kHz es el filtro que se usa al pasar la grabación del estudio a 44.1/48 kHz; los MP3 cortan antes (como mucho en unos 20.5 kHz).",
+     "The cutoff at %s kHz is the filter used when converting the studio recording to 44.1/48 kHz; MP3s cut lower (at about 20.5 kHz at most).",
+     "Срез на %s кГц — это фильтр, применяемый при переводе студийной записи в 44,1/48 кГц; MP3 обрезают ниже (максимум около 20,5 кГц)."),
+]

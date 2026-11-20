@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.37', [
+        'Espectrograma: un corte por encima de 20.6 kHz ya no cuenta como «Sospechoso». Los MP3 cortan como mucho en unos 20.5 kHz; un muro más arriba (por ejemplo en 20.9 kHz) es el filtro que se usa en el estudio al pasar la grabación a 44.1 kHz.',
+    ]),
     ('2.36', [
         'Espectrograma: nuevo detector de FLAC falsos. Ahora busca el «muro» de un MP3 (el sonido cae de golpe y encima queda silencio total) en vez de mirar solo hasta dónde llega el audio. Los CD reales con pocos agudos ya no salen «Sospechosos», y los chispazos sueltos encima del corte ya no mueven la cifra.',
         'Espectrograma: la recomendación de pasar a MP3 elige la calidad según el corte real (192, 256 o 320 kbps) y el botón «Convertir a MP3…» la trae ya puesta.',

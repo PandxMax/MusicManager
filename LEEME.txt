@@ -854,3 +854,9 @@ VERSIÓN 2.36
    320 kbps) y el botón «Convertir a MP3…» la trae ya puesta.
  - Espectrograma: si una canción sin pérdida casi no tiene agudos, sale «Sin pérdida, pero con muy
    pocos agudos», porque así no se puede comprobar si viene de un MP3.
+
+VERSIÓN 2.37
+------------
+ - Espectrograma: un corte por encima de 20.6 kHz ya no cuenta como «Sospechoso». Los MP3 cortan como
+   mucho en unos 20.5 kHz; un muro más arriba (por ejemplo en 20.9 kHz) es el filtro que se usa en el
+   estudio al pasar la grabación a 44.1 kHz.

@@ -534,6 +534,13 @@ try:
     r = spectro.analyze(cd)
     print("cd real:", round(r["cutoff"]), r["steep"], ascii(r["verdict"]), flush=True)
     assert not r["verdict"].startswith("Sospechoso") and not spectro.fake_lossless_tip(r)
+    # muro en 20.9 kHz (filtro del estudio, como «Follow» de Martin Garrix): no es un MP3
+    subprocess.run([ff, "-loglevel", "error", "-f", "lavfi", "-i", "anoisesrc=d=12:c=pink:a=0.4:r=44100", "-af",
+                    "firequalizer=gain='if(lt(f,20900),0,-130)':delay=0.05:accuracy=5", "-ac", "2", "-c:a", "flac", "-y", cd],
+                   check=True)
+    r = spectro.analyze(cd)
+    print("muro 20.9:", round(r["cutoff"]), round(r["wall_hi"]), ascii(r["verdict"]), flush=True)
+    assert r["verdict"].startswith("Alta") and not spectro.fake_lossless_tip(r)
     os.remove(cd)
     w.close_spectrum()
     w.list.clearSelection()
