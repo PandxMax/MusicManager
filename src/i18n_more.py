@@ -1727,3 +1727,22 @@ ROWS += [
      "If the mouse button \"bounces\" (two presses in under 30 ms), it no longer counts as a double click: folders don't open and songs don't start playing by accident.",
      "Если кнопка мыши «дребезжит» (два нажатия быстрее 30 мс), это больше не считается двойным щелчком: папки не открываются и песни не запускаются случайно."),
 ]
+
+ROWS += [
+    ('Espectrograma: nuevo detector de FLAC falsos. Ahora busca el «muro» de un MP3 (el sonido cae de golpe y encima queda silencio total) en vez de mirar solo hasta dónde llega el audio. Los CD reales con pocos agudos ya no salen «Sospechosos», y los chispazos sueltos encima del corte ya no mueven la cifra.',
+     "Spectrogram: new fake-FLAC detector. It now looks for the MP3 \"wall\" (the sound drops sharply and there is total silence above it) instead of only checking how high the audio goes. Real CDs with few highs are no longer \"Suspicious\", and loose sparks above the cutoff no longer move the number.",
+     "Спектрограмма: новый детектор поддельных FLAC. Теперь он ищет «стену» MP3 (звук резко обрывается, а выше — полная тишина), а не только смотрит, докуда доходит звук. Настоящие CD с малым количеством высоких частот больше не помечаются «Подозрительно», а отдельные всплески выше среза больше не сдвигают значение."),
+    ('Espectrograma: la recomendación de pasar a MP3 elige la calidad según el corte real (192, 256 o 320 kbps) y el botón «Convertir a MP3…» la trae ya puesta.',
+     "Spectrogram: the MP3 recommendation picks the quality from the real cutoff (192, 256 or 320 kbps) and the \"Convert to MP3…\" button comes with it preselected.",
+     "Спектрограмма: рекомендация перевести в MP3 выбирает качество по реальному срезу (192, 256 или 320 кбит/с), и кнопка «Конвертировать в MP3…» открывается с ним."),
+    ('Espectrograma: si una canción sin pérdida casi no tiene agudos, sale «Sin pérdida, pero con muy pocos agudos», porque así no se puede comprobar si viene de un MP3.',
+     "Spectrogram: if a lossless song has almost no highs, it shows \"Lossless, but with very few highs\", because then there is no way to check whether it comes from an MP3.",
+     "Спектрограмма: если в песне без потерь почти нет высоких частот, она помечается «Без потерь, но очень мало высоких», потому что так нельзя проверить, не из MP3 ли она."),
+    ("Recomendado: guardarla como MP3 %s kbps. Este FLAC parece venir de un MP3 (corte en %s kHz), así que como MP3 de %s kbps suena igual",
+     "Recommended: save it as a %s kbps MP3. This FLAC seems to come from an MP3 (cutoff at %s kHz), so as a %s kbps MP3 it sounds the same",
+     "Рекомендуется: сохранить как MP3 %s кбит/с. Похоже, этот FLAC сделан из MP3 (срез на %s кГц), поэтому как MP3 %s кбит/с он звучит так же"),
+    ("Sin pérdida, pero con muy pocos agudos", "Lossless, but with very few highs", "Без потерь, но очень мало высоких"),
+    ("Casi no hay sonido por encima de %s kHz, así que no se puede comprobar si viene de un MP3. Puede ser una grabación antigua o muy oscura.",
+     "There is almost no sound above %s kHz, so there is no way to check whether it comes from an MP3. It may be an old or very dark recording.",
+     "Выше %s кГц почти нет звука, поэтому нельзя проверить, не из MP3 ли она. Возможно, это старая или очень «тёмная» запись."),
+]

@@ -1,6 +1,11 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.36', [
+        'Espectrograma: nuevo detector de FLAC falsos. Ahora busca el «muro» de un MP3 (el sonido cae de golpe y encima queda silencio total) en vez de mirar solo hasta dónde llega el audio. Los CD reales con pocos agudos ya no salen «Sospechosos», y los chispazos sueltos encima del corte ya no mueven la cifra.',
+        'Espectrograma: la recomendación de pasar a MP3 elige la calidad según el corte real (192, 256 o 320 kbps) y el botón «Convertir a MP3…» la trae ya puesta.',
+        'Espectrograma: si una canción sin pérdida casi no tiene agudos, sale «Sin pérdida, pero con muy pocos agudos», porque así no se puede comprobar si viene de un MP3.',
+    ]),
     ('2.35', [
         'Clics más tranquilos en la lista de canciones y en el árbol de carpetas: un pequeño temblor del ratón al hacer clic (hasta 14 px) ya no sombrea varias canciones o carpetas ni empieza a moverlas.',
         'Si el botón del ratón «rebota» (dos pulsaciones en menos de 30 ms), ya no cuenta como doble clic: no se abre la carpeta ni se reproduce la canción sin querer.',

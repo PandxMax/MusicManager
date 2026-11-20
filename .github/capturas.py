@@ -522,6 +522,19 @@ try:
     rw.step.connect(lambda i, o, e: res.append((o, e)))
     rw.run()
     print("reparar:", ascii(res), flush=True)
+    import spectro
+    r = spectro.analyze(fl)
+    tip = spectro.fake_lossless_tip(r)
+    print("falso128:", round(r["cutoff"]), r["steep"], ascii(r["verdict"]), r.get("mp3_kbps"), flush=True)
+    assert r["verdict"].startswith("Sospechoso") and 15500 < r["cutoff"] < 17500 and r.get("mp3_kbps") == 192
+    # CD real con agudos débiles pero continuos (antes salía «Sospechoso»)
+    cd = os.path.join(fk, "cd_real.flac")
+    subprocess.run([ff, "-loglevel", "error", "-f", "lavfi", "-i", "anoisesrc=d=12:c=pink:a=0.5", "-af",
+                    "lowpass=f=4000:p=2,lowpass=f=9000:p=2", "-ac", "2", "-c:a", "flac", "-y", cd], check=True)
+    r = spectro.analyze(cd)
+    print("cd real:", round(r["cutoff"]), r["steep"], ascii(r["verdict"]), flush=True)
+    assert not r["verdict"].startswith("Sospechoso") and not spectro.fake_lossless_tip(r)
+    os.remove(cd)
     w.close_spectrum()
     w.list.clearSelection()
     w.list.item(0).setSelected(True)

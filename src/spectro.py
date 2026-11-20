@@ -158,18 +158,15 @@ def analyze(path, max_frames=1100):
     pad = np.pad(p90, (k // 2, k - k // 2 - 1), mode="edge")
     sm = np.convolve(pad, np.ones(k) / k, mode="valid")
 
-    # Frecuencia de corte: último punto con energía real por encima del "suelo"
-    upper = sm[len(sm) // 2:]
-    floor = float(np.percentile(upper, 5))
-    thr = min(max(floor + 15.0, -100.0), -75.0)
-    idx = np.where(sm > thr)[0]
-    cutoff = float(freqs[idx[-1]]) if len(idx) else 0.0
-    if cutoff > nyq * 0.985:
-        cutoff = nyq
-    ci = int(min(len(sm) - 1, cutoff / hz_per_bin))
-    a = sm[max(0, ci - int(500 / hz_per_bin))]
-    b = sm[min(len(sm) - 1, ci + int(500 / hz_per_bin))]
-    steep = (a - b) >= 25.0 and cutoff < nyq * 0.97
+    wall = find_wall(S, freqs, hz_per_bin, nyq)
+    if wall:   # corte de compresión con pérdida: un muro recto con silencio digital encima
+        cutoff, steep = wall, True
+    else:      # sin muro: hasta dónde llega el contenido (aunque sea débil)
+        idx = np.where(sm > -100.0)[0]
+        cutoff = float(freqs[idx[-1]]) if len(idx) else 0.0
+        if cutoff > nyq * 0.985:
+            cutoff = nyq
+        steep = False
 
     # Niveles
     peak = float(20 * np.log10(max(peak_lin, 1e-9)))
@@ -188,6 +185,66 @@ def analyze(path, max_frames=1100):
     return res
 
 
+def _smooth(curve, k):
+    pad = np.pad(curve, (k // 2, k - k // 2 - 1), mode="edge")
+    return np.convolve(pad, np.ones(k) / k, mode="valid")
+
+
+def find_wall(S, freqs, hz_per_bin, nyq):
+    """Busca el muro de un MP3/AAC: el sonido cae de golpe y encima queda silencio digital casi total.
+    Se usa la mediana en el tiempo, así los chispazos sueltos (golpes de percusión, recortes) no lo mueven.
+    Un CD real que se apaga poco a poco, o que tiene agudos débiles pero continuos, no tiene muro.
+    Si la música es tan oscura que la mediana ya está en silencio antes del muro, se mira el nivel de los
+    momentos fuertes (percentil 90): ahí el muro sigue viéndose y los chispazos no llegan a contar.
+    Devuelve la frecuencia del muro en Hz, o 0 si no lo hay."""
+    k = max(1, int(200 / hz_per_bin))
+    for q in (50, 90):
+        f = _wall_on(_smooth(np.percentile(S, q, axis=1), k), freqs, hz_per_bin, nyq)
+        if f:
+            return f
+    return 0.0
+
+
+def _wall_on(med, freqs, hz_per_bin, nyq):
+    n = len(med)
+    top = int(min(n, nyq * 0.995 / hz_per_bin))
+    lo = int(10000 / hz_per_bin)
+    if top - lo < 10:
+        return 0.0
+    gap, wb = max(1, int(250 / hz_per_bin)), max(2, int(1250 / hz_per_bin))
+    # lo más fuerte que hay por encima de cada punto (hasta el final del espectro)
+    above = np.maximum.accumulate(med[:top][::-1])[::-1]
+    best, bi = 0.0, -1
+    for i in range(lo, top - gap - 1):
+        if i + gap >= top or i - gap - wb < 0:
+            continue
+        below = float(np.mean(med[i - gap - wb:i - gap]))
+        ab = float(above[i + gap])
+        drop = below - ab
+        if ab <= -105.0 and below >= -100.0 and drop >= 20.0 and drop > best:
+            best, bi = drop, i
+    if bi < 0:
+        return 0.0
+    # el muro está donde la curva cruza la mitad entre el nivel de abajo y el de arriba
+    below = float(np.mean(med[bi - gap - wb:bi - gap]))
+    mid = (below + float(above[bi + gap])) / 2
+    j = bi - gap - 1
+    while j < top - 1 and med[j] >= mid:
+        j += 1
+    f = float(freqs[j])
+    return 0.0 if f >= min(21000.0, nyq * 0.95) else f
+
+
+def mp3_kbps_for(cutoff):
+    """Calidad de MP3 suficiente para un FLAC que viene de un MP3 con ese corte (un poco por encima del original,
+    para que la segunda compresión no se note)."""
+    if cutoff < 16800:
+        return 192    # origen ~128 kbps
+    if cutoff < 19500:
+        return 256    # origen ~160–192 kbps
+    return 320        # origen ~256–320 kbps
+
+
 def fake_lossless_tip(r):
     """Solo para FLAC «sospechosos» (vienen de un MP3/AAC): recomendar MP3 320 y cuánto se ahorra."""
     if not str(r.get("verdict", "")).startswith("Sospechoso"):
@@ -197,9 +254,12 @@ def fake_lossless_tip(r):
         size = os.path.getsize(p) / 1048576 if p else 0
     except OSError:
         size = 0
-    mp3 = r.get("duration", 0) * 320 / 8 / 1024
+    kb = mp3_kbps_for(r.get("cutoff", 0))
+    r["mp3_kbps"] = kb
+    mp3 = r.get("duration", 0) * kb / 8 / 1024
     save = size - mp3
-    txt = T("Recomendado: guardarla como MP3 320 kbps. Este FLAC viene de un MP3, así que como MP3 suena igual")
+    txt = T(f"Recomendado: guardarla como MP3 {kb} kbps. Este FLAC parece venir de un MP3 (corte en "
+            f"{r.get('cutoff', 0)/1000:.1f} kHz), así que como MP3 de {kb} kbps suena igual")
     if size and save > 0.5:
         f = (lambda x: f"{x:.1f}" if x < 10 else f"{x:.0f}")
         txt += T(f" y ocupa unos {f(mp3)} MB en vez de {f(size)} MB (ahorras {f(save)} MB).")
@@ -217,10 +277,14 @@ def verdict(r):
     why = []
     # Los formatos con pérdida cortan por debajo de ~21 kHz. Un archivo Hi-Res (más de 48 kHz) con
     # contenido por encima de eso no puede venir de un MP3/AAC aunque no llegue al tope de su formato.
-    full = cutoff >= 0.9 * nyq or (sr > 48000 and cutoff >= 21000)
+    full = not r["steep"] or cutoff >= min(21000, 0.95 * nyq) or (sr > 48000 and cutoff >= 21000)
     if lossless:
         bits = info["bits"] or 16
-        if full:
+        if full and not r["steep"] and cutoff < 15000:
+            level, tag = "normal", "Sin pérdida, pero con muy pocos agudos"
+            why.append(f"Casi no hay sonido por encima de {cutoff/1000:.1f} kHz, así que no se puede comprobar si viene "
+                       "de un MP3. Puede ser una grabación antigua o muy oscura.")
+        elif full:
             hires = sr > 48000 or bits > 16
             if sr > 48000 and cutoff <= 28000:
                 level, tag = "alta", "Alta fidelidad (sin pérdida)"
@@ -580,7 +644,7 @@ class SpectrumDialog(QWidget):
             row.addWidget(tip, 1)
             b = QPushButton(T("Convertir a MP3…"))
             b.setObjectName("accent")
-            b.clicked.connect(lambda _=False, p=r.get("path"): self.convert_one(p))
+            b.clicked.connect(lambda _=False, p=r.get("path"), k=r.get("mp3_kbps", 320): self.convert_one(p, k))
             row.addWidget(b, 0, Qt.AlignmentFlag.AlignVCenter)
             v.addLayout(row)
         sv = SpecView(r); sv.set_fmax(self.fmax.currentData())
@@ -590,10 +654,10 @@ class SpectrumDialog(QWidget):
         self.spec_lay.insertWidget(self.spec_lay.count() - 1, box)
         self.cards.append(box)
 
-    def convert_one(self, path):
+    def convert_one(self, path, kbps=320):
         w = self.window()
         if path and hasattr(w, "convert_paths"):
-            w.convert_paths([path], "MP3", 320)
+            w.convert_paths([path], "MP3", kbps)
 
     def ordered(self):
         return [self.results[k] for k in sorted(self.results)]
