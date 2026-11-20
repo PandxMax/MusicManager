@@ -11,6 +11,8 @@ DB_MIN = -120.0
 # El MP3 más alto (LAME a 320 kbps) corta en unos 20.5 kHz. Un muro por encima de esto es el filtro que se aplica
 # en el estudio al pasar de 48/96 kHz a 44.1 kHz, no una compresión con pérdida.
 LOSSY_MAX = 20600.0
+# Por debajo de esto un muro recto ya no lo deja ningún filtro de estudio: solo un MP3/AAC (de 256 kbps o menos).
+SURE_MAX = 19500.0
 LOSSLESS_EXT = {".flac", ".wav", ".aiff", ".aif", ".ape", ".wv"}
 
 
@@ -254,7 +256,7 @@ def mp3_kbps_for(cutoff):
 
 def fake_lossless_tip(r):
     """Solo para FLAC «sospechosos» (vienen de un MP3/AAC): recomendar MP3 320 y cuánto se ahorra."""
-    if not str(r.get("verdict", "")).startswith("Sospechoso"):
+    if not str(r.get("verdict", "")).startswith("Falso"):
         return ""
     p = r.get("path")
     try:
@@ -310,11 +312,17 @@ def verdict(r):
             if r.get("wall_hi"):
                 why.append(f"El corte en {r['wall_hi']/1000:.1f} kHz es el filtro que se usa al pasar la grabación del estudio "
                            "a 44.1/48 kHz; los MP3 cortan antes (como mucho en unos 20.5 kHz).")
+        elif cutoff < SURE_MAX:
+            # Muro recto, silencio encima y por debajo de 19.5 kHz: ningún filtro de estudio corta ahí.
+            level, tag = "normal", "Falso sin pérdida: viene de un MP3"
+            why.append(f"El archivo es {codec or 'sin pérdida'}, pero tiene un muro recto en {cutoff/1000:.1f} kHz con silencio "
+                       "encima: es la huella de un MP3/AAC. Convertirlo a FLAC no le devolvió la calidad.")
         else:
-            level, tag = "normal", "Sospechoso: sin pérdida, pero con corte"
-            why.append(f"El archivo es {codec or 'sin pérdida'}, pero el audio se corta en {cutoff/1000:.1f} kHz"
-                       f"{' con un borde muy marcado' if r['steep'] else ''}. "
-                       "Suele pasar al convertir un MP3/AAC a FLAC: no gana calidad real.")
+            # Entre 19.5 y 20.6 kHz: puede ser un MP3 de 320 o el filtro de un estudio. Desde el espectro no se distingue.
+            level, tag = "posible", "Posible MP3 de 320 (no se puede asegurar)"
+            why.append(f"Tiene un muro en {cutoff/1000:.1f} kHz. Así cortan los MP3 de 320 kbps, pero también algunos "
+                       "estudios al preparar la grabación: con el espectro no se puede saber cuál de los dos es.")
+            why.append("Si es un MP3 de 320, al oído es casi igual que el original; no hace falta hacer nada.")
     else:
         if br >= 256 and cutoff >= 19000:
             level, tag = "alta", "Buena calidad (con pérdida)"
@@ -354,7 +362,7 @@ def _lut():
 
 LUT = _lut()
 CURVE_COLORS = ["#7C5CFF", "#22D3EE", "#F59E0B", "#F43F5E", "#34D399", "#E879F9", "#A3E635", "#60A5FA"]
-LEVEL_COLOR = {"hires": "#0EA5E9", "alta": "#22C55E", "normal": "#F59E0B", "baja": "#EF4444"}
+LEVEL_COLOR = {"hires": "#0EA5E9", "alta": "#22C55E", "posible": "#A8A29E", "normal": "#F59E0B", "baja": "#EF4444"}
 
 
 def spec_image(S, fmax_ratio):

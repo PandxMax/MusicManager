@@ -526,14 +526,14 @@ try:
     r = spectro.analyze(fl)
     tip = spectro.fake_lossless_tip(r)
     print("falso128:", round(r["cutoff"]), r["steep"], ascii(r["verdict"]), r.get("mp3_kbps"), flush=True)
-    assert r["verdict"].startswith("Sospechoso") and 15500 < r["cutoff"] < 17500 and r.get("mp3_kbps") == 192
+    assert r["verdict"].startswith("Falso") and 15500 < r["cutoff"] < 17500 and r.get("mp3_kbps") == 192
     # CD real con agudos débiles pero continuos (antes salía «Sospechoso»)
     cd = os.path.join(fk, "cd_real.flac")
     subprocess.run([ff, "-loglevel", "error", "-f", "lavfi", "-i", "anoisesrc=d=12:c=pink:a=0.5", "-af",
                     "lowpass=f=4000:p=2,lowpass=f=9000:p=2", "-ac", "2", "-c:a", "flac", "-y", cd], check=True)
     r = spectro.analyze(cd)
     print("cd real:", round(r["cutoff"]), r["steep"], ascii(r["verdict"]), flush=True)
-    assert not r["verdict"].startswith("Sospechoso") and not spectro.fake_lossless_tip(r)
+    assert not r["verdict"].startswith("Falso") and not spectro.fake_lossless_tip(r)
     # muro en 20.9 kHz (filtro del estudio, como «Follow» de Martin Garrix): no es un MP3
     subprocess.run([ff, "-loglevel", "error", "-f", "lavfi", "-i", "anoisesrc=d=12:c=pink:a=0.4:r=44100", "-af",
                     "firequalizer=gain='if(lt(f,20900),0,-130)':delay=0.05:accuracy=5", "-ac", "2", "-c:a", "flac", "-y", cd],
@@ -541,6 +541,15 @@ try:
     r = spectro.analyze(cd)
     print("muro 20.9:", round(r["cutoff"]), round(r["wall_hi"]), ascii(r["verdict"]), flush=True)
     assert r["verdict"].startswith("Alta") and not spectro.fake_lossless_tip(r)
+    # MP3 de 320 pasado a FLAC: «posible», sin botón de convertir
+    t3 = os.path.join(fk, "t320.mp3")
+    subprocess.run([ff, "-loglevel", "error", "-f", "lavfi", "-i", "anoisesrc=d=12:c=pink:a=0.5:r=44100", "-ac", "2",
+                    "-c:a", "libmp3lame", "-b:a", "320k", "-y", t3], check=True)
+    subprocess.run([ff, "-loglevel", "error", "-i", t3, "-c:a", "flac", "-y", cd], check=True)
+    r = spectro.analyze(cd)
+    print("falso320:", round(r["cutoff"]), ascii(r["verdict"]), r["level"], flush=True)
+    assert r["level"] == "posible" and not spectro.fake_lossless_tip(r)
+    os.remove(t3)
     os.remove(cd)
     w.close_spectrum()
     w.list.clearSelection()

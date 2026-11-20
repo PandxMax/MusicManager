@@ -1755,3 +1755,23 @@ ROWS += [
      "The cutoff at %s kHz is the filter used when converting the studio recording to 44.1/48 kHz; MP3s cut lower (at about 20.5 kHz at most).",
      "Срез на %s кГц — это фильтр, применяемый при переводе студийной записи в 44,1/48 кГц; MP3 обрезают ниже (максимум около 20,5 кГц)."),
 ]
+
+ROWS += [
+    ('Espectrograma: el veredicto ahora distingue lo seguro de lo dudoso. «Falso sin pérdida: viene de un MP3» solo sale cuando el muro está por debajo de 19.5 kHz, donde ningún estudio corta; solo en ese caso se recomienda convertir.',
+     "Spectrogram: the verdict now tells sure cases from doubtful ones. \"Fake lossless: comes from an MP3\" only appears when the wall is below 19.5 kHz, where no studio cuts; only then is converting recommended.",
+     "Спектрограмма: вердикт теперь отличает уверенные случаи от сомнительных. «Поддельный lossless: сделан из MP3» появляется, только если стена ниже 19,5 кГц, где ни одна студия не режет; только тогда предлагается конвертация."),
+    ('Espectrograma: un muro entre 19.5 y 20.6 kHz sale como «Posible MP3 de 320 (no se puede asegurar)», en gris y sin botón de convertir, porque así cortan tanto los MP3 de 320 como algunos estudios.',
+     "Spectrogram: a wall between 19.5 and 20.6 kHz shows as \"Possible 320 kbps MP3 (can't be sure)\", in gray and without the convert button, because both 320 kbps MP3s and some studios cut there.",
+     "Спектрограмма: стена между 19,5 и 20,6 кГц отображается как «Возможно MP3 320 (нельзя утверждать)», серым и без кнопки конвертации, потому что там режут и MP3 320, и некоторые студии."),
+    ("Falso sin pérdida: viene de un MP3", "Fake lossless: comes from an MP3", "Поддельный lossless: сделан из MP3"),
+    ("Posible MP3 de 320 (no se puede asegurar)", "Possible 320 kbps MP3 (can't be sure)", "Возможно MP3 320 (нельзя утверждать)"),
+    ("El archivo es %s, pero tiene un muro recto en %s kHz con silencio encima: es la huella de un MP3/AAC. Convertirlo a FLAC no le devolvió la calidad.",
+     "The file is %s, but it has a straight wall at %s kHz with silence above: that's the fingerprint of an MP3/AAC. Converting it to FLAC didn't bring the quality back.",
+     "Файл в формате %s, но у него ровная стена на %s кГц и тишина выше: это след MP3/AAC. Перевод в FLAC не вернул качество."),
+    ("Tiene un muro en %s kHz. Así cortan los MP3 de 320 kbps, pero también algunos estudios al preparar la grabación: con el espectro no se puede saber cuál de los dos es.",
+     "It has a wall at %s kHz. 320 kbps MP3s cut there, but so do some studios when preparing the recording: the spectrum can't tell which one it is.",
+     "Стена на %s кГц. Так режут MP3 320 кбит/с, но и некоторые студии при подготовке записи: по спектру не понять, что именно."),
+    ("Si es un MP3 de 320, al oído es casi igual que el original; no hace falta hacer nada.",
+     "If it is a 320 kbps MP3, it sounds almost the same as the original; there's no need to do anything.",
+     "Если это MP3 320, на слух он почти не отличается от оригинала; ничего делать не нужно."),
+]

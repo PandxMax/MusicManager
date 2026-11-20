@@ -1,6 +1,10 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.38', [
+        'Espectrograma: el veredicto ahora distingue lo seguro de lo dudoso. «Falso sin pérdida: viene de un MP3» solo sale cuando el muro está por debajo de 19.5 kHz, donde ningún estudio corta; solo en ese caso se recomienda convertir.',
+        'Espectrograma: un muro entre 19.5 y 20.6 kHz sale como «Posible MP3 de 320 (no se puede asegurar)», en gris y sin botón de convertir, porque así cortan tanto los MP3 de 320 como algunos estudios.',
+    ]),
     ('2.37', [
         'Espectrograma: un corte por encima de 20.6 kHz ya no cuenta como «Sospechoso». Los MP3 cortan como mucho en unos 20.5 kHz; un muro más arriba (por ejemplo en 20.9 kHz) es el filtro que se usa en el estudio al pasar la grabación a 44.1 kHz.',
     ]),
