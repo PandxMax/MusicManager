@@ -1794,3 +1794,9 @@ ROWS += [
      "List and details: to select by dragging, the movement must be clearly vertical; diagonally toward the folders it drags the song.",
      "Список и подробности: чтобы выделять перетаскиванием, движение должно быть явно вертикальным; по диагонали к папкам песня перетаскивается."),
 ]
+
+ROWS += [
+    ('Guardar muchos archivos a la vez ya no muestra «Errores al guardar» con la ruta de cada canción. Pasaba cuando se pedía guardar otra vez mientras el primer guardado seguía en curso: los archivos sí se guardaban, pero el aviso salía igual. Ahora un segundo «Guardar» se ignora hasta que termina el primero.',
+     "Saving many files at once no longer shows \"Errors while saving\" with each song's path. It happened when saving was requested again while the first save was still running: the files were saved, but the warning appeared anyway. Now a second \"Save\" is ignored until the first one finishes.",
+     "Сохранение многих файлов сразу больше не показывает «Ошибки при сохранении» с путём каждой песни. Это происходило, если сохранение запускали повторно, пока первое ещё шло: файлы сохранялись, но предупреждение всё равно появлялось. Теперь второе «Сохранить» игнорируется, пока не закончится первое."),
+]

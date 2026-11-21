@@ -359,8 +359,18 @@ try:
     for i, pth in enumerate(fl):
         w.pending.setdefault(pth, {})["comment"] = f"prueba {i}"
     t0 = time.perf_counter()
+    warns = []
+    _old_warn = mm.QMessageBox.warning
+    mm.QMessageBox.warning = staticmethod(lambda *a, **k: warns.append(a[1:3]))
+    _old_wt = mm.write_tags
+    mm.write_tags = lambda *a, **k: (time.sleep(0.05), _old_wt(*a, **k))[1]   # como FLAC con portada: más lento
+    QTimer.singleShot(150, w.save_all)    # un segundo «Guardar» (doble clic) mientras el primero está en curso
     w.save_all()
     wait(800)
+    mm.write_tags = _old_wt
+    mm.QMessageBox.warning = _old_warn
+    print("guardar dos veces: avisos", len(warns), ascii(warns[:1])[:200], flush=True)
+    assert not warns
     print("guardado en lote:", round(time.perf_counter() - t0, 1), "s; pendientes:", len(w.pending),
           "comentario:", ascii(mm.read_tags(fl[7]).get("comment")), flush=True)
     # renombrar y deshacer

@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.40"
+APP_VERSION = "2.41"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.40 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.41 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -6869,6 +6869,18 @@ class Main(QMainWindow):
         self.show_current(self.current_path(), len(self.cur_paths))
 
     def save_all(self):
+        # Mientras se guardan muchos archivos en segundo plano la ventana sigue procesando eventos: un segundo
+        # «Guardar» (atajo, botón o el aviso de cambios pendientes) guardaba lo mismo otra vez y el primero
+        # luego daba un error por cada archivo. Ahora se ignora mientras hay un guardado en curso.
+        if getattr(self, "_saving", False):
+            return
+        self._saving = True
+        try:
+            self._save_all()
+        finally:
+            self._saving = False
+
+    def _save_all(self):
         self.apply_form()
         if not self.pending:
             self.statusBar().showMessage("No hay cambios pendientes.")
@@ -6915,7 +6927,7 @@ class Main(QMainWindow):
                 skipped |= sk or set()
                 ok += 1
                 saved_paths.append(path)
-                del self.pending[path]
+                self.pending.pop(path, None)
                 self.meta.pop(path, None)
                 self.tags_cache.pop(path, None)
                 TECH_MEM.pop(path, None)

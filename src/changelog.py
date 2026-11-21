@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.41', [
+        'Guardar muchos archivos a la vez ya no muestra «Errores al guardar» con la ruta de cada canción. Pasaba cuando se pedía guardar otra vez mientras el primer guardado seguía en curso: los archivos sí se guardaban, pero el aviso salía igual. Ahora un segundo «Guardar» se ignora hasta que termina el primero.',
+    ]),
     ('2.40', [
         'Lista y detalles: si al arrastrar una canción hacia abajo empieza a sombrear y luego llevas el ratón hacia las carpetas, ahora se convierte en arrastre. Si solo sombreaste un poco sin querer, se mueve solo la canción que agarraste; si sombreaste varias a propósito, se mueven todas.',
         'Lista y detalles: para sombrear arrastrando, el movimiento tiene que ser claramente vertical; en diagonal hacia las carpetas ya arrastra la canción.',

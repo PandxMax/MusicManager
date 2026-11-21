@@ -882,3 +882,10 @@ VERSIÓN 2.40
    se mueve solo la canción que agarraste; si sombreaste varias a propósito, se mueven todas.
  - Lista y detalles: para sombrear arrastrando, el movimiento tiene que ser claramente vertical; en
    diagonal hacia las carpetas ya arrastra la canción.
+
+VERSIÓN 2.41
+------------
+ - Guardar muchos archivos a la vez ya no muestra «Errores al guardar» con la ruta de cada canción.
+   Pasaba cuando se pedía guardar otra vez mientras el primer guardado seguía en curso: los archivos sí
+   se guardaban, pero el aviso salía igual. Ahora un segundo «Guardar» se ignora hasta que termina el
+   primero.
