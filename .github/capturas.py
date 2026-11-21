@@ -245,9 +245,16 @@ except Exception as e:
 try:
     house = os.path.join(root, "House", "DJ Kora")
     hp = [os.path.join(house, f) for f in sorted(os.listdir(house))]
+    import music_manager as _mm
+    print("parentesis:", [ascii(_mm.Main.strip_parens(t)) for t in
+                          ("Bubble \U0001F174", "Album (Deluxe Edition) [Explicit]", "\u24ba Hola (Remix)")], flush=True)
+    assert _mm.Main.strip_parens("Bubble \U0001F174") == "Bubble"
+    w.pending.setdefault(hp[0], {}).update({"title": "Noche \U0001F174", "album": "Club Mix (Deluxe Edition)"})
     grab_modal("16_parentesis")
     w.open_strip_parens(hp)
     wait(300)
+    w.pending.pop(hp[0], None)
+    w.mark_items()
 except Exception as e:
     print("parentesis error:", ascii(str(e)), flush=True)
 

@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.42"
+APP_VERSION = "2.43"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.42 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.43 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -6123,8 +6123,9 @@ class Main(QMainWindow):
 
     @staticmethod
     def strip_parens(text, square=True):
-        """«Summer (Official Video) [HD]» → «Summer». Quita lo que va entre paréntesis (y corchetes), también anidado."""
-        t, prev = text or "", None
+        """«Summer (Official Video) [HD]» → «Summer». Quita lo que va entre paréntesis (y corchetes), también anidado,
+        y la marca de «explícito» que ponen algunas tiendas (🅴, Ⓔ, 🄴)."""
+        t, prev = re.sub(r"\s*[\U0001F174\u24BA\U0001F134\U0001F150]\ufe0f?", "", text or ""), None
         while t != prev:
             prev = t
             t = re.sub(r"\s*\([^()]*\)", "", t)
@@ -6236,7 +6237,7 @@ class Main(QMainWindow):
         self.apply_form()
         dlg = QDialog(self)
         dlg.setWindowTitle(T("Quitar paréntesis"))
-        dlg.resize(980, 520)
+        dlg.resize(1180, 540)
         v = QVBoxLayout(dlg)
         v.setContentsMargins(18, 16, 18, 14)
         v.setSpacing(10)
@@ -6246,22 +6247,25 @@ class Main(QMainWindow):
             dialog_header = nice_table = None
         if dialog_header:
             dialog_header(v, T("🧹 Quitar paréntesis"), T("Quita lo que va entre paréntesis (y si quieres entre corchetes) "
-                                                        "en el nombre del archivo y en el título: «Summer (Official Video)» → «Summer»."))
+                                                        "y la marca de explícito 🅴 en el nombre del archivo, el título y el "
+                                                        "álbum: «Summer (Official Video) 🅴» → «Summer»."))
         opts = QHBoxLayout()
         c_file = QCheckBox(T("En el nombre del archivo"))
         c_title = QCheckBox(T("En el título de la canción"))
+        c_album = QCheckBox(T("En el álbum"))
         c_sq = QCheckBox(T("También lo que va entre corchetes [ ]"))
-        for c in (c_file, c_title, c_sq):
+        for c in (c_file, c_title, c_album, c_sq):
             c.setChecked(True)
             opts.addWidget(c)
         opts.addStretch(1)
         v.addLayout(opts)
-        tb = QTableWidget(0, 4)
-        tb.setHorizontalHeaderLabels([T("Archivo"), T("Nuevo nombre"), T("Título"), T("Nuevo título")])
+        tb = QTableWidget(0, 6)
+        tb.setHorizontalHeaderLabels([T("Archivo"), T("Nuevo nombre"), T("Título"), T("Nuevo título"),
+                                      T("Álbum"), T("Nuevo álbum")])
         tb.verticalHeader().setVisible(False)
         tb.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         tb.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        for c in range(4):
+        for c in range(6):
             tb.horizontalHeader().setSectionResizeMode(c, QHeaderView.ResizeMode.Stretch)
         if nice_table:
             nice_table(tb)
@@ -6285,24 +6289,31 @@ class Main(QMainWindow):
             for p in paths:
                 stem = os.path.splitext(os.path.basename(p))[0]
                 title = self.val(p, "title")
+                album = self.val(p, "album")
                 nstem = self.strip_parens(stem, c_sq.isChecked()) if c_file.isChecked() else stem
                 ntitle = self.strip_parens(title, c_sq.isChecked()) if (c_title.isChecked() and title) else title
+                nalbum = self.strip_parens(album, c_sq.isChecked()) if (c_album.isChecked() and album) else album
                 nstem = safe_filename(nstem) or stem
                 ntitle = ntitle or title
-                if nstem == stem and ntitle == title:
+                nalbum = nalbum or album
+                if nstem == stem and ntitle == title and nalbum == album:
                     continue
-                plan.append((p, nstem if nstem != stem else None, ntitle if ntitle != title else None))
+                plan.append((p, nstem if nstem != stem else None, ntitle if ntitle != title else None,
+                             nalbum if nalbum != album else None))
                 r = tb.rowCount()
                 tb.insertRow(r)
-                for c_, txt in enumerate((stem, nstem if nstem != stem else "—", title, ntitle if ntitle != title else "—")):
+                for c_, txt in enumerate((stem, nstem if nstem != stem else "—", title, ntitle if ntitle != title else "—",
+                                          album, nalbum if nalbum != album else "—")):
                     tb.setItem(r, c_, QTableWidgetItem(txt))
-            n_f = sum(1 for _p, f, _t in plan if f)
-            n_t = sum(1 for _p, _f, t in plan if t)
-            status.setText(T(f"{len(plan)} de {len(paths)} canciones cambian · {n_f} nombres de archivo · {n_t} títulos.")
+            n_f = sum(1 for x in plan if x[1])
+            n_t = sum(1 for x in plan if x[2])
+            n_a = sum(1 for x in plan if x[3])
+            status.setText(T(f"{len(plan)} de {len(paths)} canciones cambian · {n_f} nombres de archivo · {n_t} títulos · "
+                             f"{n_a} álbumes.")
                            if plan else T("Ninguna de estas canciones tiene paréntesis que quitar."))
             go.setEnabled(bool(plan))
 
-        for c in (c_file, c_title, c_sq):
+        for c in (c_file, c_title, c_album, c_sq):
             c.toggled.connect(preview)
         cancel.clicked.connect(dlg.reject)
         go.clicked.connect(dlg.accept)
@@ -6310,16 +6321,19 @@ class Main(QMainWindow):
         i18n.retranslate(dlg)
         if dlg.exec() != QDialog.DialogCode.Accepted or not plan:
             return
-        for p, _f, title in plan:   # títulos: quedan pendientes de guardar (en naranja)
+        for p, _f, title, album in plan:   # título y álbum: quedan pendientes de guardar (en naranja)
             if title:
                 self.pending.setdefault(p, {})["title"] = title
-        renames = [(p, f) for p, f, _t in plan if f]
+            if album:
+                self.pending.setdefault(p, {})["album"] = album
+        renames = [(p, f) for p, f, _t, _a in plan if f]
         if renames:
             self.do_renames(renames)   # los cambios pendientes pasan al nombre nuevo
         else:
             self.mark_items()
             self.on_select()
-        self.statusBar().showMessage(T(f"Paréntesis quitados en {len(plan)} canción(es). Los títulos están pendientes de guardar (Ctrl+S)."))
+        self.statusBar().showMessage(T(f"Paréntesis quitados en {len(plan)} canción(es). Los títulos y álbumes están "
+                                       f"pendientes de guardar (Ctrl+S)."))
 
     def start_inline_rename(self, it, path):
         if not getattr(self, "_inline_hooked", False):

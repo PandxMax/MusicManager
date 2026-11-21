@@ -1806,3 +1806,23 @@ ROWS += [
      "Dragging a song (especially in icon view): while you carry it, the list no longer scrolls by itself or selects the songs you pass over, and the leftover colored strip is gone. Only what you had selected moves.",
      "Перетаскивание песни (особенно в режиме значков): пока вы её несёте, список больше не прокручивается сам и не выделяет песни, над которыми вы проходите, и пропала оставшаяся цветная полоса. Перемещается только то, что было выделено."),
 ]
+
+ROWS += [
+    ('«Quitar paréntesis» también quita la marca de explícito 🅴 (y Ⓔ) que traen algunas canciones en el título o el nombre.',
+     "\"Remove parentheses\" also removes the explicit mark 🅴 (and Ⓔ) that some songs carry in the title or name.",
+     "«Убрать скобки» также убирает значок explicit 🅴 (и Ⓔ), который есть у некоторых песен в названии или имени файла."),
+    ('«Quitar paréntesis» ahora también limpia el álbum: «Álbum (Deluxe Edition)» → «Álbum». Hay una casilla «En el álbum» y la tabla muestra cómo quedará.',
+     "\"Remove parentheses\" now also cleans the album: \"Album (Deluxe Edition)\" → \"Album\". There is an \"In the album\" checkbox and the table shows how it will look.",
+     "«Убрать скобки» теперь чистит и альбом: «Альбом (Deluxe Edition)» → «Альбом». Есть флажок «В альбоме», а таблица показывает результат."),
+    ("En el álbum", "In the album", "В альбоме"),
+    ("Nuevo álbum", "New album", "Новый альбом"),
+    ("Quita lo que va entre paréntesis (y si quieres entre corchetes) y la marca de explícito 🅴 en el nombre del archivo, el título y el álbum: «Summer (Official Video) 🅴» → «Summer».",
+     "Removes what's in parentheses (and optionally brackets) and the explicit mark 🅴 from the file name, the title and the album: \"Summer (Official Video) 🅴\" → \"Summer\".",
+     "Убирает текст в скобках (и, по желанию, в квадратных скобках) и значок explicit 🅴 из имени файла, названия и альбома: «Summer (Official Video) 🅴» → «Summer»."),
+    ("%s de %s canciones cambian · %s nombres de archivo · %s títulos · %s álbumes.",
+     "%s of %s songs change · %s file names · %s titles · %s albums.",
+     "Изменятся %s из %s песен · %s имён файлов · %s названий · %s альбомов."),
+    ("Paréntesis quitados en %s canción(es). Los títulos y álbumes están pendientes de guardar (Ctrl+S).",
+     "Parentheses removed in %s song(s). Titles and albums are pending save (Ctrl+S).",
+     "Скобки убраны в %s песнях. Названия и альбомы ждут сохранения (Ctrl+S)."),
+]
