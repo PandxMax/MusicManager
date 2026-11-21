@@ -1852,3 +1852,9 @@ ROWS += [
      "Removes numbers like \"03.\", \"8.1\" or \"08 -\" at the start of the file name, the title and the album (whichever are checked).",
      "Убирает числа вроде «03.», «8.1» или «08 -» в начале имени файла, названия и альбома (тех, что отмечены)."),
 ]
+
+ROWS += [
+    ('«Quitar paréntesis»: la numeración de disco y pista («2-09. Bunbury - …», «1-01 …») ahora también se quita. Títulos como «9-1-1» o «3-2-1 Go» se quedan igual.',
+     "\"Remove parentheses\": disc-track numbering (\"2-09. Bunbury - …\", \"1-01 …\") is now removed too. Titles like \"9-1-1\" or \"3-2-1 Go\" stay as they are.",
+     "«Убрать скобки»: нумерация диск-дорожка («2-09. Bunbury - …», «1-01 …») теперь тоже убирается. Названия вроде «9-1-1» или «3-2-1 Go» остаются как есть."),
+]
