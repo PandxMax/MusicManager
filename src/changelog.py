@@ -1,6 +1,10 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.40', [
+        'Lista y detalles: si al arrastrar una canción hacia abajo empieza a sombrear y luego llevas el ratón hacia las carpetas, ahora se convierte en arrastre. Si solo sombreaste un poco sin querer, se mueve solo la canción que agarraste; si sombreaste varias a propósito, se mueven todas.',
+        'Lista y detalles: para sombrear arrastrando, el movimiento tiene que ser claramente vertical; en diagonal hacia las carpetas ya arrastra la canción.',
+    ]),
     ('2.39', [
         'Espectrograma: la etiqueta «Posible MP3 de 320» se ve más limpia: solo con borde y texto ámbar (sin el fondo gris), y la explicación aparece al pasar el ratón.',
     ]),

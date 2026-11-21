@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.39"
+APP_VERSION = "2.40"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.39 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.40 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3077,6 +3077,7 @@ class SongList(ClickGuard, QListWidget):
             self._press = e.position().toPoint()
             self._press_item = self.itemAt(self._press)
             self._press_unsel = self._press_item is not None and not self._press_item.isSelected()
+            self._band_from = None
             self._selecting = True
             self._auto.start()
             it = self._press_item
@@ -3101,9 +3102,10 @@ class SongList(ClickGuard, QListWidget):
                 and (e.position().toPoint() - self._press).manhattanLength() >= click_slop()):
             d = e.position().toPoint() - self._press
             if (self.viewMode() == QListView.ViewMode.ListMode and getattr(self, "_press_unsel", False)
-                    and abs(d.y()) >= abs(d.x())):
-                # modo lista/detalles: arrastrar hacia arriba/abajo desde una canción no elegida = sombrear varias
-                # (para mover archivos: arrastra una ya elegida, o hacia un lado)
+                    and abs(d.y()) >= 2 * abs(d.x())):
+                # modo lista/detalles: arrastrar claramente hacia arriba/abajo desde una canción no elegida = sombrear
+                # varias. Si después el ratón sale de la lista por un lado (hacia las carpetas), se convierte en arrastre.
+                self._band_from = (self._press_item, self._press)
                 self._press, self._press_item = None, None
                 super().mouseMoveEvent(e)
                 return
@@ -3118,6 +3120,28 @@ class SongList(ClickGuard, QListWidget):
                         pass
             self.begin_drag(item)
             return
+        bf = getattr(self, "_band_from", None)
+        if bf is not None and e.buttons() & Qt.MouseButton.LeftButton:
+            p = e.position().toPoint()
+            if p.x() < 0 or p.x() > self.viewport().width():   # sale por un lado: querías mover, no sombrear
+                item, p0 = bf
+                self._band_from = None
+                try:
+                    many = abs(p.y() - p0.y()) >= 2.5 * max(18, self.visualItemRect(item).height())
+                except RuntimeError:
+                    return
+                keep = list(self.selectedItems()) if many else [item]
+                self.reset_state()
+                self._clear_band()
+                self.blockSignals(True)
+                self.clearSelection()
+                for x in keep:   # sombreado largo: se mueven todas; un poco sin querer: solo la que agarraste
+                    x.setSelected(True)
+                self.setCurrentItem(item)
+                self.blockSignals(False)
+                self.itemSelectionChanged.emit()
+                self.begin_drag(item)
+                return
         super().mouseMoveEvent(e)
 
     def mouseDoubleClickEvent(self, e):
@@ -3137,6 +3161,7 @@ class SongList(ClickGuard, QListWidget):
         super().mouseDoubleClickEvent(e)
 
     def mouseReleaseEvent(self, e):
+        self._band_from = None
         self.guard_release(e)
         self._press, self._press_item = None, None
         keep = getattr(self, "_keep_multi", None)

@@ -1167,6 +1167,33 @@ try:
     mm.CLICK_SLOP, mm.CHATTER_MS = 14, 30
     n_trem, n_drag, n_bounce, n_real = run_all("ahora")
     assert n_trem == 1 and n_drag >= 3 and n_bounce == 0 and n_real == 1
+    # empezar a sombrear sin querer y salir hacia las carpetas: se convierte en arrastre
+    drags = []
+    L.begin_drag = lambda it: drags.append((it.text(), sorted(x.text() for x in L.selectedItems())))
+
+    def path_moves(p0, pts):
+        QTest.mousePress(vp, LB, NM, p0, 20)
+        for pt in pts:
+            QTest.mouseMove(vp, pt, 10)
+        QTest.mouseRelease(vp, LB, NM, pts[-1], 20)
+        QApplication.processEvents()
+    P = type(L.visualItemRect(L.item(0)).center())
+    L.clearSelection()
+    c0 = L.visualItemRect(L.item(0)).center()
+    rh = L.visualItemRect(L.item(0)).height()
+    path_moves(c0, [c0 + P(-3, 9), c0 + P(-4, 18), c0 + P(-60, 20), c0 + P(-c0.x() - 40, 22)])
+    d1 = drags[-1] if drags else None
+    L.clearSelection()
+    path_moves(c0, [c0 + P(0, 10), c0 + P(0, rh * 2), c0 + P(0, rh * 3), c0 + P(-c0.x() - 40, rh * 3)])
+    d2 = drags[-1] if len(drags) >= 2 else None
+    L.clearSelection()
+    path_moves(c0, [c0 + P(-8, 6), c0 + P(-22, 16), c0 + P(-40, 26)])   # en diagonal hacia las carpetas
+    d3 = drags[-1] if len(drags) >= 3 else None
+    del L.begin_drag
+    print("arrastres:", ascii(d1), "|", ascii(d2), "|", ascii(d3), flush=True)
+    assert d1 and len(d1[1]) == 1 and d1[1][0] == d1[0]
+    assert d2 and len(d2[1]) >= 3
+    assert d3 and len(d3[1]) == 1
     w.set_view_mode("icons", save=False)
 except Exception:
     print("FALLO clics", ascii(traceback.format_exc()), flush=True)

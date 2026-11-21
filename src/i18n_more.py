@@ -1785,3 +1785,12 @@ ROWS += [
      "320 kbps MP3s cut like this, but so do some studios: it can't be confirmed.",
      "Так режут MP3 320 кбит/с, но и некоторые студии: подтвердить нельзя."),
 ]
+
+ROWS += [
+    ('Lista y detalles: si al arrastrar una canción hacia abajo empieza a sombrear y luego llevas el ratón hacia las carpetas, ahora se convierte en arrastre. Si solo sombreaste un poco sin querer, se mueve solo la canción que agarraste; si sombreaste varias a propósito, se mueven todas.',
+     "List and details: if dragging a song downward starts selecting and you then move the mouse toward the folders, it now turns into a drag. If you only selected a little by accident, just the song you grabbed moves; if you selected several on purpose, they all move.",
+     "Список и подробности: если при перетаскивании песни вниз началось выделение, а затем вы ведёте мышь к папкам, теперь это превращается в перетаскивание. Если выделили немного случайно, перемещается только взятая песня; если выделили несколько намеренно — перемещаются все."),
+    ('Lista y detalles: para sombrear arrastrando, el movimiento tiene que ser claramente vertical; en diagonal hacia las carpetas ya arrastra la canción.',
+     "List and details: to select by dragging, the movement must be clearly vertical; diagonally toward the folders it drags the song.",
+     "Список и подробности: чтобы выделять перетаскиванием, движение должно быть явно вертикальным; по диагонали к папкам песня перетаскивается."),
+]
