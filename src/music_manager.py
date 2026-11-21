@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.42"
+APP_VERSION = "2.41"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.42 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.41 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -3192,12 +3192,6 @@ class SongList(ClickGuard, QListWidget):
         items = self.selectedItems()
         if not items:
             return
-        # Ya no se está sombreando: sin esto, durante el arrastre el desplazamiento automático y el «empujón» del
-        # recuadro seguían activos (el botón sigue apretado), la lista bajaba sola y se elegían más canciones.
-        self._selecting = False
-        self._band_from = None
-        self._auto.stop()
-        self.reset_state()
         drag = QDrag(self)
         drag.setMimeData(self.mimeData(items))
         drag.setPixmap(item.icon().pixmap(QSize(72, 72)))
