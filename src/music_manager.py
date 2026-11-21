@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.43"
+APP_VERSION = "2.44"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.43 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.44 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -6136,6 +6136,19 @@ class Main(QMainWindow):
         t = re.sub(r"(\s*-\s*){2,}", " - ", t)   # «Artista -  - Título»
         return t.strip(" -_.,")
 
+    @staticmethod
+    def strip_numbering(text):
+        """«8. Canción» / «8.1 Canción» / «08 - Canción» / «8) Canción» → «Canción».
+        No toca títulos que empiezan con un número de verdad («7 Rings», «99 Luftballons», «9-1-1»)."""
+        t = text or ""
+        m = re.match(r"\s*\d{1,3}\.\d{1,2}\s*[.)\-–_]?\s+|\s*\d{1,3}\s*[.)\-–_]\s*", t)
+        if not m:
+            return t
+        rest = t[m.end():].strip()
+        if not rest or rest[0].isdigit():
+            return t
+        return rest
+
     def copy_meta(self):
         """Copia las etiquetas (y la portada) de UNA canción para pegarlas luego en otras."""
         paths = self.selected_paths()
@@ -6254,7 +6267,10 @@ class Main(QMainWindow):
         c_title = QCheckBox(T("En el título de la canción"))
         c_album = QCheckBox(T("En el álbum"))
         c_sq = QCheckBox(T("También lo que va entre corchetes [ ]"))
-        for c in (c_file, c_title, c_album, c_sq):
+        c_num = QCheckBox(T("Numeración al principio (8. / 8.1)"))
+        c_num.setToolTip(T("Quita números como «8.», «8.1» u «08 -» al principio del título y del álbum. "
+                           "No se toca el nombre del archivo, para conservar el número de pista."))
+        for c in (c_file, c_title, c_album, c_sq, c_num):
             c.setChecked(True)
             opts.addWidget(c)
         opts.addStretch(1)
@@ -6293,6 +6309,9 @@ class Main(QMainWindow):
                 nstem = self.strip_parens(stem, c_sq.isChecked()) if c_file.isChecked() else stem
                 ntitle = self.strip_parens(title, c_sq.isChecked()) if (c_title.isChecked() and title) else title
                 nalbum = self.strip_parens(album, c_sq.isChecked()) if (c_album.isChecked() and album) else album
+                if c_num.isChecked():
+                    ntitle = self.strip_numbering(ntitle) if (c_title.isChecked() and ntitle) else ntitle
+                    nalbum = self.strip_numbering(nalbum) if (c_album.isChecked() and nalbum) else nalbum
                 nstem = safe_filename(nstem) or stem
                 ntitle = ntitle or title
                 nalbum = nalbum or album
@@ -6310,10 +6329,10 @@ class Main(QMainWindow):
             n_a = sum(1 for x in plan if x[3])
             status.setText(T(f"{len(plan)} de {len(paths)} canciones cambian · {n_f} nombres de archivo · {n_t} títulos · "
                              f"{n_a} álbumes.")
-                           if plan else T("Ninguna de estas canciones tiene paréntesis que quitar."))
+                           if plan else T("Ninguna de estas canciones tiene paréntesis ni numeración que quitar."))
             go.setEnabled(bool(plan))
 
-        for c in (c_file, c_title, c_album, c_sq):
+        for c in (c_file, c_title, c_album, c_sq, c_num):
             c.toggled.connect(preview)
         cancel.clicked.connect(dlg.reject)
         go.clicked.connect(dlg.accept)

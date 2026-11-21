@@ -249,7 +249,10 @@ try:
     print("parentesis:", [ascii(_mm.Main.strip_parens(t)) for t in
                           ("Bubble \U0001F174", "Album (Deluxe Edition) [Explicit]", "\u24ba Hola (Remix)")], flush=True)
     assert _mm.Main.strip_parens("Bubble \U0001F174") == "Bubble"
-    w.pending.setdefault(hp[0], {}).update({"title": "Noche \U0001F174", "album": "Club Mix (Deluxe Edition)"})
+    nums = [_mm.Main.strip_numbering(t) for t in ("8. Hola", "8.1 Hola", "08 - Hola", "7 Rings", "9-1-1 Emergency")]
+    print("numeracion:", ascii(nums), flush=True)
+    assert nums == ["Hola", "Hola", "Hola", "7 Rings", "9-1-1 Emergency"]
+    w.pending.setdefault(hp[0], {}).update({"title": "8.1 Noche \U0001F174", "album": "Club Mix (Deluxe Edition)"})
     grab_modal("16_parentesis")
     w.open_strip_parens(hp)
     wait(300)

@@ -1826,3 +1826,16 @@ ROWS += [
      "Parentheses removed in %s song(s). Titles and albums are pending save (Ctrl+S).",
      "Скобки убраны в %s песнях. Названия и альбомы ждут сохранения (Ctrl+S)."),
 ]
+
+ROWS += [
+    ('«Quitar paréntesis» también quita la numeración al principio del título y del álbum: «8. Canción», «8.1 Canción», «08 - Canción» → «Canción». El nombre del archivo no se toca, para conservar el número de pista, y los títulos que empiezan con un número de verdad («7 Rings») se quedan igual.',
+     "\"Remove parentheses\" also removes numbering at the start of the title and album: \"8. Song\", \"8.1 Song\", \"08 - Song\" → \"Song\". The file name is left alone to keep the track number, and titles that really start with a number (\"7 Rings\") stay as they are.",
+     "«Убрать скобки» также убирает нумерацию в начале названия и альбома: «8. Песня», «8.1 Песня», «08 - Песня» → «Песня». Имя файла не трогается, чтобы сохранить номер дорожки, а названия, которые действительно начинаются с числа («7 Rings»), остаются как есть."),
+    ("Numeración al principio (8. / 8.1)", "Numbering at the start (8. / 8.1)", "Нумерация в начале (8. / 8.1)"),
+    ("Quita números como «8.», «8.1» u «08 -» al principio del título y del álbum. No se toca el nombre del archivo, para conservar el número de pista.",
+     "Removes numbers like \"8.\", \"8.1\" or \"08 -\" at the start of the title and album. The file name is left alone to keep the track number.",
+     "Убирает числа вроде «8.», «8.1» или «08 -» в начале названия и альбома. Имя файла не трогается, чтобы сохранить номер дорожки."),
+    ("Ninguna de estas canciones tiene paréntesis ni numeración que quitar.",
+     "None of these songs have parentheses or numbering to remove.",
+     "Ни у одной из этих песен нет скобок или нумерации, которые нужно убрать."),
+]

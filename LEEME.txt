@@ -902,3 +902,9 @@ VERSIÓN 2.43
    título o el nombre.
  - «Quitar paréntesis» ahora también limpia el álbum: «Álbum (Deluxe Edition)» → «Álbum». Hay una
    casilla «En el álbum» y la tabla muestra cómo quedará.
+
+VERSIÓN 2.44
+------------
+ - «Quitar paréntesis» también quita la numeración al principio del título y del álbum: «8. Canción»,
+   «8.1 Canción», «08 - Canción» → «Canción». El nombre del archivo no se toca, para conservar el
+   número de pista, y los títulos que empiezan con un número de verdad («7 Rings») se quedan igual.
