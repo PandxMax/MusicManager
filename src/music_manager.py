@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.44"
+APP_VERSION = "2.45"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.44 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.45 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -6250,7 +6250,8 @@ class Main(QMainWindow):
         self.apply_form()
         dlg = QDialog(self)
         dlg.setWindowTitle(T("Quitar paréntesis"))
-        dlg.resize(1180, 540)
+        scr = (self.screen() or QApplication.primaryScreen()).availableGeometry()
+        dlg.resize(min(1180, scr.width() - 60), min(540, scr.height() - 80))   # que quepa en pantallas pequeñas
         v = QVBoxLayout(dlg)
         v.setContentsMargins(18, 16, 18, 14)
         v.setSpacing(10)
@@ -6267,12 +6268,14 @@ class Main(QMainWindow):
         c_title = QCheckBox(T("En el título de la canción"))
         c_album = QCheckBox(T("En el álbum"))
         c_sq = QCheckBox(T("También lo que va entre corchetes [ ]"))
-        c_num = QCheckBox(T("Numeración al principio (8. / 8.1)"))
-        c_num.setToolTip(T("Quita números como «8.», «8.1» u «08 -» al principio del título y del álbum. "
-                           "No se toca el nombre del archivo, para conservar el número de pista."))
-        for c in (c_file, c_title, c_album, c_sq, c_num):
-            c.setChecked(True)
+        c_num = QCheckBox(T("Numeración al principio (03. / 8.1)"))
+        c_num.setToolTip(T("Quita números como «03.», «8.1» u «08 -» al principio del nombre del archivo, el título "
+                           "y el álbum (en los que estén marcados)."))
+        boxes = {"file": c_file, "title": c_title, "album": c_album, "sq": c_sq, "num": c_num}
+        for k, c in boxes.items():   # recuerda cómo las dejaste la última vez
+            c.setChecked(str(self.cfg.value("parens_" + k, "1")) == "1")
             opts.addWidget(c)
+        opts.setSpacing(14)
         opts.addStretch(1)
         v.addLayout(opts)
         tb = QTableWidget(0, 6)
@@ -6307,6 +6310,8 @@ class Main(QMainWindow):
                 title = self.val(p, "title")
                 album = self.val(p, "album")
                 nstem = self.strip_parens(stem, c_sq.isChecked()) if c_file.isChecked() else stem
+                if c_num.isChecked() and c_file.isChecked():
+                    nstem = self.strip_numbering(nstem)
                 ntitle = self.strip_parens(title, c_sq.isChecked()) if (c_title.isChecked() and title) else title
                 nalbum = self.strip_parens(album, c_sq.isChecked()) if (c_album.isChecked() and album) else album
                 if c_num.isChecked():
@@ -6338,7 +6343,10 @@ class Main(QMainWindow):
         go.clicked.connect(dlg.accept)
         preview()
         i18n.retranslate(dlg)
-        if dlg.exec() != QDialog.DialogCode.Accepted or not plan:
+        ok = dlg.exec() == QDialog.DialogCode.Accepted
+        for k, c in boxes.items():
+            self.cfg.setValue("parens_" + k, "1" if c.isChecked() else "0")
+        if not ok or not plan:
             return
         for p, _f, title, album in plan:   # título y álbum: quedan pendientes de guardar (en naranja)
             if title:

@@ -1,6 +1,10 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.45', [
+        '«Quitar paréntesis»: la numeración del principio («03.», «8.1», «08 -») ahora también se quita del nombre del archivo: «03. Tungas - Dicen Que Estoy Muerto» → «Tungas - Dicen Que Estoy Muerto». Si quieres conservar el número de pista, desmarca «Numeración al principio».',
+        '«Quitar paréntesis» recuerda qué casillas dejaste marcadas, y la ventana se ajusta a la pantalla (en pantallas de 1366 px se salía por la derecha).',
+    ]),
     ('2.44', [
         '«Quitar paréntesis» también quita la numeración al principio del título y del álbum: «8. Canción», «8.1 Canción», «08 - Canción» → «Canción». El nombre del archivo no se toca, para conservar el número de pista, y los títulos que empiezan con un número de verdad («7 Rings») se quedan igual.',
     ]),

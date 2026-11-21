@@ -1839,3 +1839,16 @@ ROWS += [
      "None of these songs have parentheses or numbering to remove.",
      "Ни у одной из этих песен нет скобок или нумерации, которые нужно убрать."),
 ]
+
+ROWS += [
+    ('«Quitar paréntesis»: la numeración del principio («03.», «8.1», «08 -») ahora también se quita del nombre del archivo: «03. Tungas - Dicen Que Estoy Muerto» → «Tungas - Dicen Que Estoy Muerto». Si quieres conservar el número de pista, desmarca «Numeración al principio».',
+     "\"Remove parentheses\": leading numbering (\"03.\", \"8.1\", \"08 -\") is now also removed from the file name: \"03. Tungas - Dicen Que Estoy Muerto\" → \"Tungas - Dicen Que Estoy Muerto\". To keep the track number, uncheck \"Numbering at the start\".",
+     "«Убрать скобки»: нумерация в начале («03.», «8.1», «08 -») теперь убирается и из имени файла: «03. Tungas - Dicen Que Estoy Muerto» → «Tungas - Dicen Que Estoy Muerto». Чтобы сохранить номер дорожки, снимите «Нумерация в начале»."),
+    ('«Quitar paréntesis» recuerda qué casillas dejaste marcadas, y la ventana se ajusta a la pantalla (en pantallas de 1366 px se salía por la derecha).',
+     "\"Remove parentheses\" remembers which boxes you left checked, and the window fits the screen (on 1366 px screens it went off the right edge).",
+     "«Убрать скобки» запоминает, какие флажки вы оставили, а окно подстраивается под экран (на экранах 1366 px оно выходило за правый край)."),
+    ("Numeración al principio (03. / 8.1)", "Numbering at the start (03. / 8.1)", "Нумерация в начале (03. / 8.1)"),
+    ("Quita números como «03.», «8.1» u «08 -» al principio del nombre del archivo, el título y el álbum (en los que estén marcados).",
+     "Removes numbers like \"03.\", \"8.1\" or \"08 -\" at the start of the file name, the title and the album (whichever are checked).",
+     "Убирает числа вроде «03.», «8.1» или «08 -» в начале имени файла, названия и альбома (тех, что отмечены)."),
+]
