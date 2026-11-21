@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.47', [
+        'Espectrograma: detecta FLAC falsos en canciones bajitas o hechas sobre todo de golpes (percusión, guitarra rasgueada), donde el muro del MP3 no se veía en el promedio de la canción. Ahora se compara, momento a momento, el sonido justo debajo del corte con el de justo encima.',
+    ]),
     ('2.46', [
         '«Quitar paréntesis»: la numeración de disco y pista («2-09. Bunbury - …», «1-01 …») ahora también se quita. Títulos como «9-1-1» o «3-2-1 Go» se quedan igual.',
     ]),

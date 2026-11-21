@@ -212,7 +212,38 @@ def find_wall(S, freqs, hz_per_bin, nyq):
         f = _wall_on(_smooth(np.percentile(S, q, axis=1), k), freqs, hz_per_bin, nyq)
         if f:
             return f
-    return 0.0
+    return _wall_frames(S, freqs, hz_per_bin, nyq)
+
+
+def _wall_frames(S, freqs, hz_per_bin, nyq):
+    """Muro visto momento a momento (para canciones bajitas u oscuras, donde las curvas de todo el tema no lo ven):
+    en cada instante con sonido justo debajo del corte, se compara con lo que hay justo encima. En un CD real los
+    agudos se apagan poco a poco dentro de cada instante; en un MP3 pasan de golpe al silencio en casi todos.
+    Los chispazos sueltos son pocos instantes y no cambian la mediana."""
+    n, nf = S.shape
+    if nf < 20:
+        return 0.0
+    C = np.vstack([np.zeros((1, nf), dtype=np.float64), np.cumsum(S, axis=0, dtype=np.float64)])
+
+    def band(a, b):   # nivel medio (dB) de las filas a..b-1, para cada instante
+        return (C[b] - C[a]) / max(1, b - a)
+    gap, wb, wa = max(1, int(250 / hz_per_bin)), max(2, int(1250 / hz_per_bin)), max(2, int(2000 / hz_per_bin))
+    top = int(min(n, nyq * 0.995 / hz_per_bin))
+    step = max(1, int(100 / hz_per_bin))
+    best, bi = 0.0, -1
+    for i in range(int(11000 / hz_per_bin), top - gap - wa, step):
+        B = band(i - gap - wb, i - gap)
+        A = band(i + gap, min(top, i + gap + wa))
+        sel = B > -95.0
+        if sel.sum() < max(10, nf * 0.05):
+            continue
+        d = float(np.median(B[sel] - A[sel]))
+        a_lvl = float(np.median(A[sel]))
+        if d >= 25.0 and a_lvl <= -105.0 and d > best:
+            best, bi = d, i
+    if bi < 0:
+        return 0.0
+    return float(freqs[bi])
 
 
 def _wall_on(med, freqs, hz_per_bin, nyq):

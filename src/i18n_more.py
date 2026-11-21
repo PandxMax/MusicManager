@@ -1858,3 +1858,9 @@ ROWS += [
      "\"Remove parentheses\": disc-track numbering (\"2-09. Bunbury - …\", \"1-01 …\") is now removed too. Titles like \"9-1-1\" or \"3-2-1 Go\" stay as they are.",
      "«Убрать скобки»: нумерация диск-дорожка («2-09. Bunbury - …», «1-01 …») теперь тоже убирается. Названия вроде «9-1-1» или «3-2-1 Go» остаются как есть."),
 ]
+
+ROWS += [
+    ('Espectrograma: detecta FLAC falsos en canciones bajitas o hechas sobre todo de golpes (percusión, guitarra rasgueada), donde el muro del MP3 no se veía en el promedio de la canción. Ahora se compara, momento a momento, el sonido justo debajo del corte con el de justo encima.',
+     "Spectrogram: detects fake FLACs in quiet songs or songs made mostly of hits (percussion, strummed guitar), where the MP3 wall didn't show in the song's average. It now compares, moment by moment, the sound just below the cutoff with the sound just above it.",
+     "Спектрограмма: распознаёт поддельные FLAC в тихих песнях или песнях, состоящих в основном из ударов (перкуссия, бой на гитаре), где стена MP3 не была видна в среднем по песне. Теперь звук чуть ниже среза сравнивается со звуком чуть выше в каждый момент времени."),
+]

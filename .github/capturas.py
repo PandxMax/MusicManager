@@ -570,6 +570,18 @@ try:
     r = spectro.analyze(cd)
     print("falso320:", round(r["cutoff"]), ascii(r["verdict"]), r["level"], flush=True)
     assert r["level"] == "posible" and not spectro.fake_lossless_tip(r)
+    # canción bajita hecha de golpes (como «La Rana Kullayki»): MP3 128 → FLAC 48 kHz
+    rc = os.path.join(fk, "real_golpes.flac")
+    subprocess.run([ff, "-loglevel", "error", "-f", "lavfi", "-i", "anoisesrc=d=16:c=pink:a=0.02:r=44100", "-f", "lavfi",
+                    "-i", "anoisesrc=d=16:c=white:a=0.9:r=44100", "-filter_complex",
+                    "[0]lowpass=f=2500:p=2[b];[1]volume='if(lt(mod(t,0.23),0.004),1,0)':eval=frame[c];"
+                    "[b][c]amix=inputs=2:normalize=0", "-ac", "2", "-c:a", "flac", "-y", rc], check=True)
+    subprocess.run([ff, "-loglevel", "error", "-i", rc, "-c:a", "libmp3lame", "-b:a", "128k", "-y", t3], check=True)
+    subprocess.run([ff, "-loglevel", "error", "-i", t3, "-ar", "48000", "-c:a", "flac", "-y", cd], check=True)
+    r1, r2 = spectro.analyze(cd), spectro.analyze(rc)
+    print("golpes:", round(r1["cutoff"]), ascii(r1["verdict"]), "| real:", round(r2["cutoff"]), ascii(r2["verdict"]), flush=True)
+    assert r1["verdict"].startswith("Falso") and not r2["verdict"].startswith("Falso")
+    os.remove(rc)
     os.remove(t3)
     os.makedirs(os.path.join(root, "HiRes"), exist_ok=True)
     os.replace(cd, os.path.join(root, "HiRes", "02. Posible 320.flac"))   # sale en la captura s_espectro_hires
