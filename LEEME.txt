@@ -889,3 +889,9 @@ VERSIÓN 2.41
    Pasaba cuando se pedía guardar otra vez mientras el primer guardado seguía en curso: los archivos sí
    se guardaban, pero el aviso salía igual. Ahora un segundo «Guardar» se ignora hasta que termina el
    primero.
+
+VERSIÓN 2.42
+------------
+ - Arrastrar una canción (sobre todo en modo iconos): mientras la llevas, la lista ya no baja sola ni
+   va eligiendo las canciones por las que pasa, y desaparece la franja de color que quedaba pintada.
+   Se mueve solo lo que tenías elegido.

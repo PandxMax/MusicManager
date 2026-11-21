@@ -1205,6 +1205,47 @@ try:
     assert d2 and len(d2[1]) >= 3
     assert d3 and len(d3[1]) == 1
     w.set_view_mode("icons", save=False)
+    wait(500)
+    # modo iconos: arrastrar una canción ya elegida hacia abajo no debe elegir otras ni hacer bajar la lista
+    from PyQt6.QtGui import QCursor
+
+    class FakeDrag:
+        def __init__(self, *a):
+            pass
+
+        def setMimeData(self, *a):
+            pass
+
+        def setPixmap(self, *a):
+            pass
+
+        def exec(self, *a):
+            QCursor.setPos(vp.mapToGlobal(vp.rect().bottomLeft()) + type(vp.rect().center())(60, 12))
+            wait(700)   # en un arrastre real la lista no recibe movimientos del ratón: solo corre su temporizador
+            return Qt.DropAction.IgnoreAction
+    _old_drag = mm.QDrag
+    mm.QDrag = FakeDrag
+    w.load_folder(os.path.join(root, "Lote"))
+    wait(1500)
+    L.clearSelection()
+    L.verticalScrollBar().setValue(0)
+    it0 = L.item(0)
+    it0.setSelected(True)
+    c0 = L.visualItemRect(it0).center()
+    QTest.mouseClick(vp, LB, NM, c0, 50)
+    wait(200)
+    sb0 = L.verticalScrollBar().value()
+    QTest.mousePress(vp, LB, NM, c0, 400)
+    for k in range(1, 6):
+        QTest.mouseMove(vp, c0 + type(c0)(2, k * 12), 15)
+    QTest.mouseRelease(vp, LB, NM, c0 + type(c0)(2, 60), 20)
+    wait(300)
+    mm.QDrag = _old_drag
+    nsel, sb1 = len(L.selectedItems()), L.verticalScrollBar().value()
+    print("arrastre iconos: elegidas", nsel, "desplazamiento", sb0, "->", sb1, flush=True)
+    w.load_folder(os.path.join(root, "Synthpop", "Aurora Norte"))
+    wait(800)
+    assert nsel == 1 and sb1 == sb0
 except Exception:
     print("FALLO clics", ascii(traceback.format_exc()), flush=True)
 w.set_theme("light")

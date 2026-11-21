@@ -1800,3 +1800,9 @@ ROWS += [
      "Saving many files at once no longer shows \"Errors while saving\" with each song's path. It happened when saving was requested again while the first save was still running: the files were saved, but the warning appeared anyway. Now a second \"Save\" is ignored until the first one finishes.",
      "Сохранение многих файлов сразу больше не показывает «Ошибки при сохранении» с путём каждой песни. Это происходило, если сохранение запускали повторно, пока первое ещё шло: файлы сохранялись, но предупреждение всё равно появлялось. Теперь второе «Сохранить» игнорируется, пока не закончится первое."),
 ]
+
+ROWS += [
+    ('Arrastrar una canción (sobre todo en modo iconos): mientras la llevas, la lista ya no baja sola ni va eligiendo las canciones por las que pasa, y desaparece la franja de color que quedaba pintada. Se mueve solo lo que tenías elegido.',
+     "Dragging a song (especially in icon view): while you carry it, the list no longer scrolls by itself or selects the songs you pass over, and the leftover colored strip is gone. Only what you had selected moves.",
+     "Перетаскивание песни (особенно в режиме значков): пока вы её несёте, список больше не прокручивается сам и не выделяет песни, над которыми вы проходите, и пропала оставшаяся цветная полоса. Перемещается только то, что было выделено."),
+]

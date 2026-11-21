@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.42', [
+        'Arrastrar una canción (sobre todo en modo iconos): mientras la llevas, la lista ya no baja sola ni va eligiendo las canciones por las que pasa, y desaparece la franja de color que quedaba pintada. Se mueve solo lo que tenías elegido.',
+    ]),
     ('2.41', [
         'Guardar muchos archivos a la vez ya no muestra «Errores al guardar» con la ruta de cada canción. Pasaba cuando se pedía guardar otra vez mientras el primer guardado seguía en curso: los archivos sí se guardaban, pero el aviso salía igual. Ahora un segundo «Guardar» se ignora hasta que termina el primero.',
     ]),
