@@ -1314,6 +1314,59 @@ try:
     assert nsel == 1 and sb1 == sb0
 except Exception:
     print("FALLO clics", ascii(traceback.format_exc()), flush=True)
+# ---------------- rendimiento con 500 canciones
+try:
+    import cProfile, pstats, io, imageio_ffmpeg, subprocess as _sp
+    from mutagen.id3 import ID3, APIC
+    from mutagen.easyid3 import EasyID3
+    from PyQt6.QtGui import QImage, QColor as _QC
+    big = os.path.join(root, "Grande")
+    os.makedirs(big, exist_ok=True)
+    seed = os.path.join(big, "_seed.mp3")
+    _sp.run([imageio_ffmpeg.get_ffmpeg_exe(), "-loglevel", "error", "-f", "lavfi", "-i", "sine=d=3", "-c:a", "libmp3lame",
+             "-b:a", "128k", "-y", seed], check=True)
+    img = QImage(800, 800, QImage.Format.Format_RGB32)
+    img.fill(_QC(120, 40, 160))
+    from PyQt6.QtCore import QBuffer, QByteArray
+    ba = QByteArray(); bf = QBuffer(ba); bf.open(QBuffer.OpenModeFlag.WriteOnly); img.save(bf, "JPG", 90)
+    jpg = bytes(ba)
+    t0 = time.perf_counter()
+    for i in range(500):
+        dst = os.path.join(big, f"{i + 1:03d}. Artista {i % 37} - Cancion {i}.mp3")
+        shutil.copy(seed, dst)
+        e = EasyID3(dst); e["title"] = f"Cancion {i}"; e["artist"] = f"Artista {i % 37}"; e["album"] = f"Album {i % 50}"; e.save()
+        t = ID3(dst); t.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="", data=jpg)); t.save(v2_version=3)
+    os.remove(seed)
+    print("perf: crear 500", round(time.perf_counter() - t0, 1), "s", flush=True)
+    gaps = []
+    last = [time.perf_counter()]
+    def beat():
+        now = time.perf_counter(); gaps.append(now - last[0]); last[0] = now
+    hb = QTimer(); hb.setInterval(20); hb.timeout.connect(beat); hb.start()
+
+    def stage(name, fn, settle=1500):
+        gaps.clear(); last[0] = time.perf_counter()
+        pr = cProfile.Profile(); t0 = time.perf_counter()
+        pr.enable(); fn(); pr.disable()
+        t1 = time.perf_counter() - t0
+        pr.enable(); wait(settle); pr.disable()
+        st = io.StringIO(); pstats.Stats(pr, stream=st).sort_stats("cumulative").print_stats(18)
+        mx = max(gaps) if gaps else 0
+        print(f"perf: {name}: llamada {t1:.2f}s, peor bloqueo {mx*1000:.0f} ms, bloqueos>200ms {sum(1 for g in gaps if g > 0.2)}", flush=True)
+        for ln in st.getvalue().splitlines()[6:40]:
+            if ln.strip():
+                print("perf|", ascii(ln[:170]), flush=True)
+    stage("abrir carpeta", lambda: w.load_folder(big), 6000)
+    stage("elegir todas", lambda: (w.list.selectAll(), w.on_select()), 3000)
+    def edit_genre():
+        le = w.inputs["genre"]; le.setText("Rock"); w.edited.add("genre"); w.apply_form()
+    stage("poner genero a 500", edit_genre, 1500)
+    stage("elegir una", lambda: (w.list.clearSelection(), w.list.item(3).setSelected(True), w.on_select()), 1500)
+    stage("elegir todas otra vez", lambda: (w.list.selectAll(), w.on_select()), 2000)
+    stage("guardar 500", w.save_all, 2000)
+    hb.stop()
+except Exception:
+    print("FALLO perf", ascii(traceback.format_exc()), flush=True)
 w.set_theme("light")
 wait(1200)
 shot(w, "10_principal_claro")
