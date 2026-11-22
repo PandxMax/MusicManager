@@ -1314,6 +1314,58 @@ try:
     assert nsel == 1 and sb1 == sb0
 except Exception:
     print("FALLO clics", ascii(traceback.format_exc()), flush=True)
+# ---------------- «Unir carpeta de artistas con la biblioteca por géneros»
+try:
+    import merge_folders, imageio_ffmpeg, subprocess as _sp
+    ua = os.path.join(root, "Union", "Artistas")
+    ug = os.path.join(root, "Union", "Generos")
+    tiny = os.path.join(root, "Union", "t.mp3")
+    os.makedirs(ua, exist_ok=True)
+    _sp.run([imageio_ffmpeg.get_ffmpeg_exe(), "-loglevel", "error", "-f", "lavfi", "-i", "sine=d=1", "-c:a", "libmp3lame",
+             "-b:a", "64k", "-y", tiny], check=True)
+    def put(*parts):
+        d = os.path.join(*parts)
+        os.makedirs(os.path.dirname(d), exist_ok=True)
+        shutil.copy(tiny, d)
+    put(ua, "Bunbury", "01. Nueva.mp3"); put(ua, "Bunbury", "Album 1", "02. Del album.mp3")
+    put(ua, "Café Tacvba", "03. Eres.mp3"); put(ua, "Nuevo Artista", "04. Algo.mp3"); put(ua, "Tungas", "05. Repetida.mp3")
+    put(ug, "ROCK", "Español", "Rock Alternativo", "Bunbury", "10. Ya estaba.mp3")
+    put(ug, "ROCK", "Español", "Rock Alternativo", "Bunbury", "Album 1", "11. Otra.mp3")
+    put(ug, "ROCK", "Cafe Tacvba", "12. Vieja.mp3"); put(ug, "PUNK", "Tungas", "05. Repetida.mp3")
+    os.remove(tiny)
+    w.load_folder(ua)
+    wait(500)
+    w.open_merge_folders(ua)
+    wait(500)
+    dlg = w._tool
+    dlg.dst_le.setText(ug)
+    dlg.analyze()
+    wait(300)
+    shot(dlg, "s_unir_carpetas")
+    rows = [(os.path.basename(a), dlg.choice(cb)[0]) for a, _n, cb in dlg.rows]
+    print("unir filas:", ascii(rows), ascii(dlg.status.text()), flush=True)
+    _q = merge_folders.QMessageBox.question
+    _i = merge_folders.QMessageBox.information
+    merge_folders.QMessageBox.question = staticmethod(lambda *a, **k: merge_folders.QMessageBox.StandardButton.Yes)
+    merge_folders.QMessageBox.information = staticmethod(lambda *a, **k: None)
+    dlg.run()
+    merge_folders.QMessageBox.question, merge_folders.QMessageBox.information = _q, _i
+    allf = sorted(os.path.relpath(os.path.join(d, f), os.path.join(root, "Union")) for d, _, fs in os.walk(os.path.join(root, "Union")) for f in fs)
+    print("unir resultado:", ascii(allf), flush=True)
+    bun = os.path.join("Generos", "ROCK", "Español", "Rock Alternativo", "Bunbury")
+    assert os.path.join(bun, "01. Nueva.mp3") in allf and os.path.join(bun, "Album 1", "02. Del album.mp3") in allf
+    assert os.path.join("Generos", "ROCK", "Cafe Tacvba", "03. Eres.mp3") in allf
+    assert os.path.join("Artistas", "Nuevo Artista", "04. Algo.mp3") in allf
+    assert os.path.join("Artistas", "Tungas", "05. Repetida.mp3") in allf
+    assert not os.path.isdir(os.path.join(ua, "Bunbury"))
+    dlg.close()
+    w.undo_fs()
+    wait(300)
+    assert os.path.isfile(os.path.join(ua, "Bunbury", "Album 1", "02. Del album.mp3"))
+    print("unir deshacer: ok", flush=True)
+except Exception:
+    print("FALLO unir", ascii(traceback.format_exc()), flush=True)
+
 # ---------------- muchos archivos: renombrar y copiar en segundo plano, y el registro de bloqueos
 try:
     import imageio_ffmpeg, subprocess as _sp

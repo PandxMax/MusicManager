@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.49"
+APP_VERSION = "2.50"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.49 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.50 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -7722,6 +7722,7 @@ class Main(QMainWindow):
         if it is not None and it.data(0, PATH_ROLE) and os.path.isdir(it.data(0, PATH_ROLE)):
             m.addAction("🏷 Géneros en lote de esta carpeta…", lambda d=it.data(0, PATH_ROLE): self.open_batch_genres(folder=d))
             m.addAction(T("✂ Separar por artista…"), lambda d=it.data(0, PATH_ROLE): self.open_split_artist(d))
+            m.addAction(T("🔀 Unir con la biblioteca por géneros…"), lambda d=it.data(0, PATH_ROLE): self.open_merge_folders(d))
         other = self.tree2 if tree is self.tree else self.tree
         oc = other.currentItem()
         if it is not None and self.tree2_box.isVisible() and oc is not None and oc.data(0, PATH_ROLE):
@@ -8442,6 +8443,8 @@ class Main(QMainWindow):
             ("Organizar la biblioteca", [
                 ("✂ Separar carpeta por artista…", self.open_split_artist,
                  "Crea dentro de la carpeta abierta una carpeta por artista y mete ahí sus canciones"),
+                ("🔀 Unir carpeta de artistas con la biblioteca…", self.open_merge_folders,
+                 "Junta cada carpeta de artista con la del mismo artista en tu biblioteca por géneros"),
                 ("📋 Informe de la biblioteca…", self.open_report,
                  "Cuántas canciones no tienen portada, letra, género, año… y acceso directo a cada una"),
                 ("🔁 Buscar canciones repetidas…", self.open_dupes,
@@ -8651,6 +8654,17 @@ class Main(QMainWindow):
             return
         folder = os.path.normpath(folder)
         self._show_tool(folders_by.FoldersByDialog(self, folders_by.audio_in(folder), tech_info, folder=folder))
+
+    def open_merge_folders(self, src=None):
+        """Une una carpeta de artistas con la biblioteca ordenada por géneros (ver merge_folders.py)."""
+        import merge_folders
+        src = src or (self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else None)
+        dst = self.cfg.value("merge_dst", "") or ""
+        if not (dst and os.path.isdir(dst)):
+            dst = ""
+        dlg = merge_folders.MergeFoldersDialog(self, src, dst)
+        dlg.dst_le.textChanged.connect(lambda t: self.cfg.setValue("merge_dst", t))
+        self._show_tool(dlg)
 
     def open_tags_from_name(self):
         import libtools

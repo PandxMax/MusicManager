@@ -1,6 +1,10 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.50', [
+        'Nueva herramienta «Unir carpeta de artistas con la biblioteca» (Herramientas → Organizar la biblioteca, o clic derecho sobre una carpeta): cada carpeta de artista se junta con la del mismo artista en tu biblioteca por géneros, aunque esté a varios niveles (ROCK/Español/Rock Alternativo/Bunbury). Sus canciones y álbumes pasan allí y la carpeta vacía desaparece.',
+        'Al unir: reconoce el mismo artista aunque cambien tildes, mayúsculas o «The»/«&» (Café Tacvba = Cafe Tacvba). Los artistas que no están en la biblioteca puedes mandarlos a un género o dejarlos donde están, y las canciones que ya estaban no se duplican. Se ve todo antes y se puede deshacer con Ctrl+Alt+Z.',
+    ]),
     ('2.49', [
         'Muchas canciones a la vez sin «No responde»: renombrar (también «Quitar paréntesis»), copiar y revisar las portadas antes de «Portadas automáticas» se hacen en segundo plano con barra de progreso cuando son 12 o más.',
         'Espectrograma: cada canción analizada ocupa unas 30 veces menos memoria (antes ~16 MB por canción), y las imágenes se dibujan solo cuando se ven.',

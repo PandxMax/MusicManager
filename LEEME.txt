@@ -947,3 +947,14 @@ VERSIÓN 2.49
  - Nuevo registro de bloqueos: si la ventana se queda congelada más de 6 segundos, se anota en
    «bloqueos.txt» en qué parte del programa estaba atascada. «Ayuda → Reportar un problema» lo incluye,
    para poder corregir cuelgues que no se repiten a voluntad.
+
+VERSIÓN 2.50
+------------
+ - Nueva herramienta «Unir carpeta de artistas con la biblioteca» (Herramientas → Organizar la
+   biblioteca, o clic derecho sobre una carpeta): cada carpeta de artista se junta con la del mismo
+   artista en tu biblioteca por géneros, aunque esté a varios niveles (ROCK/Español/Rock
+   Alternativo/Bunbury). Sus canciones y álbumes pasan allí y la carpeta vacía desaparece.
+ - Al unir: reconoce el mismo artista aunque cambien tildes, mayúsculas o «The»/«&» (Café Tacvba = Cafe
+   Tacvba). Los artistas que no están en la biblioteca puedes mandarlos a un género o dejarlos donde
+   están, y las canciones que ya estaban no se duplican. Se ve todo antes y se puede deshacer con
+   Ctrl+Alt+Z.
