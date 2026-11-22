@@ -189,10 +189,19 @@ def analyze(path, max_frames=1100):
     dyn = float(np.percentile(bdb, 95) - np.percentile(bdb, 10)) if len(bdb) > 3 else 0.0
 
     res = {"path": path, "name": os.path.basename(path), "info": info, "sr": sr, "nyq": nyq,
-           "duration": duration, "S": S, "freqs": freqs, "mean": mean, "p90": p90,
+           "duration": duration, "S": compact(S), "freqs": freqs, "mean": mean, "p90": p90,
            "cutoff": cutoff, "steep": steep, "wall_hi": wall_hi, "peak": peak, "rms": rms, "clipped": clipped, "dyn": dyn}
     res.update(verdict(res))
     return res
+
+
+def compact(S, group=4):
+    """Lo que se guarda para dibujar: el espectrograma completo ocupa ~9 MB por canción (con 500 canciones, varios GB
+    y la computadora entera se ponía lenta). Para la pantalla basta con juntar las frecuencias de 4 en 4 (quedándose
+    con la más fuerte) y guardarlo en 1 byte por punto: ~0.5 MB."""
+    n = (S.shape[0] - 1) // group * group
+    m = S[:n].reshape(n // group, group, S.shape[1]).max(axis=1)
+    return np.round((np.clip(m, DB_MIN, 0) - DB_MIN) / (-DB_MIN) * 255).astype(np.uint8)
 
 
 def _smooth(curve, k):
@@ -399,8 +408,11 @@ LEVEL_COLOR = {"hires": "#0EA5E9", "alta": "#22C55E", "posible": "#F5B841", "nor
 def spec_image(S, fmax_ratio):
     """S (bins × frames) en dB → QImage coloreada, con el eje de frecuencia hacia arriba."""
     rows = max(2, int(S.shape[0] * fmax_ratio))
-    v = np.clip((S[:rows] - DB_MIN) / (-DB_MIN), 0, 1)
-    rgb = LUT[(v * 255).astype(np.uint8)][::-1]
+    if S.dtype == np.uint8:   # versión compacta (ver compact())
+        rgb = LUT[S[:rows]][::-1]
+    else:
+        v = np.clip((S[:rows] - DB_MIN) / (-DB_MIN), 0, 1)
+        rgb = LUT[(v * 255).astype(np.uint8)][::-1]
     rgb = np.ascontiguousarray(rgb)
     h, w, _ = rgb.shape
     img = QImage(rgb.data, w, h, w * 3, QImage.Format.Format_RGB888).copy()
@@ -416,6 +428,9 @@ def nice_step(span, target):
     return 10 * p
 
 
+_LIVE = []
+
+
 class SpecView(QWidget):
     """Espectrograma con ejes de frecuencia (kHz), tiempo y barra de nivel (dB)."""
     L, R, T, B = 58, 74, 8, 30
@@ -429,8 +444,18 @@ class SpecView(QWidget):
     def set_fmax(self, khz):
         r = self.res
         self.fmax = min(khz * 1000.0, r["nyq"]) if khz else r["nyq"]
-        self._img = spec_image(r["S"], self.fmax / r["nyq"])
+        self._img = None   # se dibuja cuando se vea (con cientos de canciones no se crean todas las imágenes a la vez)
         self.update()
+
+    def image(self):
+        if self._img is None:
+            self._img = spec_image(self.res["S"], self.fmax / self.res["nyq"])
+            _LIVE.append(self)
+            while len(_LIVE) > 40:   # solo las últimas 40 vistas guardan su imagen; las demás la rehacen al volver
+                old = _LIVE.pop(0)
+                if old is not self:
+                    old._img = None
+        return self._img
 
     def paintEvent(self, _):
         p = QPainter(self)
@@ -440,7 +465,7 @@ class SpecView(QWidget):
         W, H = self.width(), self.height()
         plot = QRectF(self.L, self.T, W - self.L - self.R, H - self.T - self.B)
         p.fillRect(self.rect(), pal.window())
-        p.drawImage(plot, self._img)
+        p.drawImage(plot, self.image())
         p.setPen(QPen(fg, 1))
         small = QFont(self.font()); small.setPointSizeF(8.5); p.setFont(small)
         r = self.res

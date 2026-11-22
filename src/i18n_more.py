@@ -1887,3 +1887,18 @@ ROWS += [
     ("Abre primero la carpeta que quieres separar.", "First open the folder you want to split.", "Сначала откройте папку, которую хотите разделить."),
     ("separar en carpetas", "split into folders", "разделить по папкам"),
 ]
+
+ROWS += [
+    ('Muchas canciones a la vez sin «No responde»: renombrar (también «Quitar paréntesis»), copiar y revisar las portadas antes de «Portadas automáticas» se hacen en segundo plano con barra de progreso cuando son 12 o más.',
+     "Many songs at once without \"Not responding\": renaming (including \"Remove parentheses\"), copying and checking covers before \"Automatic covers\" run in the background with a progress bar when there are 12 or more.",
+     "Много песен сразу без «Не отвечает»: переименование (в том числе «Убрать скобки»), копирование и проверка обложек перед «Автоматическими обложками» выполняются в фоне с индикатором, когда их 12 и больше."),
+    ('Espectrograma: cada canción analizada ocupa unas 30 veces menos memoria (antes ~16 MB por canción), y las imágenes se dibujan solo cuando se ven.',
+     "Spectrogram: each analysed song uses about 30 times less memory (before ~16 MB per song), and images are drawn only when visible.",
+     "Спектрограмма: каждая проанализированная песня занимает примерно в 30 раз меньше памяти (раньше ~16 МБ), а изображения рисуются только когда видны."),
+    ('Nuevo registro de bloqueos: si la ventana se queda congelada más de 6 segundos, se anota en «bloqueos.txt» en qué parte del programa estaba atascada. «Ayuda → Reportar un problema» lo incluye, para poder corregir cuelgues que no se repiten a voluntad.',
+     "New hang log: if the window freezes for more than 6 seconds, the part of the program where it got stuck is written to \"bloqueos.txt\". \"Help → Report a problem\" includes it, so hangs that can't be reproduced at will can be fixed.",
+     "Новый журнал зависаний: если окно замирает больше чем на 6 секунд, в «bloqueos.txt» записывается, где именно программа застряла. «Справка → Сообщить о проблеме» включает его, чтобы можно было исправить зависания, которые не повторяются по желанию."),
+    ("Renombrando %s archivos…", "Renaming %s files…", "Переименование %s файлов…"),
+    ("Copiando %s elementos…", "Copying %s items…", "Копирование %s элементов…"),
+    ("Revisando portadas…", "Checking covers…", "Проверка обложек…"),
+]

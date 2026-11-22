@@ -6,7 +6,7 @@ Music Manager: explorador de carpetas (arrastrar y soltar) + editor de metadatos
 Instalación:   pip install PyQt6 mutagen send2trash
 Ejecutar:      python src/music_manager.py
 """
-import sys, os, json, re, shutil, time, base64, html, urllib.request, urllib.error, urllib.parse
+import sys, os, json, re, shutil, time, threading, base64, html, urllib.request, urllib.error, urllib.parse
 import secret
 from functools import lru_cache
 from urllib.parse import quote_plus, quote
@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.48"
+APP_VERSION = "2.49"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.48 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.49 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -6404,6 +6404,8 @@ class Main(QMainWindow):
                 pass
 
     def do_renames(self, res):
+        if len(res) >= 12:   # muchos: en segundo plano con barra de progreso (antes la ventana quedaba «No responde»)
+            return self.do_renames_bg(res)
         done, errors, newpaths = 0, [], []
         undo = []
         for old, nb in res:
@@ -6444,6 +6446,55 @@ class Main(QMainWindow):
             self.statusBar().showMessage(f"{done} archivo(s) renombrado(s).")
         if errors:
             QMessageBox.warning(self, "No se renombraron algunos archivos", "\n".join(errors))
+
+    def do_renames_bg(self, res):
+        errors, newpaths, jobs, taken = [], [], [], set()
+        for old, nb in res:
+            oname = os.path.basename(old)
+            if not nb:
+                errors.append(f"{oname}: nombre vacío o faltan datos (artista/título).")
+                newpaths.append(old)
+                continue
+            new = os.path.join(os.path.dirname(old), nb + os.path.splitext(old)[1])
+            if new == old:
+                newpaths.append(old)
+                continue
+            if (os.path.exists(new) and not os.path.samefile(old, new)) or os.path.normcase(new) in taken:
+                errors.append(f"{oname}: ya existe «{os.path.basename(new)}».")
+                newpaths.append(old)
+                continue
+            taken.add(os.path.normcase(new))
+            jobs.append((old, new))
+        self.release_if([o for o, _ in jobs])
+
+        def one(job):
+            old, new = job
+            for attempt in range(8):   # el archivo puede estar abierto un instante (miniatura, tonalidad…)
+                try:
+                    os.rename(old, new)
+                    return new
+                except PermissionError:
+                    if attempt == 7:
+                        raise
+                    time.sleep(0.15)
+
+        out = self.run_batch(T(f"Renombrando {len(jobs)} archivos…"), jobs, one) if jobs else []
+        undo, done = [], 0
+        for (old, new), got, err in out:
+            if err is not None:
+                errors.append(f"{os.path.basename(old)}: {err}")
+                newpaths.append(old)
+                continue
+            self.retarget(old, new)
+            newpaths.append(new)
+            undo.append((new, old))
+            done += 1
+        self.push_undo(T("renombrar"), undo)
+        if done:
+            self.load_folder(self.current_dir, select=newpaths)
+            self.statusBar().showMessage(f"{done} archivo(s) renombrado(s).")
+        if errors:
+            QMessageBox.warning(self, "No se renombraron algunos archivos", "\n".join(errors[:30]))
 
     # ---------------------------------------------------- Metadatos y panel
     def tags_of(self, p):
@@ -6751,7 +6802,12 @@ class Main(QMainWindow):
             QMessageBox.information(self, "Portada automática", "Selecciona una o varias canciones primero.")
             return
         self.apply_form()
-        todo = [p for p in paths if not self.cover_data_of(p)]
+        if len(paths) >= 12:   # leer la portada de cientos de archivos: en segundo plano
+            has = {p: bool(r) for p, r, e in self.run_batch(T("Revisando portadas…"), paths,
+                                                            lambda p: bool(self.cover_data_of(p)))}
+            todo = [p for p in paths if not has.get(p)]
+        else:
+            todo = [p for p in paths if not self.cover_data_of(p)]
         if not todo and len(paths) == 1:
             q = QMessageBox.question(self, "Ya tiene portada", "Esta canción ya tiene portada. ¿Buscar otras opciones de mejor calidad en internet?")
             if q == QMessageBox.StandardButton.Yes:
@@ -7500,6 +7556,8 @@ class Main(QMainWindow):
 
     def copy_items(self, paths, target):
         target = os.path.normpath(target)
+        if len(paths) >= 12:   # muchos: en segundo plano con barra de progreso
+            return self.copy_items_bg(paths, target)
         done, errors = 0, []
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
@@ -7529,6 +7587,39 @@ class Main(QMainWindow):
         self.statusBar().showMessage(f"{done} elemento(s) copiado(s) a {target}")
         if errors:
             QMessageBox.warning(self, "Algunos elementos no se copiaron", "\n".join(errors))
+        self.after_fs_change()
+
+    def copy_items_bg(self, paths, target):
+        errors, jobs = [], []
+        for src in paths:
+            src = os.path.normpath(src)
+            if not os.path.exists(src):
+                continue
+            if os.path.isdir(src) and (target == src or target.startswith(src + os.sep)):
+                errors.append(f"No puedes copiar «{os.path.basename(src)}» dentro de sí misma.")
+                continue
+            jobs.append(src)
+        lock = threading.Lock()
+
+        def one(src):
+            dst = os.path.join(target, os.path.basename(src))
+            with lock:   # nunca sobrescribe: "nombre - copia", "nombre - copia (2)"…
+                if os.path.exists(dst):
+                    root, ext = os.path.splitext(dst) if os.path.isfile(src) else (dst, "")
+                    n, cand = 1, f"{root} - copia{ext}"
+                    while os.path.exists(cand):
+                        n += 1
+                        cand = f"{root} - copia ({n}){ext}"
+                    dst = cand
+            shutil.copytree(src, dst) if os.path.isdir(src) else shutil.copy2(src, dst)
+            return dst
+
+        out = self.run_batch(T(f"Copiando {len(jobs)} elementos…"), jobs, one) if jobs else []
+        done = sum(1 for _s, _d, e in out if e is None)
+        errors += [f"{os.path.basename(s_)}: {e}" for s_, _d, e in out if e is not None]
+        self.statusBar().showMessage(f"{done} elemento(s) copiado(s) a {target}")
+        if errors:
+            QMessageBox.warning(self, "Algunos elementos no se copiaron", "\n".join(errors[:30]))
         self.after_fs_change()
 
     def delete_paths(self, paths):
@@ -9398,7 +9489,8 @@ class Main(QMainWindow):
         enviar por GitHub. No se envía nada solo: se muestra primero y lo manda la persona."""
         import platform
         tail = ""
-        for pth in (error_log_path(), os.path.join(os.path.dirname(error_log_path()), "errores_menores.txt")):
+        for pth in (error_log_path(), os.path.join(os.path.dirname(error_log_path()), "errores_menores.txt"),
+                    os.path.join(os.path.dirname(error_log_path()), "bloqueos.txt")):
             try:
                 with open(pth, encoding="utf-8", errors="replace") as fh:
                     txt = fh.read()[-1800:]
@@ -9683,6 +9775,41 @@ class DialogPolish(QObject):
             lay.insertWidget(0, head)
 
 
+class HangWatch(QObject):
+    """Si la ventana se queda congelada («No responde») más de 6 s, anota en «bloqueos.txt» en qué línea del programa
+    estaba atascada (con faulthandler, que lo escribe desde fuera aunque el programa esté trabado). Así un cuelgue que
+    no se puede repetir a voluntad deja su rastro para corregirlo; «Ayuda → Reportar un problema» lo incluye."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        import faulthandler
+        self.fh, self.fileobj = faulthandler, None
+        try:
+            path = os.path.join(os.path.dirname(error_log_path()), "bloqueos.txt")
+            try:
+                if os.path.getsize(path) > 300_000:   # que no crezca sin fin
+                    os.replace(path, path + ".old")
+            except OSError:
+                pass
+            self.fileobj = open(path, "a", encoding="utf-8")
+            self.fileobj.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M')} · Music Manager {APP_VERSION} abierto ---\n")
+            self.fileobj.flush()
+        except OSError:
+            return
+        self.t = QTimer(self)
+        self.t.setInterval(1000)
+        self.t.timeout.connect(self.beat)
+        self.t.start()
+        self.beat()
+
+    def beat(self):
+        try:
+            self.fh.cancel_dump_traceback_later()   # la ventana sigue viva: se aplaza el volcado otros 6 s
+            self.fh.dump_traceback_later(6, repeat=False, file=self.fileobj)
+        except Exception:
+            pass
+
+
 def error_log_path():
     base = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation) or \
         os.path.join(os.path.expanduser("~"), ".musicmanager")
@@ -9791,6 +9918,7 @@ if __name__ == "__main__":
     except Exception:
         _server = None
     w = Main()
+    _hang = HangWatch(app)
 
     def _other_instance():
         c = _server.nextPendingConnection()

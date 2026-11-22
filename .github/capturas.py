@@ -1314,6 +1314,48 @@ try:
     assert nsel == 1 and sb1 == sb0
 except Exception:
     print("FALLO clics", ascii(traceback.format_exc()), flush=True)
+# ---------------- muchos archivos: renombrar y copiar en segundo plano, y el registro de bloqueos
+try:
+    import imageio_ffmpeg, subprocess as _sp
+    big = os.path.join(root, "Muchos")
+    os.makedirs(big, exist_ok=True)
+    seed = os.path.join(big, "seed.mp3")
+    _sp.run([imageio_ffmpeg.get_ffmpeg_exe(), "-loglevel", "error", "-f", "lavfi", "-i", "sine=d=1", "-c:a", "libmp3lame",
+             "-b:a", "64k", "-y", seed], check=True)
+    srcs = []
+    for i in range(40):
+        d = os.path.join(big, f"{i + 1:02d}. Artista - Tema {i}.mp3")
+        shutil.copy(seed, d)
+        srcs.append(d)
+    os.remove(seed)
+    w.load_folder(big)
+    wait(800)
+    t0 = time.perf_counter()
+    w.do_renames([(p, w.strip_numbering(os.path.splitext(os.path.basename(p))[0])) for p in srcs])
+    names = sorted(os.listdir(big))
+    print("muchos: renombrar 40 en", round(time.perf_counter() - t0, 2), "s ->", ascii(names[:2]), len(names), flush=True)
+    assert len(names) == 40 and names[0].startswith("Artista - Tema")
+    dst = os.path.join(root, "MuchosCopia")
+    os.makedirs(dst, exist_ok=True)
+    w.copy_items([os.path.join(big, n) for n in names], dst)
+    print("muchos: copiados", len(os.listdir(dst)), flush=True)
+    assert len(os.listdir(dst)) == 40
+    w.undo_fs()
+    wait(300)
+    assert sorted(os.listdir(big))[0].startswith("01. ")
+    hw = mm.HangWatch(QApplication.instance())
+    bl = os.path.join(os.path.dirname(mm.error_log_path()), "bloqueos.txt")
+    wait(1500)
+    time.sleep(7.5)   # la ventana «congelada» 7.5 s
+    wait(500)
+    with open(bl, encoding="utf-8", errors="replace") as fh:
+        txt = fh.read()
+    print("bloqueos:", ascii(txt[-600:]), flush=True)
+    assert "capturas.py" in txt and "Thread" in txt
+    hw.t.stop()
+    import faulthandler; faulthandler.cancel_dump_traceback_later()
+except Exception:
+    print("FALLO muchos", ascii(traceback.format_exc()), flush=True)
 w.set_theme("light")
 wait(1200)
 shot(w, "10_principal_claro")

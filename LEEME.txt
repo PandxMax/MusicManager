@@ -936,3 +936,14 @@ VERSIÓN 2.48
  - Al separar o crear carpetas por artista: si una canción no tiene el artista en las etiquetas se toma
    del nombre del archivo («03. Tungas - Dicen…» → «Tungas»); «Bunbury» y «BUNBURY» van a la misma
    carpeta, y si la carpeta del artista ya existe se usa esa.
+
+VERSIÓN 2.49
+------------
+ - Muchas canciones a la vez sin «No responde»: renombrar (también «Quitar paréntesis»), copiar y
+   revisar las portadas antes de «Portadas automáticas» se hacen en segundo plano con barra de progreso
+   cuando son 12 o más.
+ - Espectrograma: cada canción analizada ocupa unas 30 veces menos memoria (antes ~16 MB por canción), y
+   las imágenes se dibujan solo cuando se ven.
+ - Nuevo registro de bloqueos: si la ventana se queda congelada más de 6 segundos, se anota en
+   «bloqueos.txt» en qué parte del programa estaba atascada. «Ayuda → Reportar un problema» lo incluye,
+   para poder corregir cuelgues que no se repiten a voluntad.
