@@ -1864,3 +1864,26 @@ ROWS += [
      "Spectrogram: detects fake FLACs in quiet songs or songs made mostly of hits (percussion, strummed guitar), where the MP3 wall didn't show in the song's average. It now compares, moment by moment, the sound just below the cutoff with the sound just above it.",
      "Спектрограмма: распознаёт поддельные FLAC в тихих песнях или песнях, состоящих в основном из ударов (перкуссия, бой на гитаре), где стена MP3 не была видна в среднем по песне. Теперь звук чуть ниже среза сравнивается со звуком чуть выше в каждый момент времени."),
 ]
+
+ROWS += [
+    ('Nueva herramienta «Separar carpeta por artista» (Herramientas → Organizar la biblioteca, o clic derecho sobre una carpeta): crea dentro de la carpeta una carpeta por cada artista y mete ahí sus canciones. Muestra antes cómo quedará y se puede deshacer con Ctrl+Alt+Z.',
+     "New \"Split folder by artist\" tool (Tools → Organize the library, or right-click a folder): creates a folder per artist inside the folder and moves their songs there. It shows the result first and can be undone with Ctrl+Alt+Z.",
+     "Новый инструмент «Разделить папку по исполнителям» (Инструменты → Упорядочить библиотеку или правый щелчок по папке): создаёт внутри папки папку для каждого исполнителя и переносит туда его песни. Сначала показывает результат, отменяется Ctrl+Alt+Z."),
+    ('Al separar o crear carpetas por artista: si una canción no tiene el artista en las etiquetas se toma del nombre del archivo («03. Tungas - Dicen…» → «Tungas»); «Bunbury» y «BUNBURY» van a la misma carpeta, y si la carpeta del artista ya existe se usa esa.',
+     "When splitting or creating folders by artist: if a song has no artist tag it is taken from the file name (\"03. Tungas - Dicen…\" → \"Tungas\"); \"Bunbury\" and \"BUNBURY\" go to the same folder, and an existing artist folder is reused.",
+     "При разделении или создании папок по исполнителям: если у песни нет тега исполнителя, он берётся из имени файла («03. Tungas - Dicen…» → «Tungas»); «Bunbury» и «BUNBURY» попадают в одну папку, а существующая папка исполнителя используется повторно."),
+    ("Separar carpeta por artista", "Split folder by artist", "Разделить папку по исполнителям"),
+    ("✂ Separar carpeta por artista…", "✂ Split folder by artist…", "✂ Разделить папку по исполнителям…"),
+    ("✂ Separar por artista…", "✂ Split by artist…", "✂ Разделить по исполнителям…"),
+    ("Crea dentro de la carpeta abierta una carpeta por artista y mete ahí sus canciones",
+     "Creates a folder per artist inside the open folder and moves their songs there",
+     "Создаёт в открытой папке папку для каждого исполнителя и переносит туда его песни"),
+    ("Crea dentro de la carpeta una carpeta por cada artista y mete ahí sus canciones. El artista se toma de las etiquetas o, si falta, del nombre del archivo («03. Artista - Canción»). Primero ves cómo quedará; no se mueve nada hasta que pulses el botón, y luego se puede deshacer con Ctrl+Alt+Z.",
+     "Creates a folder for each artist inside the folder and moves their songs there. The artist comes from the tags or, if missing, from the file name (\"03. Artist - Song\"). You see the result first; nothing moves until you press the button, and it can be undone with Ctrl+Alt+Z.",
+     "Создаёт внутри папки папку для каждого исполнителя и переносит туда его песни. Исполнитель берётся из тегов или, если его нет, из имени файла («03. Исполнитель - Песня»). Сначала вы видите результат; ничего не перемещается, пока не нажмёте кнопку, а потом можно отменить Ctrl+Alt+Z."),
+    ("Carpeta:", "Folder:", "Папка:"),
+    ("Elegir otra…", "Choose another…", "Выбрать другую…"),
+    ("Carpeta a separar", "Folder to split", "Папка для разделения"),
+    ("Abre primero la carpeta que quieres separar.", "First open the folder you want to split.", "Сначала откройте папку, которую хотите разделить."),
+    ("separar en carpetas", "split into folders", "разделить по папкам"),
+]

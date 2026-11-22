@@ -33,20 +33,44 @@ def safe(t):
     return t[:120]
 
 
+_NAME_ARTIST = re.compile(r"^(?:\d{1,3}(?:[-.]\d{1,3})?\s*[.)\-–_]?\s+)?(.+?)\s+[-–]\s+.+$")
+AUDIO = {".mp3", ".flac", ".ogg", ".oga", ".opus", ".m4a", ".mp4", ".wav", ".wma", ".aac", ".aiff", ".aif", ".ape", ".wv"}
+
+
+def artist_from_name(path):
+    """Si la canción no tiene intérprete en las etiquetas, se saca del nombre: «03. Tungas - Dicen…» → «Tungas»."""
+    m = _NAME_ARTIST.match(os.path.splitext(os.path.basename(path))[0])
+    return m.group(1).strip() if m else ""
+
+
+def audio_in(folder, sub=False):
+    out = []
+    try:
+        if sub:
+            for d, dirs, files in os.walk(folder):
+                dirs[:] = [x for x in dirs if not x.startswith(".")]
+                out += [os.path.join(d, f) for f in files if os.path.splitext(f)[1].lower() in AUDIO]
+        else:
+            out = [e.path for e in os.scandir(folder) if e.is_file() and os.path.splitext(e.name)[1].lower() in AUDIO]
+    except OSError:
+        pass
+    return sorted(out, key=str.lower)
+
+
 def main_artist(a):
     return re.split(r"\s*(?:,|&|;|/| feat\.? | ft\.? | x )\s*", a or "", maxsplit=1, flags=re.I)[0].strip()
 
 
 class MoveWorker(QThread):
     progress = pyqtSignal(int, int)
-    done = pyqtSignal(int, list)
+    done = pyqtSignal(int, list, list)
 
     def __init__(self, plan, copy):
         super().__init__()
         self.plan, self.copy, self.stop = plan, copy, False
 
     def run(self):
-        ok, fails = 0, []
+        ok, fails, moved = 0, [], []
         for i, (src, dst) in enumerate(self.plan):
             if self.stop:
                 break
@@ -54,6 +78,7 @@ class MoveWorker(QThread):
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 (shutil.copy2 if self.copy else shutil.move)(src, dst)
                 ok += 1
+                moved.append((dst, src))
                 lrc = os.path.splitext(src)[0] + ".lrc"   # la letra .lrc acompaña a su canción
                 if os.path.exists(lrc):
                     try:
@@ -64,27 +89,51 @@ class MoveWorker(QThread):
                 fails.append(f"{os.path.basename(src)}: {e}")
             if i % 5 == 0 or i == len(self.plan) - 1:
                 self.progress.emit(i + 1, len(self.plan))
-        self.done.emit(ok, fails)
+        self.done.emit(ok, fails, moved)
 
 
 class FoldersByDialog(QDialog):
-    def __init__(self, main, paths, tech_info):
+    def __init__(self, main, paths, tech_info, folder=None):
+        """folder: modo «Separar carpeta por artista»: toma las canciones de esa carpeta y crea dentro una carpeta por
+        artista."""
         super().__init__(main)
         self.main, self.paths, self.tech_info = main, list(paths), tech_info
+        self.folder = folder
         self.worker, self.plan = None, []
-        self.setWindowTitle(T("Crear carpetas por…"))
-        self.resize(860, 660)
+        self.title = T("Separar carpeta por artista") if folder else T("Crear carpetas por…")
+        self.setWindowTitle(self.title)
+        scr = (main.screen() or QApplication.primaryScreen()).availableGeometry()
+        self.resize(min(860, scr.width() - 60), min(660, scr.height() - 80))
         v = QVBoxLayout(self)
         v.setContentsMargins(18, 16, 18, 14)
         v.setSpacing(10)
-        info = QLabel(T("Reparte las canciones elegidas en carpetas según sus datos. Elige hasta tres niveles "
-                        "(por ejemplo Género → Intérprete → Álbum). Primero ves cómo quedará; no se mueve nada hasta "
-                        "que pulses el botón."))
+        if folder:
+            info = QLabel(T("Crea dentro de la carpeta una carpeta por cada artista y mete ahí sus canciones. El artista "
+                            "se toma de las etiquetas o, si falta, del nombre del archivo («03. Artista - Canción»). "
+                            "Primero ves cómo quedará; no se mueve nada hasta que pulses el botón, y luego se puede "
+                            "deshacer con Ctrl+Alt+Z."))
+        else:
+            info = QLabel(T("Reparte las canciones elegidas en carpetas según sus datos. Elige hasta tres niveles "
+                            "(por ejemplo Género → Intérprete → Álbum). Primero ves cómo quedará; no se mueve nada hasta "
+                            "que pulses el botón."))
         info.setWordWrap(True)
         v.addWidget(info)
+        if folder:
+            fr = QHBoxLayout()
+            fr.addWidget(QLabel(T("Carpeta:")))
+            self.folder_le = QLineEdit(folder)
+            self.folder_le.setReadOnly(True)
+            fr.addWidget(self.folder_le, 1)
+            pick = QPushButton(T("Elegir otra…"))
+            pick.clicked.connect(self.pick_folder)
+            fr.addWidget(pick)
+            self.sub = QCheckBox(T("Incluir subcarpetas"))
+            self.sub.toggled.connect(self.rescan)
+            fr.addWidget(self.sub)
+            v.addLayout(fr)
         g = QGridLayout()
         self.levels = []
-        defaults = ["albumartist", "album", ""]
+        defaults = ["artist_main", "", ""] if folder else ["albumartist", "album", ""]
         for i, lab in enumerate((T("Crear carpetas por"), T("y dentro, por"), T("y dentro, por"))):
             cb = QComboBox()
             for k, name in FIELDS:
@@ -99,7 +148,7 @@ class FoldersByDialog(QDialog):
         g.setColumnStretch(1, 1)
         v.addLayout(g)
         common = os.path.commonpath([os.path.dirname(p) for p in self.paths]) if self.paths else ""
-        self.base = main.current_dir if main.current_dir and os.path.isdir(main.current_dir) else common
+        self.base = folder or (main.current_dir if main.current_dir and os.path.isdir(main.current_dir) else common)
         wr = QHBoxLayout()
         wr.addWidget(QLabel(T("Dónde crearlas:")))
         self.base_le = QLineEdit(self.base)
@@ -142,15 +191,27 @@ class FoldersByDialog(QDialog):
         self.copy.toggled.connect(lambda on: self.go.setText(T("📁 Crear carpetas y copiar") if on else T("📁 Crear carpetas y mover")))
         self.preview()
 
+    def pick_folder(self):
+        d = QFileDialog.getExistingDirectory(self, T("Carpeta a separar"), self.folder)
+        if d:
+            self.folder = self.base = os.path.normpath(d)
+            self.folder_le.setText(self.folder)
+            self.base_le.setText(self.folder)
+            self.rescan()
+
+    def rescan(self):
+        self.paths = audio_in(self.folder, self.sub.isChecked())
+        self.preview()
+
     # ------------------------------------------------------------ datos
     def value(self, p, key):
         val = self.main.val
         if key == "artist":
-            return safe(val(p, "artist"))
+            return safe(val(p, "artist") or artist_from_name(p))
         if key == "artist_main":
-            return safe(main_artist(val(p, "artist")))
+            return safe(main_artist(val(p, "artist") or artist_from_name(p)))
         if key == "albumartist":
-            return safe(val(p, "albumartist") or val(p, "artist"))
+            return safe(val(p, "albumartist") or val(p, "artist") or artist_from_name(p))
         if key == "album":
             return safe(val(p, "album"))
         if key == "year_album":
@@ -185,7 +246,7 @@ class FoldersByDialog(QDialog):
     # ------------------------------------------------------------ vista previa
     def preview(self):
         keys = [cb.currentData() for cb in self.levels if cb.currentData()]
-        groups, skipped = {}, 0
+        groups, skipped, canon = {}, 0, {}
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             for i, p in enumerate(self.paths):
@@ -201,7 +262,8 @@ class FoldersByDialog(QDialog):
                 if missing and self.skip_missing.isChecked():
                     skipped += 1
                     continue
-                groups.setdefault(tuple(parts), []).append(p)
+                key = tuple(canon.setdefault(x.lower(), x) for x in parts)   # «BUNBURY» y «Bunbury» = una carpeta
+                groups.setdefault(key, []).append(p)
             if self.min_n.isChecked() and len(keys) >= 1:   # grupos de 1 canción → «Varios» del nivel de arriba
                 merged = {}
                 for parts, ps in groups.items():
@@ -212,7 +274,13 @@ class FoldersByDialog(QDialog):
             self.tree.setUpdatesEnabled(False)
             self.tree.clear()
             nodes = {}
-            for parts in sorted(groups, key=lambda t: [x.lower() for x in t]):
+            existing = {}
+            try:   # si ya hay una carpeta «bunbury» se usa esa aunque cambien las mayúsculas
+                existing = {e.name.lower(): e.name for e in os.scandir(self.base) if e.is_dir()}
+            except OSError:
+                pass
+            for orig in sorted(groups, key=lambda t: [x.lower() for x in t]):
+                parts = (existing.get(orig[0].lower(), orig[0]),) + tuple(orig[1:])
                 dst_dir = os.path.join(self.base, *parts)
                 parent = None
                 for d in range(len(parts)):
@@ -222,7 +290,7 @@ class FoldersByDialog(QDialog):
                         (parent.addChild(it) if parent else self.tree.addTopLevelItem(it))
                         nodes[k] = [it, 0]
                     parent = nodes[k][0]
-                for p in groups[parts]:
+                for p in groups[orig]:
                     name = os.path.basename(p)
                     if os.path.normcase(os.path.normpath(os.path.dirname(p))) == os.path.normcase(os.path.normpath(dst_dir)):
                         continue   # ya está en su carpeta
@@ -256,13 +324,13 @@ class FoldersByDialog(QDialog):
             return
         m = self.main
         if any(m.pending.get(p) for p, _ in self.plan) or (m.edited and set(m.cur_paths) & {p for p, _ in self.plan}):
-            if QMessageBox.question(self, T("Crear carpetas por…"),
+            if QMessageBox.question(self, self.title,
                                     T("Algunas de estas canciones tienen cambios sin guardar. ¿Guardar ahora antes de moverlas?")) \
                     != QMessageBox.StandardButton.Yes:
                 return
             m.save_all()
         verb = T("copiar") if self.copy.isChecked() else T("mover")
-        if QMessageBox.question(self, T("Crear carpetas por…"),
+        if QMessageBox.question(self, self.title,
                                 T(f"¿{verb.capitalize()} {len(self.plan)} canción(es) a sus carpetas?")) != QMessageBox.StandardButton.Yes:
             return
         if not self.copy.isChecked():
@@ -283,8 +351,13 @@ class FoldersByDialog(QDialog):
         if self.worker is not None:
             self.worker.stop = True
 
-    def finished_ok(self, ok, fails):
+    def finished_ok(self, ok, fails, moved=None):
         self.worker = None
+        if moved and not self.copy.isChecked():
+            try:   # Ctrl+Alt+Z lo devuelve todo a su sitio
+                self.main.push_undo(T("separar en carpetas"), moved)
+            except Exception:
+                pass
         self.bar.hide()
         self.close_btn.setText(T("Cerrar"))
         self.close_btn.clicked.disconnect()
@@ -297,7 +370,7 @@ class FoldersByDialog(QDialog):
         except Exception:
             pass
         if fails:
-            QMessageBox.warning(self, T("Crear carpetas por…"), "\n".join(fails[:15]))
+            QMessageBox.warning(self, self.title, "\n".join(fails[:15]))
         self.preview()
         self.status.setText(T(f"✔ {ok} canción(es) listas en {self.base}.") + (" " + T(f"{len(fails)} con error.") if fails else ""))
 

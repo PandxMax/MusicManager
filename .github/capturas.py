@@ -171,6 +171,49 @@ dlg.show()
 shot(dlg, "09_crear_carpetas")
 dlg.close()
 
+# ---------------- «Separar carpeta por artista»
+try:
+    import imageio_ffmpeg, subprocess as _sp
+    _ff = imageio_ffmpeg.get_ffmpeg_exe()
+    mez = os.path.join(root, "Mezcla")
+    os.makedirs(mez, exist_ok=True)
+    for name, art in (("01. Uno.mp3", "Bunbury"), ("02. Dos.mp3", "BUNBURY"), ("03. Tres.mp3", "Café Tacvba feat. X"),
+                      ("04. Cuatro.mp3", "Café Tacvba"), ("05. Tungas - Dicen Que Estoy Muerto.mp3", "")):
+        cmd = [_ff, "-loglevel", "error", "-f", "lavfi", "-i", "sine=d=1", "-c:a", "libmp3lame", "-b:a", "64k"]
+        if art:
+            cmd += ["-metadata", "artist=" + art]
+        _sp.run(cmd + ["-y", os.path.join(mez, name)], check=True)
+    os.makedirs(os.path.join(mez, "bunbury"), exist_ok=True)   # ya existía en minúsculas: se reutiliza
+    w.load_folder(mez)
+    wait(600)
+    w.open_split_artist(mez)
+    wait(800)
+    dlg = w._tool
+    shot(dlg, "s_separar_artista")
+    plan = [(os.path.basename(a), os.path.relpath(b, mez)) for a, b in dlg.plan]
+    print("separar plan:", ascii(plan), flush=True)
+    _q = folders_by.QMessageBox.question
+    folders_by.QMessageBox.question = staticmethod(lambda *a, **k: folders_by.QMessageBox.StandardButton.Yes)
+    dlg.run()
+    for _ in range(100):
+        if dlg.worker is None:
+            break
+        wait(100)
+    folders_by.QMessageBox.question = _q
+    tree_now = sorted(os.path.relpath(os.path.join(d, f), mez) for d, _, fs in os.walk(mez) for f in fs)
+    print("separar resultado:", ascii(tree_now), flush=True)
+    assert os.path.join("bunbury", "01. Uno.mp3") in tree_now and os.path.join("bunbury", "02. Dos.mp3") in tree_now
+    assert os.path.join("Café Tacvba", "03. Tres.mp3") in tree_now
+    assert os.path.join("Tungas", "05. Tungas - Dicen Que Estoy Muerto.mp3") in tree_now
+    dlg.close()
+    w.undo_fs()
+    wait(500)
+    back = sorted(f for f in os.listdir(mez) if f.endswith(".mp3"))
+    print("separar deshacer:", ascii(back), flush=True)
+    assert len(back) == 5
+except Exception:
+    print("FALLO separar", ascii(traceback.format_exc()), flush=True)
+
 # ---------------- interacciones (sombrear en el árbol, renombrar, recuadro de selección, menú Herramientas)
 from PyQt6.QtTest import QTest
 from PyQt6.QtCore import QPoint

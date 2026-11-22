@@ -927,3 +927,12 @@ VERSIÓN 2.47
  - Espectrograma: detecta FLAC falsos en canciones bajitas o hechas sobre todo de golpes (percusión,
    guitarra rasgueada), donde el muro del MP3 no se veía en el promedio de la canción. Ahora se
    compara, momento a momento, el sonido justo debajo del corte con el de justo encima.
+
+VERSIÓN 2.48
+------------
+ - Nueva herramienta «Separar carpeta por artista» (Herramientas → Organizar la biblioteca, o clic
+   derecho sobre una carpeta): crea dentro de la carpeta una carpeta por cada artista y mete ahí sus
+   canciones. Muestra antes cómo quedará y se puede deshacer con Ctrl+Alt+Z.
+ - Al separar o crear carpetas por artista: si una canción no tiene el artista en las etiquetas se toma
+   del nombre del archivo («03. Tungas - Dicen…» → «Tungas»); «Bunbury» y «BUNBURY» van a la misma
+   carpeta, y si la carpeta del artista ya existe se usa esa.

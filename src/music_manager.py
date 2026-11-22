@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.47"
+APP_VERSION = "2.48"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.47 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.48 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -7630,6 +7630,7 @@ class Main(QMainWindow):
         m.addAction("➕ Nueva carpeta aquí", lambda: self.new_folder())
         if it is not None and it.data(0, PATH_ROLE) and os.path.isdir(it.data(0, PATH_ROLE)):
             m.addAction("🏷 Géneros en lote de esta carpeta…", lambda d=it.data(0, PATH_ROLE): self.open_batch_genres(folder=d))
+            m.addAction(T("✂ Separar por artista…"), lambda d=it.data(0, PATH_ROLE): self.open_split_artist(d))
         other = self.tree2 if tree is self.tree else self.tree
         oc = other.currentItem()
         if it is not None and self.tree2_box.isVisible() and oc is not None and oc.data(0, PATH_ROLE):
@@ -7660,6 +7661,7 @@ class Main(QMainWindow):
             m.addAction("📂 Abrir carpeta", lambda: self.open_dir(d))
             m.addAction("▶ Reproducir carpeta", lambda: self.play_folder(d))
             m.addAction("➕ Añadir carpeta a la lista", lambda: self.pl_add([d]))
+            m.addAction(T("✂ Separar por artista…"), lambda: self.open_split_artist(d))
             m.addSeparator()
             m.addAction("✂️ Cortar (Ctrl+X)", lambda: self.clip_set("cut"))
             m.addAction("📋 Copiar (Ctrl+C)", lambda: self.clip_set("copy"))
@@ -8347,6 +8349,8 @@ class Main(QMainWindow):
                 ("🏷 Etiquetas desde el nombre del archivo…", self.open_tags_from_name,
                  "Saca artista, título, pista… del nombre de los archivos seleccionados")]),
             ("Organizar la biblioteca", [
+                ("✂ Separar carpeta por artista…", self.open_split_artist,
+                 "Crea dentro de la carpeta abierta una carpeta por artista y mete ahí sus canciones"),
                 ("📋 Informe de la biblioteca…", self.open_report,
                  "Cuántas canciones no tienen portada, letra, género, año… y acceso directo a cada una"),
                 ("🔁 Buscar canciones repetidas…", self.open_dupes,
@@ -8546,6 +8550,16 @@ class Main(QMainWindow):
         paths = self._lib_paths()
         if paths:
             self._show_tool(folders_by.FoldersByDialog(self, paths, tech_info))
+
+    def open_split_artist(self, folder=None):
+        """«Separar carpeta por artista»: crea dentro de la carpeta una carpeta por artista y reparte sus canciones."""
+        import folders_by
+        folder = folder or (self.current_dir if self.current_dir and os.path.isdir(self.current_dir) else None)
+        if not folder:
+            self.statusBar().showMessage(T("Abre primero la carpeta que quieres separar."))
+            return
+        folder = os.path.normpath(folder)
+        self._show_tool(folders_by.FoldersByDialog(self, folders_by.audio_in(folder), tech_info, folder=folder))
 
     def open_tags_from_name(self):
         import libtools
