@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.50"
+APP_VERSION = "2.51"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.50 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.51 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -4438,6 +4438,10 @@ class Main(QMainWindow):
         v.setSpacing(5)
         self.xfer_lbl = QLabel("")
         self.xfer_lbl.setWordWrap(True)
+        # un nombre largo sin espacios («Bryan_Adams_Have_You_…mp3») no se puede partir y obligaba a toda la columna
+        # izquierda a ser igual de ancha (y la división ya no se podía mover): la etiqueta nunca impone su ancho
+        self.xfer_lbl.setMinimumWidth(10)
+        self.xfer_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.xfer_lbl.setTextFormat(Qt.TextFormat.RichText)
         v.addWidget(self.xfer_lbl)
         row = QHBoxLayout()
@@ -4502,11 +4506,12 @@ class Main(QMainWindow):
         files = [p for p in self.selected_paths() if p and os.path.isfile(p)]
         if files and src_dir and self.current_dir and \
                 os.path.normcase(os.path.normpath(self.current_dir)) == os.path.normcase(os.path.normpath(src_dir)):
-            what = T(f"{len(files)} canción(es)") if len(files) > 1 else f"«{os.path.basename(files[0])}»"
+            what = T(f"{len(files)} canción(es)") if len(files) > 1 else f"«{short_name(os.path.basename(files[0]))}»"
             return files, dst, what
         dirs = [d for d in src_tree.selected_dirs() if d]
         if dirs:
-            what = f"📁 «{os.path.basename(dirs[0].rstrip(os.sep)) or dirs[0]}»" if len(dirs) == 1 else T(f"{len(dirs)} carpetas")
+            what = (f"📁 «{short_name(os.path.basename(dirs[0].rstrip(os.sep)) or dirs[0])}»" if len(dirs) == 1
+                    else T(f"{len(dirs)} carpetas"))
             return dirs, dst, what
         return [], dst, ""
 
@@ -4520,8 +4525,8 @@ class Main(QMainWindow):
             return
         srcs, dst, what = self.xfer_plan()
         dname = (os.path.basename(dst.rstrip(os.sep)) or dst) if dst else ""
-        de = what or f"<i>{html.escape(T('elige en «De»'))}</i>"
-        a = f"<b>{html.escape(dname)}</b>" if dname else f"<i>{html.escape(T('elige en «A»'))}</i>"
+        de = html.escape(what) if what else f"<i>{html.escape(T('elige en «De»'))}</i>"
+        a = f"<b>{html.escape(short_name(dname))}</b>" if dname else f"<i>{html.escape(T('elige en «A»'))}</i>"
         self.xfer_lbl.setText(f"<b>{html.escape(T('De'))}:</b> {de}<br><b>{html.escape(T('A'))}:</b> {a}")
         ok = bool(srcs and dst)
         self.xfer_copy.setEnabled(ok)
@@ -9822,6 +9827,14 @@ class HangWatch(QObject):
             self.fh.dump_traceback_later(6, repeat=False, file=self.fileobj)
         except Exception:
             pass
+
+
+def short_name(name, limit=46):
+    """Nombre recortado por el medio («Bryan_Adams_Have_You…_Don_Jua.mp3») y con puntos de corte invisibles tras «_» y
+    «-», para que un texto largo sin espacios pueda partirse en varias líneas."""
+    if len(name) > limit:
+        name = name[:limit - 14] + "…" + name[-13:]
+    return re.sub(r"([_\-.])", "\\1\u200b", name)
 
 
 def error_log_path():

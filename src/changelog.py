@@ -1,6 +1,9 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.51', [
+        'La columna del árbol de carpetas ya no se ensancha sola ni se queda trabada: un nombre de archivo larguísimo sin espacios («Bryan_Adams_Have_You_Ever…mp3») en el aviso «De:» obligaba a la columna a ser igual de ancha y no dejaba mover la división. Ahora el nombre se recorta por el medio y se parte en líneas.',
+    ]),
     ('2.50', [
         'Nueva herramienta «Unir carpeta de artistas con la biblioteca» (Herramientas → Organizar la biblioteca, o clic derecho sobre una carpeta): cada carpeta de artista se junta con la del mismo artista en tu biblioteca por géneros, aunque esté a varios niveles (ROCK/Español/Rock Alternativo/Bunbury). Sus canciones y álbumes pasan allí y la carpeta vacía desaparece.',
         'Al unir: reconoce el mismo artista aunque cambien tildes, mayúsculas o «The»/«&» (Café Tacvba = Cafe Tacvba). Los artistas que no están en la biblioteca puedes mandarlos a un género o dejarlos donde están, y las canciones que ya estaban no se duplican. Se ve todo antes y se puede deshacer con Ctrl+Alt+Z.',

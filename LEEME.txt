@@ -958,3 +958,10 @@ VERSIÓN 2.50
    Tacvba). Los artistas que no están en la biblioteca puedes mandarlos a un género o dejarlos donde
    están, y las canciones que ya estaban no se duplican. Se ve todo antes y se puede deshacer con
    Ctrl+Alt+Z.
+
+VERSIÓN 2.51
+------------
+ - La columna del árbol de carpetas ya no se ensancha sola ni se queda trabada: un nombre de archivo
+   larguísimo sin espacios («Bryan_Adams_Have_You_Ever…mp3») en el aviso «De:» obligaba a la columna a
+   ser igual de ancha y no dejaba mover la división. Ahora el nombre se recorta por el medio y se parte
+   en líneas.
