@@ -2001,3 +2001,9 @@ ROWS += [
      '%s were already there and stayed in the artist folder.',
      '%s уже были там и остались в папке исполнителей.'),
 ]
+
+ROWS += [
+    ('La columna del árbol de carpetas ya no se ensancha sola ni se queda trabada: un nombre de archivo larguísimo sin espacios («Bryan_Adams_Have_You_Ever…mp3») en el aviso «De:» obligaba a la columna a ser igual de ancha y no dejaba mover la división. Ahora el nombre se recorta por el medio y se parte en líneas.',
+     "The folder tree column no longer widens by itself or gets stuck: a very long file name without spaces (\"Bryan_Adams_Have_You_Ever…mp3\") in the \"From:\" note forced the column to be that wide and the divider couldn't be moved. The name is now shortened in the middle and wrapped.",
+     "Колонка дерева папок больше не расширяется сама и не застревает: очень длинное имя файла без пробелов («Bryan_Adams_Have_You_Ever…mp3») в подсказке «Откуда:» заставляло колонку быть такой же широкой, и разделитель нельзя было сдвинуть. Теперь имя сокращается посередине и переносится."),
+]

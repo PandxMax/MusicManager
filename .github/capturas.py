@@ -1314,6 +1314,33 @@ try:
     assert nsel == 1 and sb1 == sb0
 except Exception:
     print("FALLO clics", ascii(traceback.format_exc()), flush=True)
+# ---------------- un nombre larguísimo sin espacios no debe ensanchar la columna del árbol
+try:
+    ln = os.path.join(root, "Largo")
+    os.makedirs(ln, exist_ok=True)
+    longp = os.path.join(ln, "Bryan_Adams_Have_You_Ever_Really_Loved_A_Woman_From_Don_Juan_DeMarco_Remastered.mp3")
+    shutil.copy(next(os.path.join(dp, f) for dp, _, fs in os.walk(root) for f in fs if f.endswith(".mp3")), longp)
+    w.toggle_tree2(True)
+    w.load_folder(ln)
+    wait(500)
+    st = w.tree.findItems  # árbol «De»: se elige la carpeta para que el aviso muestre el archivo
+    w.list.clearSelection(); w.list.item(0).setSelected(True); w.on_select()
+    for it in w.tree.findItems("Largo", Qt.MatchFlag.MatchRecursive):
+        w.tree.setCurrentItem(it)
+    w.update_xfer()
+    wait(400)
+    print("columna: aviso", ascii(w.xfer_lbl.text()[:120]), flush=True)
+    tot = sum(w.main_split.sizes())
+    w.main_split.setSizes([230, tot - 230])
+    wait(300)
+    print("columna: ancho pedido 230 ->", w.main_split.sizes()[0], "mínimo", w.main_split.widget(0).minimumSizeHint().width(), flush=True)
+    shot(w, "s_columna_estrecha")
+    assert w.main_split.sizes()[0] <= 300
+    w.main_split.setSizes([290, tot - 290])
+    w.toggle_tree2(False)
+except Exception:
+    print("FALLO columna", ascii(traceback.format_exc()), flush=True)
+
 # ---------------- «Unir carpeta de artistas con la biblioteca por géneros»
 try:
     import merge_folders, imageio_ffmpeg, subprocess as _sp
