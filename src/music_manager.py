@@ -75,7 +75,7 @@ KIND_ROLE = Qt.ItemDataRole.UserRole.value + 1
 MARK_ROLE = Qt.ItemDataRole.UserRole.value + 7   # estado ya pintado (pendiente, sonando): solo se toca si cambia
 THUMB, COVER = 96, 200
 THUMB_GEN = 160   # las miniaturas se generan a este tamaño para que se vean nítidas al agrandarlas
-APP_VERSION = "2.51"
+APP_VERSION = "2.52"
 
 
 class TMenu(QMenu):
@@ -1152,7 +1152,7 @@ class CoverWorker(QThread):
     """Busca varias portadas candidatas en iTunes, Deezer y SoundCloud (gratis, sin clave) para cada álbum."""
     group_done = pyqtSignal(int, object)  # índice del grupo, lista de candidatos [{src,label,data,w,h}]
     finished_all = pyqtSignal()
-    UA = "MusicManager/2.51 (https://github.com/PandxMax/MusicManager)"
+    UA = "MusicManager/2.52 (https://github.com/PandxMax/MusicManager)"
 
     def __init__(self, groups, side):
         super().__init__()
@@ -2159,8 +2159,14 @@ class FolderTree(ClickGuard, QTreeWidget):
         self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
         self.setDefaultDropAction(Qt.DropAction.CopyAction)
         self.setAutoExpandDelay(-1)   # no abre carpetas por sí solo al arrastrar
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.itemExpanded.connect(self.on_expand)
+        # desplazamiento suave propio mientras se arrastra algo encima (el de Qt iba a saltos y cada vez más rápido)
+        self._ds_dir, self._ds_depth, self._ds_since, self._ds_auto = 0, 0.0, 0.0, None
+        self._ds_timer = QTimer(self)
+        self._ds_timer.setInterval(30)
+        self._ds_timer.timeout.connect(self._ds_tick)
         self.setItemDelegate(TreeEditDelegate(self))
 
     # ---- sombrear varias carpetas (arrastrando hacia arriba/abajo desde una no elegida) o arrastrarlas
@@ -2232,8 +2238,51 @@ class FolderTree(ClickGuard, QTreeWidget):
             DRAG_ACTIVE[0] = False
 
     def dragEnterEvent(self, e):
+        if self._ds_auto is None:
+            self._ds_auto = self.hasAutoScroll()
+            self.setAutoScroll(False)
         if e.mimeData().hasUrls():
             e.acceptProposedAction()
+
+    DS_MARGIN = 34      # px desde el borde en los que el árbol empieza a desplazarse
+    DS_WAIT = 0.35      # s que hay que quedarse en el borde antes de que se mueva
+    DS_MAX = 7          # px por paso (cada 30 ms) en el mismo borde: ~230 px/s como mucho
+
+    def drag_edge(self, y):
+        """Decide si el árbol debe desplazarse según dónde está el ratón al arrastrar: solo cerca del borde, después
+        de una pequeña espera, y más rápido cuanto más pegado al borde."""
+        h, m = self.viewport().height(), self.DS_MARGIN
+        if y < m:
+            d, depth = -1, (m - y) / m
+        elif y > h - m:
+            d, depth = 1, (y - (h - m)) / m
+        else:
+            d, depth = 0, 0.0
+        if d != self._ds_dir:
+            self._ds_since = time.monotonic()
+        self._ds_dir, self._ds_depth = d, max(0.0, min(1.0, depth))
+        if d and not self._ds_timer.isActive():
+            self._ds_timer.start()
+        elif not d:
+            self._ds_timer.stop()
+
+    def _ds_tick(self):
+        if not self._ds_dir:
+            self._ds_timer.stop()
+            return
+        if time.monotonic() - self._ds_since < self.DS_WAIT:
+            return
+        sb = self.verticalScrollBar()
+        sb.setValue(sb.value() + self._ds_dir * max(1, round(self._ds_depth * self.DS_MAX)))
+        it = self.itemAt(self.viewport().mapFromGlobal(QCursor.pos()))
+        self.set_highlight(it if it is not None and it.data(0, PATH_ROLE) else None)
+
+    def _ds_stop(self):
+        self._ds_timer.stop()
+        self._ds_dir = 0
+        if self._ds_auto is not None:
+            self.setAutoScroll(self._ds_auto)
+            self._ds_auto = None
 
     def set_highlight(self, it):
         if it is self._hl:
@@ -2251,6 +2300,7 @@ class FolderTree(ClickGuard, QTreeWidget):
 
     def dragMoveEvent(self, e):
         super().dragMoveEvent(e)
+        self.drag_edge(e.position().y())
         it = self.itemAt(e.position().toPoint())
         self.set_highlight(it if it is not None and it.data(0, PATH_ROLE) else None)
         if e.mimeData().hasUrls():
@@ -2258,10 +2308,12 @@ class FolderTree(ClickGuard, QTreeWidget):
 
     def dragLeaveEvent(self, e):
         self.set_highlight(None)
+        self._ds_stop()
         super().dragLeaveEvent(e)
 
     def dropEvent(self, e):
         self.set_highlight(None)
+        self._ds_stop()
         it = self.itemAt(e.position().toPoint())
         paths = [u.toLocalFile() for u in e.mimeData().urls() if u.isLocalFile()]
         e.setDropAction(Qt.DropAction.CopyAction)  # evita que la vista borre nada por su cuenta
@@ -7676,9 +7728,37 @@ class Main(QMainWindow):
     def delete_selected(self):
         self.delete_paths(self.active_tree.selected_dirs())
 
+    def ask_dir_drop(self, dirs, target, copy):
+        """Mover una carpeta arrastrándola es fácil de hacer sin querer (se suelta un poco más arriba o abajo):
+        antes se pregunta, con la opción de no volver a preguntar."""
+        if str(self.cfg.value("ask_dir_drop", "1")) != "1":
+            return True
+        names = ", ".join(f"«{os.path.basename(d.rstrip(os.sep))}»" for d in dirs[:3]) + ("…" if len(dirs) > 3 else "")
+        tgt = os.path.basename(target.rstrip(os.sep)) or target
+        mb = QMessageBox(self)
+        mb.setWindowTitle(T("Copiar carpeta") if copy else T("Mover carpeta"))
+        mb.setIcon(QMessageBox.Icon.Question)
+        mb.setText(T(f"¿{'Copiar' if copy else 'Mover'} {names} dentro de «{tgt}»?"))
+        mb.setInformativeText(target)
+        yes = mb.addButton(T("Copiar") if copy else T("Mover"), QMessageBox.ButtonRole.AcceptRole)
+        mb.addButton(T("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+        mb.setDefaultButton(yes)
+        cb = QCheckBox(T("No volver a preguntar"))
+        mb.setCheckBox(cb)
+        mb.exec()
+        ok = mb.clickedButton() is yes
+        if ok and cb.isChecked():
+            self.cfg.setValue("ask_dir_drop", "0")
+        return ok
+
     def defer_move(self, paths, target):
         """Mueve (o copia, con Ctrl) cuando termina el arrastre, para no recargar la lista en pleno arrastre."""
         copy = bool(QApplication.keyboardModifiers() & Qt.KeyboardModifier.ControlModifier)
+        dirs = [p for p in paths if os.path.isdir(p)]
+        if dirs:
+            QTimer.singleShot(0, lambda: self.ask_dir_drop(dirs, target, copy) and (
+                self.copy_items(paths, target) if copy else self.move_items(paths, target)))
+            return
         if copy:
             QTimer.singleShot(0, lambda: self.copy_items(paths, target))
         else:

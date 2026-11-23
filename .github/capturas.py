@@ -1341,6 +1341,47 @@ try:
 except Exception:
     print("FALLO columna", ascii(traceback.format_exc()), flush=True)
 
+# ---------------- arrastrar carpetas al árbol: desplazamiento suave y confirmación
+try:
+    T_ = w.tree
+    T_.verticalScrollBar().setValue(0)
+    for _ in range(2):
+        for it in list(T_.all_items())[:60]:
+            if it.data(0, mm.PATH_ROLE):
+                it.setExpanded(True)
+        wait(200)
+    T_.setMaximumHeight(140)   # árbol bajito para que haya algo que desplazar
+    wait(400)
+    sb = T_.verticalScrollBar()
+    print("arbol: max desplazamiento", sb.maximum(), flush=True)
+    v0 = sb.value()
+    T_.dragEnterEvent  # (sin arrastre real: se llama a la lógica del borde directamente)
+    T_.drag_edge(T_.viewport().height() - 3)
+    wait(250)
+    v_wait = sb.value()
+    wait(1000)
+    v1 = sb.value()
+    T_._ds_stop()
+    T_.setMaximumHeight(16777215)
+    print("arbol: borde ->", v0, "a los 0.25 s", v_wait, "al 1.25 s", v1, flush=True)
+    assert v_wait == v0 and 0 < v1 - v0 <= 260
+    A_ = os.path.join(root, "ArrastreA"); B_ = os.path.join(root, "ArrastreB")
+    os.makedirs(A_, exist_ok=True); os.makedirs(B_, exist_ok=True)
+    asked = []
+    _ask = w.ask_dir_drop
+    w.ask_dir_drop = lambda d, t, c: (asked.append((d, t)), False)[1]   # el usuario pulsa «Cancelar»
+    w.defer_move([A_], B_)
+    wait(400)
+    no_move = os.path.isdir(A_)
+    w.ask_dir_drop = lambda d, t, c: (asked.append((d, t)), True)[1]    # pulsa «Mover»
+    w.defer_move([A_], B_)
+    wait(800)
+    w.ask_dir_drop = _ask
+    print("arbol: preguntas", len(asked), "cancelado sigue en su sitio", no_move, "movida", os.path.isdir(os.path.join(B_, "ArrastreA")), flush=True)
+    assert no_move and os.path.isdir(os.path.join(B_, "ArrastreA")) and len(asked) == 2
+except Exception:
+    print("FALLO arbol", ascii(traceback.format_exc()), flush=True)
+
 # ---------------- «Unir carpeta de artistas con la biblioteca por géneros»
 try:
     import merge_folders, imageio_ffmpeg, subprocess as _sp

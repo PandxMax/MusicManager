@@ -1,6 +1,10 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.52', [
+        'Arrastrar al árbol de carpetas: el árbol ya no se desplaza a saltos ni cada vez más rápido. Solo se mueve si dejas el ratón un momento pegado al borde de arriba o de abajo, despacio, y más rápido cuanto más cerca del borde.',
+        'Al soltar una carpeta encima de otra se pregunta «¿Mover «X» dentro de «Y»?» antes de moverla, para no mandarla sin querer a la carpeta de al lado. Se puede marcar «No volver a preguntar».',
+    ]),
     ('2.51', [
         'La columna del árbol de carpetas ya no se ensancha sola ni se queda trabada: un nombre de archivo larguísimo sin espacios («Bryan_Adams_Have_You_Ever…mp3») en el aviso «De:» obligaba a la columna a ser igual de ancha y no dejaba mover la división. Ahora el nombre se recorta por el medio y se parte en líneas.',
     ]),

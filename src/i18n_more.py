@@ -2007,3 +2007,27 @@ ROWS += [
      "The folder tree column no longer widens by itself or gets stuck: a very long file name without spaces (\"Bryan_Adams_Have_You_Ever…mp3\") in the \"From:\" note forced the column to be that wide and the divider couldn't be moved. The name is now shortened in the middle and wrapped.",
      "Колонка дерева папок больше не расширяется сама и не застревает: очень длинное имя файла без пробелов («Bryan_Adams_Have_You_Ever…mp3») в подсказке «Откуда:» заставляло колонку быть такой же широкой, и разделитель нельзя было сдвинуть. Теперь имя сокращается посередине и переносится."),
 ]
+
+ROWS += [
+    ('Arrastrar al árbol de carpetas: el árbol ya no se desplaza a saltos ni cada vez más rápido. Solo se mueve si dejas el ratón un momento pegado al borde de arriba o de abajo, despacio, y más rápido cuanto más cerca del borde.',
+     'Dragging onto the folder tree: the tree no longer scrolls in jumps or faster and faster. It only moves if you keep the mouse at the top or bottom edge for a moment, slowly, and faster the closer to the edge.',
+     'Перетаскивание на дерево папок: дерево больше не прокручивается рывками и всё быстрее. Оно двигается, только если задержать мышь у верхнего или нижнего края, медленно, и быстрее у самого края.'),
+    ('Al soltar una carpeta encima de otra se pregunta «¿Mover «X» dentro de «Y»?» antes de moverla, para no mandarla sin querer a la carpeta de al lado. Se puede marcar «No volver a preguntar».',
+     'When you drop a folder onto another, it asks "Move X into Y?" before moving it, so it isn\'t sent to the neighbouring folder by accident. You can tick "Don\'t ask again".',
+     'При перетаскивании папки на другую спрашивается «Переместить X в Y?», чтобы случайно не отправить её в соседнюю папку. Можно отметить «Больше не спрашивать».'),
+    ('Mover carpeta',
+     'Move folder',
+     'Переместить папку'),
+    ('Copiar carpeta',
+     'Copy folder',
+     'Копировать папку'),
+    ('¿Mover %s dentro de «%s»?',
+     'Move %s into "%s"?',
+     'Переместить %s в «%s»?'),
+    ('¿Copiar %s dentro de «%s»?',
+     'Copy %s into "%s"?',
+     'Копировать %s в «%s»?'),
+    ('No volver a preguntar',
+     "Don't ask again",
+     'Больше не спрашивать'),
+]
