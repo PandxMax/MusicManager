@@ -1,6 +1,10 @@
 """Historial de novedades de cada versión (lo más nuevo arriba)."""
 
 CHANGELOG = [
+    ('2.53', [
+        '«Unir carpeta de artistas con la biblioteca» ahora también funciona con canciones sueltas (una carpeta de descargas sin subcarpetas): se agrupan por el artista de sus etiquetas o de su nombre («03. Amon Amarth - …») y van a la carpeta de ese artista en tu biblioteca.',
+        'Al unir, una carpeta de álbum llamada «Artista - Álbum» se reconoce y entra como subcarpeta dentro de la carpeta del artista.',
+    ]),
     ('2.52', [
         'Arrastrar al árbol de carpetas: el árbol ya no se desplaza a saltos ni cada vez más rápido. Solo se mueve si dejas el ratón un momento pegado al borde de arriba o de abajo, despacio, y más rápido cuanto más cerca del borde.',
         'Al soltar una carpeta encima de otra se pregunta «¿Mover «X» dentro de «Y»?» antes de moverla, para no mandarla sin querer a la carpeta de al lado. Se puede marcar «No volver a preguntar».',

@@ -2031,3 +2031,21 @@ ROWS += [
      "Don't ask again",
      'Больше не спрашивать'),
 ]
+
+ROWS += [
+    ('«Unir carpeta de artistas con la biblioteca» ahora también funciona con canciones sueltas (una carpeta de descargas sin subcarpetas): se agrupan por el artista de sus etiquetas o de su nombre («03. Amon Amarth - …») y van a la carpeta de ese artista en tu biblioteca.',
+     '"Merge artist folder with the library" now also works with loose songs (a downloads folder with no subfolders): they are grouped by the artist in their tags or name ("03. Amon Amarth - …") and go to that artist\'s folder in your library.',
+     '«Объединить папку исполнителей с библиотекой» теперь работает и с отдельными песнями (папка загрузок без подпапок): они группируются по исполнителю из тегов или имени («03. Amon Amarth - …») и попадают в папку этого исполнителя в библиотеке.'),
+    ('Al unir, una carpeta de álbum llamada «Artista - Álbum» se reconoce y entra como subcarpeta dentro de la carpeta del artista.',
+     'When merging, an album folder named "Artist - Album" is recognised and goes in as a subfolder of the artist\'s folder.',
+     'При объединении папка альбома «Исполнитель - Альбом» распознаётся и помещается подпапкой в папку исполнителя.'),
+    ('Canciones sueltas de este artista',
+     'Loose songs by this artist',
+     'Отдельные песни этого исполнителя'),
+    ('No se encontraron canciones: ni subcarpetas por artista ni canciones sueltas con artista.',
+     'No songs found: no artist subfolders and no loose songs with an artist.',
+     'Песни не найдены: нет подпапок исполнителей и отдельных песен с исполнителем.'),
+    ('Cada carpeta de artista se junta con la del mismo artista en tu biblioteca por géneros: sus canciones y álbumes pasan allí y la carpeta vacía desaparece. Las canciones sueltas (sin carpeta) van a la carpeta de su artista según sus etiquetas o su nombre. Los artistas que no están en la biblioteca puedes mandarlos a un género o dejarlos donde están. No se mueve nada hasta que pulses «Unir», y luego se puede deshacer con Ctrl+Alt+Z.',
+     'Each artist folder is merged with the same artist\'s folder in your genre library: its songs and albums move there and the empty folder disappears. Loose songs (without a folder) go to their artist\'s folder based on their tags or name. Artists not in the library can be sent to a genre or left where they are. Nothing moves until you press "Merge", and it can be undone with Ctrl+Alt+Z.',
+     'Каждая папка исполнителя объединяется с папкой того же исполнителя в библиотеке по жанрам: песни и альбомы переносятся туда, а пустая папка исчезает. Отдельные песни (без папки) попадают в папку своего исполнителя по тегам или имени. Исполнителей, которых нет в библиотеке, можно отправить в жанр или оставить. Ничего не перемещается, пока не нажмёте «Объединить», отменяется Ctrl+Alt+Z.'),
+]

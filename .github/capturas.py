@@ -1397,6 +1397,8 @@ try:
         shutil.copy(tiny, d)
     put(ua, "Bunbury", "01. Nueva.mp3"); put(ua, "Bunbury", "Album 1", "02. Del album.mp3")
     put(ua, "Café Tacvba", "03. Eres.mp3"); put(ua, "Nuevo Artista", "04. Algo.mp3"); put(ua, "Tungas", "05. Repetida.mp3")
+    put(ua, "07. Bunbury - Suelta.mp3")                                  # suelta, sin etiquetas: artista por el nombre
+    put(ua, "Tungas - Vamos Perdiendo (2014)", "01. Del disco.mp3")      # carpeta de álbum «Artista - Álbum»
     put(ug, "ROCK", "Español", "Rock Alternativo", "Bunbury", "10. Ya estaba.mp3")
     put(ug, "ROCK", "Español", "Rock Alternativo", "Bunbury", "Album 1", "11. Otra.mp3")
     put(ug, "ROCK", "Cafe Tacvba", "12. Vieja.mp3"); put(ug, "PUNK", "Tungas", "05. Repetida.mp3")
@@ -1410,7 +1412,7 @@ try:
     dlg.analyze()
     wait(300)
     shot(dlg, "s_unir_carpetas")
-    rows = [(os.path.basename(a), dlg.choice(cb)[0]) for a, _n, cb in dlg.rows]
+    rows = [(os.path.basename(a) if isinstance(a, str) else "suelta:" + a[1], dlg.choice(cb)[0]) for a, _n, cb in dlg.rows]
     print("unir filas:", ascii(rows), ascii(dlg.status.text()), flush=True)
     _q = merge_folders.QMessageBox.question
     _i = merge_folders.QMessageBox.information
@@ -1425,6 +1427,8 @@ try:
     assert os.path.join("Generos", "ROCK", "Cafe Tacvba", "03. Eres.mp3") in allf
     assert os.path.join("Artistas", "Nuevo Artista", "04. Algo.mp3") in allf
     assert os.path.join("Artistas", "Tungas", "05. Repetida.mp3") in allf
+    assert os.path.join(bun, "07. Bunbury - Suelta.mp3") in allf
+    assert os.path.join("Generos", "PUNK", "Tungas", "Tungas - Vamos Perdiendo (2014)", "01. Del disco.mp3") in allf
     assert not os.path.isdir(os.path.join(ua, "Bunbury"))
     dlg.close()
     w.undo_fs()

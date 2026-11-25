@@ -81,6 +81,29 @@ def plan_merge(src_dir, dst_dir, keep_both=False):
     return moves, dup
 
 
+def plan_files(files, dst_dir, keep_both=False):
+    """Como plan_merge, para canciones sueltas que van directo a la carpeta del artista."""
+    moves, dup = [], []
+    try:
+        existing = {e.name.lower(): e.name for e in os.scandir(dst_dir)}
+    except OSError:
+        existing = {}
+    for src in files:
+        f = os.path.basename(src)
+        if f.lower() in existing:
+            if not keep_both:
+                dup.append(src)
+                continue
+            root, ext = os.path.splitext(f)
+            n = 2
+            while f"{root} ({n}){ext}".lower() in existing:
+                n += 1
+            f = f"{root} ({n}){ext}"
+        existing[f.lower()] = f
+        moves.append((src, os.path.join(dst_dir, f)))
+    return moves, dup
+
+
 def remove_empty(folder):
     for d, dirs, files in os.walk(folder, topdown=False):
         try:
@@ -101,8 +124,9 @@ class MergeFoldersDialog(QDialog):
         v = QVBoxLayout(self)
         v.setContentsMargins(18, 16, 18, 14)
         v.setSpacing(10)
-        info = QLabel(T("Cada carpeta de artista de la izquierda se junta con la del mismo artista en tu biblioteca por "
-                        "géneros: sus canciones y álbumes pasan allí y la carpeta vacía desaparece. Los artistas que no "
+        info = QLabel(T("Cada carpeta de artista se junta con la del mismo artista en tu biblioteca por géneros: sus "
+                        "canciones y álbumes pasan allí y la carpeta vacía desaparece. Las canciones sueltas (sin "
+                        "carpeta) van a la carpeta de su artista según sus etiquetas o su nombre. Los artistas que no "
                         "están en la biblioteca puedes mandarlos a un género o dejarlos donde están. No se mueve nada "
                         "hasta que pulses «Unir», y luego se puede deshacer con Ctrl+Alt+Z."))
         info.setWordWrap(True)
@@ -184,25 +208,44 @@ class MergeFoldersDialog(QDialog):
             artists = sorted((e.path for e in os.scandir(src) if e.is_dir() and not e.name.startswith(".")),
                              key=lambda p: os.path.basename(p).lower())
             gen_rel = [os.path.relpath(g, dst) for g in genres if g != os.path.normpath(dst)]
-            for a in artists:
-                n = count_audio(a)
+            # canciones sueltas en la carpeta (sin subcarpeta por artista): se agrupan por el artista de sus etiquetas
+            # o, si falta, del nombre del archivo («03. Artista - Canción»)
+            import folders_by
+            loose = {}
+            for f in folders_by.audio_in(src):
+                art = folders_by.main_artist(self.main.val(f, "albumartist") or self.main.val(f, "artist")
+                                             or folders_by.artist_from_name(f))
+                art = folders_by.safe(art) if art else ""
+                if art:
+                    key = norm(art)
+                    loose.setdefault(key, [art, []])[1].append(f)
+            entries = [(a, os.path.basename(a), count_audio(a)) for a in artists]
+            entries += [(("files", name, fl), name, len(fl)) for name, fl in loose.values()]
+            entries.sort(key=lambda e: e[1].lower())
+            for a, name, n in entries:
                 if not n:
                     continue
-                cands = by_name.get(norm(os.path.basename(a)), [])
+                cands, sub = by_name.get(norm(name), []), ""
+                if not cands and isinstance(a, str) and " - " in name:
+                    # carpeta de álbum «Amon Amarth - Jomsviking (2016)»: entra como subcarpeta de «Amon Amarth»
+                    cands, sub = by_name.get(norm(name.split(" - ")[0]), []), name
                 # si el artista está en varios géneros, primero el que tiene más canciones
                 cands = sorted(cands, key=lambda c: -count_audio(c))
                 r = self.tb.rowCount()
                 self.tb.insertRow(r)
-                self.tb.setItem(r, 0, QTableWidgetItem(os.path.basename(a)))
+                self.tb.setItem(r, 0, QTableWidgetItem(name if isinstance(a, str) else "🎵 " + name))
+                if not isinstance(a, str):
+                    self.tb.item(r, 0).setToolTip(T("Canciones sueltas de este artista"))
                 it = QTableWidgetItem(str(n))
                 it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.tb.setItem(r, 1, it)
                 cb = QComboBox()
                 for c in cands:
-                    cb.addItem("🔗 " + os.path.relpath(c, dst), "join|" + c)
+                    tgt = os.path.join(c, sub) if sub else c
+                    cb.addItem("🔗 " + os.path.relpath(tgt, dst), "join|" + tgt)
                 cb.addItem(T("(dejar donde está)"), KEEP)
                 for g in gen_rel:
-                    cb.addItem("📁 " + os.path.join(g, os.path.basename(a)), "new|" + os.path.join(dst, g, os.path.basename(a)))
+                    cb.addItem("📁 " + os.path.join(g, name), "new|" + os.path.join(dst, g, name))
                 cb.setCurrentIndex(0 if cands else len(cands))
                 cb.currentIndexChanged.connect(self.refresh_status)
                 self.tb.setCellWidget(r, 2, cb)
@@ -230,7 +273,7 @@ class MergeFoldersDialog(QDialog):
             self.tb.item(r, 3).setText(txt)
         self.status.setText(T(f"{len(self.rows)} artistas · {joins} se unen con su carpeta · {news} van a un género nuevo · "
                               f"{keep} se quedan donde están.") if self.rows else
-                            T("La carpeta de artistas no tiene subcarpetas con canciones."))
+                            T("No se encontraron canciones: ni subcarpetas por artista ni canciones sueltas con artista."))
         self.go.setEnabled(joins + news > 0)
 
     # ------------------------------------------------------------ unir
@@ -241,7 +284,7 @@ class MergeFoldersDialog(QDialog):
             kind, target = self.choice(cb)
             if kind == KEEP:
                 continue
-            mv, dp = plan_merge(a, target, keep_both)
+            mv, dp = plan_merge(a, target, keep_both) if isinstance(a, str) else plan_files(a[2], target, keep_both)
             jobs += mv
             dups += dp
             used.append(a)
@@ -255,7 +298,7 @@ class MergeFoldersDialog(QDialog):
             return
         m = self.main
         try:
-            m.release_if([a for a in used])
+            m.release_if([a for a in used if isinstance(a, str)] + [f for a in used if not isinstance(a, str) for f in a[2]])
         except Exception:
             pass
 
@@ -273,7 +316,8 @@ class MergeFoldersDialog(QDialog):
             except Exception:
                 pass
         for a in used:
-            remove_empty(a)
+            if isinstance(a, str):
+                remove_empty(a)
         try:
             m.push_undo(T("unir carpetas"), moved)
             m.after_fs_change()
